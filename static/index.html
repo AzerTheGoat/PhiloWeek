@@ -162,12 +162,28 @@
             <input id="note-title-input" class="note-title-input" type="text" placeholder="Note title…">
             <input id="note-tags-input"  class="note-tags-input"  type="text" placeholder="Tags (comma-separated)">
           </div>
-          <div class="md-toolbar" aria-label="Formatting">
-            <button class="md-btn" data-action="bold"   title="Bold"><b>B</b></button>
-            <button class="md-btn" data-action="italic" title="Italic"><em>I</em></button>
-            <button class="md-btn" data-action="h2"     title="Heading">H2</button>
-            <button class="md-btn" data-action="quote"  title="Blockquote">❝</button>
-            <button class="md-btn" data-action="link"   title="Link">🔗</button>
+          <div class="md-toolbar" aria-label="Formatting" data-target="note-content" data-preview="note-preview">
+            <button class="md-btn" data-action="bold"      title="Gras"><strong>B</strong></button>
+            <button class="md-btn" data-action="italic"    title="Italique"><em>I</em></button>
+            <button class="md-btn" data-action="underline" title="Souligné"><u>U</u></button>
+            <button class="md-btn" data-action="strike"    title="Barré"><s>S</s></button>
+            <span class="md-sep"></span>
+            <button class="md-btn" data-action="h1" title="Titre 1">H1</button>
+            <button class="md-btn" data-action="h2" title="Titre 2">H2</button>
+            <button class="md-btn" data-action="h3" title="Titre 3">H3</button>
+            <span class="md-sep"></span>
+            <button class="md-btn" data-action="ul"    title="Liste à puces">• ≡</button>
+            <button class="md-btn" data-action="ol"    title="Liste numérotée">1. ≡</button>
+            <span class="md-sep"></span>
+            <button class="md-btn" data-action="quote" title="Citation">❝</button>
+            <button class="md-btn" data-action="code"  title="Code">&lt;/&gt;</button>
+            <button class="md-btn" data-action="table" title="Tableau">⊞</button>
+            <button class="md-btn" data-action="hr"    title="Séparateur">—</button>
+            <span class="md-sep"></span>
+            <button class="md-btn" data-action="link"  title="Lien">🔗</button>
+            <span class="md-sep"></span>
+            <button class="md-btn md-color-btn" data-color-type="color"     title="Couleur du texte"><span class="cp-label">A</span></button>
+            <button class="md-btn md-color-btn" data-color-type="highlight" title="Surligner"><span class="cp-label cp-hl">A</span></button>
           </div>
           <div class="md-split">
             <textarea id="note-content" class="md-input" placeholder="Write in Markdown…" spellcheck="true"></textarea>
@@ -188,11 +204,37 @@
 
       <!-- ── JOURNAL PANEL ────────────────────────────────────── -->
       <div class="tab-panel hidden" id="panel-journal" role="tabpanel">
-        <div class="journal-body">
-          <textarea id="journal-textarea" class="journal-textarea" placeholder="Notez vos réflexions sur cette question…" spellcheck="true"></textarea>
-          <div class="journal-footer">
-            <span class="save-indicator" id="journal-saved-indicator"></span>
+        <div class="md-toolbar" aria-label="Formatting" data-target="journal-textarea" data-preview="journal-preview">
+          <button class="md-btn" data-action="bold"      title="Gras"><strong>B</strong></button>
+          <button class="md-btn" data-action="italic"    title="Italique"><em>I</em></button>
+          <button class="md-btn" data-action="underline" title="Souligné"><u>U</u></button>
+          <button class="md-btn" data-action="strike"    title="Barré"><s>S</s></button>
+          <span class="md-sep"></span>
+          <button class="md-btn" data-action="h1" title="Titre 1">H1</button>
+          <button class="md-btn" data-action="h2" title="Titre 2">H2</button>
+          <button class="md-btn" data-action="h3" title="Titre 3">H3</button>
+          <span class="md-sep"></span>
+          <button class="md-btn" data-action="ul"    title="Liste à puces">• ≡</button>
+          <button class="md-btn" data-action="ol"    title="Liste numérotée">1. ≡</button>
+          <span class="md-sep"></span>
+          <button class="md-btn" data-action="quote" title="Citation">❝</button>
+          <button class="md-btn" data-action="code"  title="Code">&lt;/&gt;</button>
+          <button class="md-btn" data-action="table" title="Tableau">⊞</button>
+          <button class="md-btn" data-action="hr"    title="Séparateur">—</button>
+          <span class="md-sep"></span>
+          <button class="md-btn" data-action="link"  title="Lien">🔗</button>
+          <span class="md-sep"></span>
+          <button class="md-btn md-color-btn" data-color-type="color"     title="Couleur du texte"><span class="cp-label">A</span></button>
+          <button class="md-btn md-color-btn" data-color-type="highlight" title="Surligner"><span class="cp-label cp-hl">A</span></button>
+        </div>
+        <div class="md-split" style="flex:1;min-height:0;">
+          <textarea id="journal-textarea" class="md-input" placeholder="Notez vos réflexions sur cette question…" spellcheck="true"></textarea>
+          <div id="journal-preview" class="md-preview">
+            <p class="preview-placeholder"><em>La preview apparaîtra ici…</em></p>
           </div>
+        </div>
+        <div class="journal-footer">
+          <span class="save-indicator" id="journal-saved-indicator"></span>
         </div>
       </div>
 

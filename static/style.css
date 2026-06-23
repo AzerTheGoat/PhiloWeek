@@ -475,7 +475,20 @@ html, body {
 
 .md-toolbar {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.md-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 2px 3px;
+  flex-shrink: 0;
 }
 
 .md-btn {
@@ -562,6 +575,73 @@ html, body {
 .md-preview strong { font-weight: 600; }
 .md-preview em { font-style: italic; }
 .md-preview img { max-width: 100%; border-radius: 6px; margin: 8px 0; display: block; }
+.md-preview mark { border-radius: 3px; padding: 0 2px; }
+.md-preview table { border-collapse: collapse; width: 100%; margin-bottom: 12px; font-size: 0.9em; }
+.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 6px 12px; text-align: left; }
+.md-preview th { background: var(--hover); font-weight: 600; }
+
+/* ── Color picker popup ──────────────────────────────────────────────────── */
+.cp-label {
+  display: inline-block;
+  font-weight: 700;
+  border-bottom: 3px solid #ef4444;
+  line-height: 1.1;
+}
+.cp-label.cp-hl {
+  border-bottom: none;
+  background: #fef08a;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.cp-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  min-width: 200px;
+}
+
+.cp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cp-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.cp-swatch:hover { transform: scale(1.25); box-shadow: 0 0 0 2px var(--accent); }
+
+.cp-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.cp-custom-input {
+  width: 30px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 2px;
+  cursor: pointer;
+  background: none;
+}
 
 .editor-footer {
   display: flex;

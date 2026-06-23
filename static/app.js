@@ -508,78 +508,149 @@ async function deleteNoteById(id) {
   toast('Note supprimée.');
 }
 
-// Image paste into note
-function pasteImageIntoNote(e) {
+// ── Generic image paste ───────────────────────────────────────────────────────
+function pasteImage(e) {
   const items = [...(e.clipboardData?.items ?? [])];
   const imageItem = items.find(item => item.type.startsWith('image/'));
   if (!imageItem) return;
-
   e.preventDefault();
+
+  const ta = e.currentTarget;
+  const previewMap = { 'note-content': 'note-preview', 'journal-textarea': 'journal-preview' };
+  const preview = previewMap[ta.id] ? el(previewMap[ta.id]) : null;
+
   const file = imageItem.getAsFile();
   const objectUrl = URL.createObjectURL(file);
   const img = new Image();
-
   img.onload = () => {
     const MAX_W = 1200;
     let w = img.naturalWidth, h = img.naturalHeight;
     if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
-
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(objectUrl);
-
     const dataUrl = canvas.toDataURL('image/webp', 0.85);
-    const ta = el('note-content');
     const pos = ta.selectionStart;
     const insertion = `\n![image](${dataUrl})\n`;
     ta.value = ta.value.slice(0, pos) + insertion + ta.value.slice(ta.selectionEnd);
     ta.selectionStart = ta.selectionEnd = pos + insertion.length;
-    updateNotePreview();
+    if (preview) updatePreview(ta, preview);
   };
   img.src = objectUrl;
 }
 
-// Markdown toolbar
-function applyMdAction(action) {
-  const ta = el('note-content');
-  const start = ta.selectionStart;
-  const end   = ta.selectionEnd;
-  const sel   = ta.value.slice(start, end);
-  const before = ta.value.slice(0, start);
-  const after  = ta.value.slice(end);
+// ── Preview ───────────────────────────────────────────────────────────────────
+function updatePreview(ta, previewEl) {
+  const md = ta.value;
+  previewEl.innerHTML = md.trim()
+    ? marked.parse(md)
+    : '<p class="preview-placeholder"><em>Preview will appear here…</em></p>';
+}
+function updateNotePreview()    { updatePreview(el('note-content'),    el('note-preview')); }
+function updateJournalPreview() { updatePreview(el('journal-textarea'), el('journal-preview')); }
 
-  let insertion = '';
-  let cursorOffset = 0;
+// ── Color picker (singleton) ──────────────────────────────────────────────────
+const TEXT_COLORS = ['#000000','#374151','#6b7280','#ffffff','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899'];
+const HL_COLORS   = ['#fef08a','#bbf7d0','#bfdbfe','#fecaca','#f5d0fe','#fed7aa','#e2e8f0'];
 
+let _cpState = null;
+const _cpEl = (() => {
+  const d = document.createElement('div');
+  d.id = 'cp-popup';
+  d.className = 'cp-popup hidden';
+  document.body.appendChild(d);
+  return d;
+})();
+
+function openColorPicker(type, ta, preview, anchorBtn) {
+  if (!_cpEl.classList.contains('hidden') && _cpState?.btn === anchorBtn) {
+    _cpEl.classList.add('hidden'); _cpState = null; return;
+  }
+  _cpState = { type, ta, preview, btn: anchorBtn };
+  const colors = type === 'color' ? TEXT_COLORS : HL_COLORS;
+  _cpEl.innerHTML = `
+    <div class="cp-swatches">${colors.map(c =>
+      `<button class="cp-swatch" style="background:${c}" data-color="${c}" title="${c}"></button>`
+    ).join('')}</div>
+    <label class="cp-custom-row">
+      <input type="color" class="cp-custom-input" value="${type === 'color' ? '#000000' : '#fef08a'}">
+      <span>Personnalisée</span>
+    </label>`;
+  _cpEl.querySelector('.cp-custom-input').addEventListener('change', e => {
+    applyColorInsert(e.target.value);
+  });
+  const r = anchorBtn.getBoundingClientRect();
+  _cpEl.style.top  = (r.bottom + 6) + 'px';
+  _cpEl.style.left = Math.min(r.left, window.innerWidth - 220) + 'px';
+  _cpEl.classList.remove('hidden');
+}
+
+function applyColorInsert(color) {
+  if (!_cpState) return;
+  const { type, ta, preview } = _cpState;
+  ta.focus();
+  const s = ta.selectionStart, e2 = ta.selectionEnd;
+  const sel = ta.value.slice(s, e2) || 'texte';
+  const ins = type === 'color'
+    ? `<span style="color:${color}">${sel}</span>`
+    : `<mark style="background:${color}">${sel}</mark>`;
+  ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e2);
+  ta.selectionStart = ta.selectionEnd = s + ins.length;
+  updatePreview(ta, preview);
+  _cpEl.classList.add('hidden'); _cpState = null;
+}
+
+// ── Markdown toolbar actions ───────────────────────────────────────────────────
+function applyLinePrefix(ta, prefix, preview) {
+  const val = ta.value, pos = ta.selectionStart;
+  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+  const lineEnd   = val.indexOf('\n', pos);
+  const end       = lineEnd === -1 ? val.length : lineEnd;
+  const line      = val.slice(lineStart, end);
+  if (line.startsWith(prefix)) {
+    ta.value = val.slice(0, lineStart) + line.slice(prefix.length) + val.slice(end);
+    ta.selectionStart = ta.selectionEnd = Math.max(lineStart, pos - prefix.length);
+  } else {
+    ta.value = val.slice(0, lineStart) + prefix + line + val.slice(end);
+    ta.selectionStart = ta.selectionEnd = pos + prefix.length;
+  }
+  ta.focus();
+  updatePreview(ta, preview);
+}
+
+function applyMdAction(action, ta, preview) {
+  ta.focus();
+  const val = ta.value, start = ta.selectionStart, end = ta.selectionEnd;
+  const sel = val.slice(start, end);
+  const before = val.slice(0, start), after = val.slice(end);
+
+  const prefixes = { h1: '# ', h2: '## ', h3: '### ', ul: '- ', ol: '1. ', quote: '> ' };
+  if (action in prefixes) { applyLinePrefix(ta, prefixes[action], preview); return; }
+
+  let ins = '', cursor = null;
   switch (action) {
-    case 'bold':
-      insertion = `**${sel || 'bold text'}**`;
-      cursorOffset = sel ? insertion.length : 2;
-      break;
-    case 'italic':
-      insertion = `*${sel || 'italic text'}*`;
-      cursorOffset = sel ? insertion.length : 1;
-      break;
-    case 'h2':
-      insertion = `## ${sel || 'Heading'}`;
-      cursorOffset = insertion.length;
-      break;
-    case 'quote':
-      insertion = `> ${sel || 'quoted text'}`;
-      cursorOffset = insertion.length;
-      break;
-    case 'link':
-      insertion = sel ? `[${sel}](url)` : '[link text](url)';
-      cursorOffset = sel ? insertion.length - 1 : 1;
-      break;
+    case 'bold':      ins = `**${sel || 'texte'}**`;        cursor = sel ? null : start + 2; break;
+    case 'italic':    ins = `*${sel || 'texte'}*`;          cursor = sel ? null : start + 1; break;
+    case 'underline': ins = `<u>${sel || 'texte'}</u>`;     cursor = sel ? null : start + 3; break;
+    case 'strike':    ins = `~~${sel || 'texte'}~~`;        cursor = sel ? null : start + 2; break;
+    case 'code':
+      ins = sel.includes('\n') ? `\`\`\`\n${sel}\n\`\`\`` : `\`${sel || 'code'}\``;
+      cursor = sel ? null : start + 1; break;
+    case 'link': {
+      const url = prompt('URL :') || 'https://';
+      ins = `[${sel || 'texte'}](${url})`; break;
+    }
+    case 'table':
+      ins = `\n| Colonne 1 | Colonne 2 | Colonne 3 |\n|-----------|-----------|----------|\n| Cellule   | Cellule   | Cellule   |\n`; break;
+    case 'hr':
+      ins = `\n\n---\n\n`; break;
   }
 
-  ta.value = before + insertion + after;
-  const pos = start + cursorOffset;
-  ta.setSelectionRange(pos, pos);
-  ta.focus();
-  updateNotePreview();
+  ta.value = before + ins + after;
+  const p = cursor ?? (start + ins.length);
+  ta.setSelectionRange(p, p);
+  updatePreview(ta, preview);
 }
 
 // ── Journal ───────────────────────────────────────────────────────────────────
@@ -594,6 +665,7 @@ async function loadJournal() {
 function loadJournalContent() {
   el('journal-textarea').value = state.journalEntry?.content ?? '';
   el('journal-saved-indicator').textContent = '';
+  updateJournalPreview();
 }
 
 let journalSaveTimer = null;
@@ -605,6 +677,7 @@ async function saveJournal(content) {
 }
 
 function scheduleJournalSave() {
+  updateJournalPreview();
   clearTimeout(journalSaveTimer);
   journalSaveTimer = setTimeout(async () => {
     const content = el('journal-textarea').value;
@@ -1305,8 +1378,32 @@ function bindGlobalEvents() {
     switchTab(tab);
   });
 
-  document.addEventListener('click', () => {
+  document.addEventListener('click', e => {
     el('tab-add-menu').classList.add('hidden');
+    if (!_cpEl.contains(e.target) && !e.target.closest('.md-color-btn')) {
+      _cpEl.classList.add('hidden'); _cpState = null;
+    }
+  });
+
+  // Toolbar delegation (notes + journal)
+  document.querySelectorAll('.md-toolbar').forEach(toolbar => {
+    toolbar.addEventListener('click', e => {
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action], .md-color-btn');
+      if (!btn) return;
+      const ta      = el(toolbar.dataset.target);
+      const preview = toolbar.dataset.preview ? el(toolbar.dataset.preview) : null;
+      if (!ta) return;
+      if (btn.dataset.action)    applyMdAction(btn.dataset.action, ta, preview);
+      else if (btn.dataset.colorType) openColorPicker(btn.dataset.colorType, ta, preview, btn);
+    });
+  });
+
+  // Color picker swatches
+  _cpEl.addEventListener('click', e => {
+    e.stopPropagation();
+    const swatch = e.target.closest('.cp-swatch');
+    if (swatch) applyColorInsert(swatch.dataset.color);
   });
 
   // Notes
@@ -1315,13 +1412,11 @@ function bindGlobalEvents() {
   el('cancel-note-btn').addEventListener('click', closeNoteEditor);
   el('delete-note-btn').addEventListener('click', deleteNote);
   el('note-content').addEventListener('input', updateNotePreview);
-  el('note-content').addEventListener('paste', pasteImageIntoNote);
-  document.querySelectorAll('.md-btn').forEach(btn => {
-    btn.addEventListener('click', () => applyMdAction(btn.dataset.action));
-  });
+  el('note-content').addEventListener('paste', pasteImage);
 
   // Journal
   el('journal-textarea').addEventListener('input', scheduleJournalSave);
+  el('journal-textarea').addEventListener('paste', pasteImage);
 
   // Resources
   el('new-resource-btn').addEventListener('click', () => {
