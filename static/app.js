@@ -187,7 +187,7 @@ async function loadQuestions() {
 function renderSidebar() {
   const list = el('questions-list');
   if (!state.questions.length) {
-    list.innerHTML = emptyState('No questions yet.');
+    list.innerHTML = emptyState('Aucun sujet pour l\'instant.');
     return;
   }
   list.innerHTML = state.questions.map(q => `
@@ -207,9 +207,9 @@ function renderSidebar() {
       CtxMenu.show(e.clientX, e.clientY, {
         edit: () => { selectQuestion(q.id); setTimeout(openEditQuestion, 50); },
         delete: () => showConfirm({
-          icon: '❓',
-          title: 'Supprimer cette question ?',
-          body: `"${q.title}" et toutes ses données (notes, journal, ressources…) seront supprimées définitivement.`,
+          icon: '🗑️',
+          title: 'Supprimer ce sujet ?',
+          body: `"${q.title}" et toutes ses données (notes, ressources…) seront supprimées définitivement.`,
           onConfirm: () => deleteQuestionById(q.id),
         }),
       });
@@ -266,10 +266,10 @@ function showMobileHome() {
 
 // ── Question modal ─────────────────────────────────────────────────────────────
 function openNewQuestion() {
-  el('qm-heading').textContent = 'New Question';
+  el('qm-heading').textContent = 'Nouveau sujet';
   el('qm-title').value = '';
   el('qm-desc').value  = '';
-  el('qm-save').textContent = 'Create Question';
+  el('qm-save').textContent = 'Créer le sujet';
   el('qm-delete').classList.add('hidden');
   el('qm-save').dataset.mode = 'create';
   el('question-modal').classList.remove('hidden');
@@ -279,10 +279,10 @@ function openNewQuestion() {
 function openEditQuestion() {
   if (!state.currentQuestion) return;
   const q = state.currentQuestion;
-  el('qm-heading').textContent = 'Edit Question';
+  el('qm-heading').textContent = 'Modifier le sujet';
   el('qm-title').value = q.title;
   el('qm-desc').value  = q.description || '';
-  el('qm-save').textContent = 'Save Changes';
+  el('qm-save').textContent = 'Sauvegarder';
   el('qm-save').dataset.mode = 'edit';
   el('qm-delete').classList.remove('hidden');
   el('question-modal').classList.remove('hidden');
@@ -296,7 +296,7 @@ function closeQuestionModal() {
 async function saveQuestion() {
   const title = el('qm-title').value.trim();
   const desc  = el('qm-desc').value.trim();
-  if (!title) { toast('Please enter a question.'); return; }
+  if (!title) { toast('Veuillez saisir un titre.'); return; }
 
   const mode = el('qm-save').dataset.mode;
   if (mode === 'create') {
@@ -305,7 +305,7 @@ async function saveQuestion() {
     closeQuestionModal();
     await selectQuestion(q.id);
     switchTab('programme');
-    toast('Question créée — définissez votre programme.');
+    toast('Sujet créé — définissez votre programme.');
   } else {
     const q = await PUT(`/api/questions/${state.currentQuestion.id}`, { title, description: desc });
     const idx = state.questions.findIndex(x => x.id === q.id);
@@ -315,15 +315,15 @@ async function saveQuestion() {
     el('q-desc').textContent  = q.description || '';
     renderSidebar();
     closeQuestionModal();
-    toast('Question updated.');
+    toast('Sujet modifié.');
   }
 }
 
 async function deleteQuestion() {
   if (!state.currentQuestion) return;
   showConfirm({
-    icon: '❓',
-    title: 'Supprimer cette question ?',
+    icon: '🗑️',
+    title: 'Supprimer ce sujet ?',
     body: `"${state.currentQuestion.title}" et toutes ses données seront supprimées définitivement.`,
     onConfirm: () => deleteQuestionById(state.currentQuestion.id),
   });
@@ -340,7 +340,7 @@ async function deleteQuestionById(id) {
     el('root-empty-state').classList.remove('hidden');
   }
   renderSidebar();
-  toast(`"${q?.title || 'Question'}" supprimée.`);
+  toast(`"${q?.title || 'Sujet'}" supprimé.`);
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -412,7 +412,7 @@ async function loadNotes() {
 function renderNotesList() {
   const list = el('notes-list');
   if (!state.notes.length) {
-    list.innerHTML = emptyState('No notes yet. Start with a question that troubles you.');
+    list.innerHTML = emptyState('Aucune note pour l\'instant.');
     return;
   }
   list.innerHTML = state.notes.map(n => {
@@ -1744,7 +1744,7 @@ const Tour = {
       emoji: '🧠',
       title: 'Bienvenue dans PhiloWeek',
       titleReturn: 'Visite guidée de PhiloWeek',
-      body: 'Un espace focalisé pour l\'enquête philosophique. Une question à la fois — explorée à travers des notes, un journal, des ressources et un assistant IA.',
+      body: 'Un espace focalisé pour l\'exploration intellectuelle. Un sujet à la fois — exploré à travers des notes, des ressources, un rapport et un assistant IA.',
       bodyReturn: 'Rappel rapide de tout ce que vous pouvez faire dans PhiloWeek. Prenez 2 minutes ou cliquez sur Skip.',
     },
     // 1 ── Sidebar
@@ -1752,8 +1752,8 @@ const Tour = {
       target: '.sidebar',
       position: 'right',
       emoji: '📋',
-      title: 'Vos questions',
-      body: 'Toutes vos questions philosophiques apparaissent ici dans la barre latérale. La question active est marquée d\'une bordure indigo. Cliquez pour sélectionner, clic droit pour modifier ou supprimer.',
+      title: 'Vos sujets',
+      body: 'Tous vos sujets apparaissent ici dans la barre latérale. Le sujet actif est marqué d\'une bordure indigo. Cliquez pour sélectionner, clic droit pour modifier ou supprimer.',
     },
     // 2 ── Right-click menu
     {
@@ -1761,23 +1761,23 @@ const Tour = {
       position: 'right',
       emoji: '🖱️',
       title: 'Clic droit — Modifier & Supprimer',
-      body: 'Sur n\'importe quel élément créé (question, note, ressource, activité, session, note vocale), faites un clic droit pour accéder aux options Modifier et Supprimer. Une confirmation s\'affiche avant chaque suppression.',
+      body: 'Sur n\'importe quel élément créé (sujet, note, ressource, activité, session, note vocale), faites un clic droit pour accéder aux options Modifier et Supprimer. Une confirmation s\'affiche avant chaque suppression.',
     },
     // 3 ── New question button
     {
       target: '#new-question-btn',
       position: 'right',
       emoji: '✨',
-      title: 'Créer une nouvelle question',
-      body: 'Cliquez sur + pour formuler votre question de la semaine. Donnez-lui un titre précis et un contexte : qu\'est-ce qui vous attire vers cette question ? Pourquoi maintenant ?',
+      title: 'Créer un nouveau sujet',
+      body: 'Cliquez sur + pour créer un nouveau sujet à explorer. Donnez-lui un titre précis et un contexte : qu\'est-ce qui vous attire vers ce sujet ? Pourquoi maintenant ?',
     },
     // 3 ── Question header
     {
       target: '.question-header',
       position: 'bottom',
       emoji: '📖',
-      title: 'En-tête de la question',
-      body: 'Votre question active et sa description s\'affichent ici. Utilisez le bouton Modifier pour affiner votre question au fil de votre réflexion — une bonne question évolue.',
+      title: 'En-tête du sujet',
+      body: 'Le titre et la description de votre sujet actif s\'affichent ici. Utilisez le bouton Modifier pour affiner votre angle au fil de votre réflexion.',
     },
     // 4 ── Stats row
     {
@@ -1785,7 +1785,7 @@ const Tour = {
       position: 'bottom',
       emoji: '📊',
       title: 'Progression en un coup d\'œil',
-      body: 'Quatre indicateurs clés : minutes d\'étude, notes rédigées, journal rédigé et ressources consultées. Ils se mettent à jour en temps réel.',
+      body: 'Trois indicateurs clés : minutes d\'étude, notes rédigées et ressources consultées. Ils se mettent à jour en temps réel.',
     },
     // 5 ── Notes tab
     {
@@ -1889,7 +1889,7 @@ const Tour = {
       position: 'center',
       emoji: '🚀',
       title: 'Vous êtes prêt',
-      body: 'Commencez par une question qui vous trouble vraiment. La qualité de l\'enquête dépend entièrement de la qualité de la question — soyez précis, soyez honnête.',
+      body: 'Commencez par un sujet qui vous attire vraiment. La qualité de l\'exploration dépend de la précision du sujet — soyez curieux, soyez honnête.',
     },
   ],
 

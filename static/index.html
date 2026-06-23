@@ -20,17 +20,17 @@
 <!-- Question modal -->
 <div id="question-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
   <div class="modal">
-    <h2 class="modal-heading" id="qm-heading">New Question</h2>
+    <h2 class="modal-heading" id="qm-heading">Nouveau sujet</h2>
     <div class="form-group">
-      <label class="form-label" for="qm-title">Question</label>
-      <input id="qm-title" class="form-input" type="text" placeholder="What is…" autocomplete="off">
+      <label class="form-label" for="qm-title">Titre du sujet</label>
+      <input id="qm-title" class="form-input" type="text" placeholder="Nom du sujet à explorer…" autocomplete="off">
     </div>
     <div class="form-group">
       <label class="form-label" for="qm-desc">Description</label>
-      <textarea id="qm-desc" class="form-input" rows="5" placeholder="Context, background, initial thoughts…"></textarea>
+      <textarea id="qm-desc" class="form-input" rows="5" placeholder="Contexte, angle d'approche, premières réflexions…"></textarea>
     </div>
     <div class="form-actions">
-      <button class="btn-primary" id="qm-save">Create Question</button>
+      <button class="btn-primary" id="qm-save">Créer le sujet</button>
       <button class="btn-ghost" id="qm-cancel">Cancel</button>
       <button class="btn-danger hidden" id="qm-delete">Delete</button>
     </div>
@@ -53,12 +53,12 @@
         <button class="btn-icon" id="citations-library-btn" title="Bibliothèque des citations" aria-label="Toutes les citations">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 3.5C2 2.67 2.67 2 3.5 2H6v5H3.5A1.5 1.5 0 012 5.5V3.5z" fill="currentColor" opacity=".35"/><path d="M8 3.5C8 2.67 8.67 2 9.5 2H12v5H9.5A1.5 1.5 0 018 5.5V3.5z" fill="currentColor" opacity=".35"/><path d="M2 3.5C2 2.67 2.67 2 3.5 2H6v5H3.5A1.5 1.5 0 012 5.5V3.5zM8 3.5C8 2.67 8.67 2 9.5 2H12v5H9.5A1.5 1.5 0 018 5.5V3.5z" stroke="currentColor" stroke-width="1.4"/><path d="M6 7v4a4 4 0 004 4M10 7v4a4 4 0 01-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>
-        <button class="btn-icon" id="new-question-btn" title="New question" aria-label="New question">
+        <button class="btn-icon" id="new-question-btn" title="Nouveau sujet" aria-label="Nouveau sujet">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
       </div>
     </div>
-    <nav class="sidebar-questions" id="questions-list" aria-label="Questions">
+    <nav class="sidebar-questions" id="questions-list" aria-label="Sujets">
       <!-- populated by JS -->
     </nav>
   </aside>
@@ -68,19 +68,19 @@
 
     <!-- Mobile top bar (detail view header) -->
     <div class="mobile-topbar" id="mobile-topbar">
-      <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Retour aux questions">
+      <button class="mobile-back-btn" id="mobile-back-btn" aria-label="Retour aux sujets">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12 4l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Questions</span>
+        <span>Sujets</span>
       </button>
       <span class="mobile-topbar-title" id="mobile-q-title"></span>
-      <button class="btn-icon" id="mobile-edit-btn" title="Modifier la question">
+      <button class="btn-icon" id="mobile-edit-btn" title="Modifier le sujet">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
 
     <!-- Empty state -->
     <div class="root-empty-state" id="root-empty-state">
-      <p><em>No question selected. Begin by creating a question that troubles you.</em></p>
+      <p><em>Aucun sujet sélectionné. Commencez par créer un sujet à explorer.</em></p>
     </div>
 
     <!-- Citations library (global, all questions) -->
@@ -121,7 +121,7 @@
         </div>
         <div class="question-header-actions">
           <button class="btn-secondary" id="export-btn">Export .md</button>
-          <button class="btn-ghost" id="edit-question-btn">Edit</button>
+          <button class="btn-ghost" id="edit-question-btn">Modifier</button>
         </div>
       </header>
 
