@@ -2223,11 +2223,7 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
   /* Voice notes */
   .voice-note-card { flex-wrap: wrap; }
 
-  /* Tour card */
-  .tour-card {
-    width: calc(100vw - 32px);
-    left: 16px !important;
-    right: 16px !important;
-    transform: none !important;
-  }
+  /* Tour card: narrower on mobile, let JS handle position */
+  .tour-card { max-width: calc(100vw - 32px); }
+  .tour-card.tour-center { width: calc(100vw - 32px); }
 }
