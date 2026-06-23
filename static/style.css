@@ -1807,6 +1807,88 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
 
 .voice-note-delete:hover { color: var(--danger); background: var(--danger-dim); }
 
+/* ── Citations ───────────────────────────────────────────────────────────── */
+.citations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.citation-form {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow);
+}
+
+.citation-text-input {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-style: italic;
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.65;
+}
+
+.citation-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.citation-card {
+  position: relative;
+  background: var(--card);
+  border-radius: 10px;
+  padding: 18px 46px 16px 20px;
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s;
+}
+.citation-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.10); }
+
+.citation-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0;
+  color: var(--placeholder);
+  transition: opacity 0.15s, color 0.12s;
+  padding: 5px;
+  border-radius: 6px;
+}
+.citation-card:hover .citation-delete-btn { opacity: 1; }
+.citation-delete-btn:hover { color: var(--danger); background: var(--danger-dim); }
+
+.citation-text {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-style: italic;
+  line-height: 1.75;
+  color: var(--text);
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  border: none;
+  padding: 0;
+}
+
+.citation-attribution {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 0;
+  font-style: normal;
+}
+
+/* Mobile: show delete button always (no hover on touch) */
+@media (max-width: 768px) {
+  .citation-delete-btn { opacity: 1; }
+  .citation-meta-row { grid-template-columns: 1fr; }
+}
+
 /* ── Context Menu ────────────────────────────────────────────────────────── */
 .ctx-menu {
   position: fixed;

@@ -119,6 +119,7 @@
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="journal">Journal</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="rapport">Rapport</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="voix">Voix</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="citations">Citations</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="resources">Ressources</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="timer">Timer</button>
         <div class="tab-add-wrapper">
@@ -248,6 +249,29 @@
         <div class="journal-footer">
           <span class="save-indicator" id="journal-saved-indicator"></span>
         </div>
+      </div>
+
+      <!-- ── CITATIONS PANEL ────────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-citations" role="tabpanel">
+
+        <div class="panel-toolbar">
+          <button class="btn-primary" id="new-citation-btn">+ Ajouter une citation</button>
+        </div>
+
+        <div class="citation-form hidden" id="citation-form">
+          <textarea id="citation-text" class="form-input citation-text-input" rows="4"
+            placeholder="« La citation, l'extrait, la pensée que vous voulez retenir… »"></textarea>
+          <div class="citation-meta-row">
+            <input id="citation-author" class="form-input" type="text" placeholder="Auteur (optionnel)">
+            <input id="citation-source" class="form-input" type="text" placeholder="Source, ouvrage… (optionnel)">
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="save-citation-btn">Sauvegarder</button>
+            <button class="btn-ghost"   id="cancel-citation-btn">Annuler</button>
+          </div>
+        </div>
+
+        <div id="citations-list" class="citations-list"></div>
       </div>
 
       <!-- ── RESOURCES PANEL ──────────────────────────────────── -->
@@ -477,6 +501,10 @@
     <button class="mobile-sheet-item" data-tab="voix">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="7" y="2" width="6" height="9" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M4 10a6 6 0 0012 0M10 16v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       Notes vocales
+    </button>
+    <button class="mobile-sheet-item" data-tab="citations">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6c0-1.1.9-2 2-2h2v4H5a2 2 0 01-2-2zM10 6c0-1.1.9-2 2-2h2v4h-2a2 2 0 01-2-2z" fill="currentColor" opacity=".4"/><path d="M3 6c0-1.1.9-2 2-2h2v4H5a2 2 0 01-2-2zM10 6c0-1.1.9-2 2-2h2v4h-2a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.4"/><path d="M7 8v5a4 4 0 004 4M14 8v5a4 4 0 01-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Citations & Extraits
     </button>
     <div class="mobile-sheet-sep"></div>
     <button class="mobile-sheet-item" id="mobile-export-btn">

@@ -72,3 +72,10 @@ class ProgrammeItemUpdate(BaseModel):
 
 class RapportSave(BaseModel):
     content: str
+
+
+class CitationCreate(BaseModel):
+    question_id: int
+    content: str
+    author: Optional[str] = ""
+    source: Optional[str] = ""

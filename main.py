@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from database import init_db
-from routes import questions, notes, journal, resources, sessions, programme, rapport, voice, ai_route, export_route
+from routes import questions, notes, journal, resources, sessions, programme, rapport, voice, ai_route, export_route, citations
 
 APP_SESSION_ID = str(uuid.uuid4())
 
@@ -39,6 +39,7 @@ app.include_router(rapport.router)
 app.include_router(voice.router)
 app.include_router(ai_route.router)
 app.include_router(export_route.router)
+app.include_router(citations.router)
 
 # Static files (must be last)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

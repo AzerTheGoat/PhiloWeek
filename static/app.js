@@ -15,6 +15,7 @@ const state = {
   rapport:          { content: '' },
   rapportMode:      'edit',
   voiceNotes:       [],
+  citations:        [],
   stats:            null,
   activeTab:        'programme',
   visibleTabs:      new Set(['programme']),
@@ -240,7 +241,7 @@ async function selectQuestion(id) {
   // Load data
   await Promise.all([
     loadStats(), loadNotes(), loadJournal(), loadResources(),
-    loadSessions(), loadProgramme(), loadRapport(), loadVoiceNotes(),
+    loadSessions(), loadProgramme(), loadRapport(), loadVoiceNotes(), loadCitations(),
   ]);
 
   updateVisibleTabs();
@@ -353,9 +354,9 @@ async function loadStats() {
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const TAB_LABELS = {
   notes: 'Notes', journal: 'Journal', rapport: 'Rapport',
-  voix: 'Voix', resources: 'Ressources', timer: 'Timer',
+  voix: 'Voix', citations: 'Citations', resources: 'Ressources', timer: 'Timer',
 };
-const ALL_OPTIONAL_TABS = ['notes', 'journal', 'rapport', 'voix', 'resources', 'timer'];
+const ALL_OPTIONAL_TABS = ['notes', 'journal', 'rapport', 'voix', 'citations', 'resources', 'timer'];
 
 function updateVisibleTabs() {
   if (!el('tab-add-btn')) return;
@@ -363,6 +364,7 @@ function updateVisibleTabs() {
   if (state.journalEntry?.content?.trim()) state.visibleTabs.add('journal');
   if (state.rapport?.content?.trim())      state.visibleTabs.add('rapport');
   if (state.voiceNotes.length > 0)         state.visibleTabs.add('voix');
+  if (state.citations.length > 0)          state.visibleTabs.add('citations');
   if (state.resources.length > 0)          state.visibleTabs.add('resources');
   if (state.sessions.length > 0)           state.visibleTabs.add('timer');
 
@@ -1326,6 +1328,53 @@ async function generateAI() {
   }
 }
 
+// ── Citations ─────────────────────────────────────────────────────────────────
+async function loadCitations() {
+  if (!state.currentQuestion) return;
+  state.citations = await GET(`/api/citations?question_id=${state.currentQuestion.id}`);
+  if (state.activeTab === 'citations') renderCitations();
+  updateVisibleTabs();
+}
+
+function renderCitations() {
+  const list = el('citations-list');
+  if (!list) return;
+  if (!state.citations.length) {
+    list.innerHTML = '<p class="empty-state"><em>Aucune citation pour l\'instant. Cliquez sur « + Ajouter une citation » pour commencer.</em></p>';
+    return;
+  }
+  list.innerHTML = state.citations.map(c => `
+    <div class="citation-card" data-citation-id="${c.id}">
+      <button class="citation-delete-btn btn-icon" data-id="${c.id}" title="Supprimer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
+      <blockquote class="citation-text">${escapeHtml(c.content)}</blockquote>
+      ${c.author || c.source ? `<p class="citation-attribution">— ${[c.author, c.source].filter(Boolean).map(escapeHtml).join(' · ')}</p>` : ''}
+    </div>
+  `).join('');
+}
+
+async function saveCitation() {
+  const content = el('citation-text').value.trim();
+  if (!content) { toast('La citation ne peut pas être vide.'); return; }
+  const author = el('citation-author').value.trim();
+  const source = el('citation-source').value.trim();
+  await POST('/api/citations', { question_id: state.currentQuestion.id, content, author, source });
+  el('citation-text').value   = '';
+  el('citation-author').value = '';
+  el('citation-source').value = '';
+  el('citation-form').classList.add('hidden');
+  await loadCitations();
+  toast('Citation ajoutée.');
+}
+
+async function deleteCitationById(id) {
+  await DEL(`/api/citations/${id}`);
+  state.citations = state.citations.filter(c => c.id !== id);
+  renderCitations();
+  updateVisibleTabs();
+}
+
 // ── Export ────────────────────────────────────────────────────────────────────
 function exportMarkdown() {
   if (!state.currentQuestion) return;
@@ -1431,6 +1480,25 @@ function bindGlobalEvents() {
   // Journal
   el('journal-textarea').addEventListener('input', scheduleJournalSave);
   el('journal-textarea').addEventListener('paste', pasteImage);
+
+  // Citations
+  el('new-citation-btn').addEventListener('click', () => {
+    el('citation-form').classList.toggle('hidden');
+    if (!el('citation-form').classList.contains('hidden')) el('citation-text').focus();
+  });
+  el('cancel-citation-btn').addEventListener('click', () => el('citation-form').classList.add('hidden'));
+  el('save-citation-btn').addEventListener('click', saveCitation);
+  el('citations-list').addEventListener('click', e => {
+    const btn = e.target.closest('.citation-delete-btn');
+    if (!btn) return;
+    showConfirm({
+      icon: '❝',
+      title: 'Supprimer cette citation ?',
+      body: 'Cette citation sera supprimée définitivement.',
+      label: 'Supprimer',
+      onConfirm: () => deleteCitationById(Number(btn.dataset.id)),
+    });
+  });
 
   // Resources
   el('new-resource-btn').addEventListener('click', () => {
@@ -1700,7 +1768,15 @@ const Tour = {
       title: 'Mode sombre / clair',
       body: 'Basculez entre le mode clair et le mode sombre à tout moment. Votre préférence est sauvegardée automatiquement.',
     },
-    // 12 ── Add-tab button
+    // 12 ── Citations tab
+    {
+      target: '[data-tab="citations"]',
+      position: 'bottom',
+      emoji: '❝',
+      title: 'Citations & Extraits',
+      body: 'Sauvegardez vos citations préférées, extraits de lecture et pensées marquantes liés à votre question. Ajoutez l\'auteur et la source pour chaque entrée.',
+    },
+    // 13 ── Add-tab button
     {
       target: '#tab-add-btn',
       position: 'bottom',
@@ -1708,7 +1784,7 @@ const Tour = {
       title: 'Sections à la demande',
       body: 'Les onglets n\'apparaissent que quand vous avez du contenu. Cliquez sur "+" pour ouvrir une section vide — Journal, Notes, Timer, etc.',
     },
-    // 13 ── Finish (no spotlight)
+    // 14 ── Finish (no spotlight)
     {
       target: null,
       position: 'center',

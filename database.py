@@ -96,6 +96,16 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS citations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            author TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        );
     """)
 
     cur = conn.cursor()
