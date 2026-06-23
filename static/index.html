@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhiloWeek</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<!-- Toast container -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- Question modal -->
+<div id="question-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 class="modal-heading" id="qm-heading">New Question</h2>
+    <div class="form-group">
+      <label class="form-label" for="qm-title">Question</label>
+      <input id="qm-title" class="form-input" type="text" placeholder="What is…" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="qm-desc">Description</label>
+      <textarea id="qm-desc" class="form-input" rows="5" placeholder="Context, background, initial thoughts…"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" id="qm-save">Create Question</button>
+      <button class="btn-ghost" id="qm-cancel">Cancel</button>
+      <button class="btn-danger hidden" id="qm-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-layout">
+
+  <!-- ── Left Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">PhiloWeek</span>
+      <div class="sidebar-header-actions">
+        <button class="btn-icon" id="tour-launch" title="Lancer le tutoriel" aria-label="Lancer le tutoriel">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.6"/><text x="8" y="12" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor" font-family="sans-serif">?</text></svg>
+        </button>
+        <button class="btn-icon" id="theme-toggle" title="Changer le thème" aria-label="Basculer mode sombre/clair">
+          <!-- icon injected by JS -->
+        </button>
+        <button class="btn-icon" id="new-question-btn" title="New question" aria-label="New question">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="sidebar-questions" id="questions-list" aria-label="Questions">
+      <!-- populated by JS -->
+    </nav>
+  </aside>
+
+  <!-- ── Main Content ──────────────────────────────────────────── -->
+  <main class="main-content" id="main-content">
+
+    <!-- Empty state -->
+    <div class="root-empty-state" id="root-empty-state">
+      <p><em>No question selected. Begin by creating a question that troubles you.</em></p>
+    </div>
+
+    <!-- Question view -->
+    <div class="question-view hidden" id="question-view">
+
+      <!-- Header -->
+      <header class="question-header">
+        <div class="question-meta">
+          <h1 class="question-title" id="q-title"></h1>
+          <p class="question-desc" id="q-desc"></p>
+        </div>
+        <div class="question-header-actions">
+          <button class="btn-secondary" id="export-btn">Export .md</button>
+          <button class="btn-ghost" id="edit-question-btn">Edit</button>
+        </div>
+      </header>
+
+      <!-- Stat cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-number" id="stat-time">0</span>
+          <span class="stat-label">Min Studied</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" id="stat-notes">0</span>
+          <span class="stat-label">Notes</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" id="stat-journal">0/7</span>
+          <span class="stat-label">Journal Days</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" id="stat-resources">0</span>
+          <span class="stat-label">Resources</span>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tabs-bar" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true"  data-tab="programme">Programme</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="notes">Notes</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="journal">Journal</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="rapport">Rapport</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="voix">Voix</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="resources">Ressources</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="timer">Timer</button>
+      </div>
+
+      <!-- ── PROGRAMME PANEL ─────────────────────────────────────── -->
+      <div class="tab-panel" id="panel-programme" role="tabpanel">
+
+        <div class="panel-toolbar">
+          <div class="programme-intro-text">
+            <span class="programme-label">Plan de la semaine</span>
+            <span class="programme-sublabel">Définissez vos activités avant de commencer.</span>
+          </div>
+          <button class="btn-primary" id="new-prog-btn">+ Ajouter une activité</button>
+        </div>
+
+        <div class="programme-form hidden" id="programme-form">
+          <div class="prog-form-row">
+            <select id="prog-type" class="form-select">
+              <option value="article">📖 Article / Lecture</option>
+              <option value="video">🎥 Vidéo</option>
+              <option value="reflection">💭 Réflexion</option>
+              <option value="writing">✍️ Rapport écrit</option>
+              <option value="podcast">🎧 Podcast</option>
+            </select>
+            <input id="prog-title"   class="form-input" type="text"   placeholder="Titre ou description *">
+            <input id="prog-url"     class="form-input" type="url"    placeholder="Lien (optionnel)">
+            <input id="prog-aspect"  class="form-input" type="text"   placeholder="Aspect à explorer (optionnel)">
+            <input id="prog-minutes" class="form-input" type="number" placeholder="Durée prévue (min)" min="0" style="width:160px">
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="save-prog-btn">Ajouter</button>
+            <button class="btn-ghost"   id="cancel-prog-btn">Annuler</button>
+          </div>
+        </div>
+
+        <div id="programme-list" class="programme-list"></div>
+      </div>
+
+      <!-- ── NOTES PANEL ──────────────────────────────────────── -->
+      <div class="tab-panel" id="panel-notes" role="tabpanel">
+
+        <div class="panel-toolbar">
+          <button class="btn-primary" id="new-note-btn">+ New Note</button>
+        </div>
+
+        <!-- Editor -->
+        <div class="note-editor hidden" id="note-editor">
+          <div class="note-editor-top">
+            <input id="note-title-input" class="note-title-input" type="text" placeholder="Note title…">
+            <input id="note-tags-input"  class="note-tags-input"  type="text" placeholder="Tags (comma-separated)">
+          </div>
+          <div class="md-toolbar" aria-label="Formatting">
+            <button class="md-btn" data-action="bold"   title="Bold"><b>B</b></button>
+            <button class="md-btn" data-action="italic" title="Italic"><em>I</em></button>
+            <button class="md-btn" data-action="h2"     title="Heading">H2</button>
+            <button class="md-btn" data-action="quote"  title="Blockquote">❝</button>
+            <button class="md-btn" data-action="link"   title="Link">🔗</button>
+          </div>
+          <div class="md-split">
+            <textarea id="note-content" class="md-input" placeholder="Write in Markdown…" spellcheck="true"></textarea>
+            <div id="note-preview" class="md-preview">
+              <p class="preview-placeholder"><em>Preview will appear here…</em></p>
+            </div>
+          </div>
+          <div class="editor-footer">
+            <button class="btn-primary" id="save-note-btn">Save Note</button>
+            <button class="btn-ghost"   id="cancel-note-btn">Cancel</button>
+            <button class="btn-danger hidden" id="delete-note-btn">Delete Note</button>
+          </div>
+        </div>
+
+        <!-- Notes list -->
+        <div id="notes-list" class="notes-list"></div>
+      </div>
+
+      <!-- ── JOURNAL PANEL ────────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-journal" role="tabpanel">
+        <div class="journal-days" id="journal-days" role="group" aria-label="Select day"></div>
+        <div class="journal-body">
+          <div class="journal-day-label" id="journal-day-label">Day 1</div>
+          <textarea id="journal-textarea" class="journal-textarea" placeholder="Write your thoughts for today…" spellcheck="true"></textarea>
+          <div class="journal-footer">
+            <span class="save-indicator" id="journal-saved-indicator"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RESOURCES PANEL ──────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-resources" role="tabpanel">
+
+        <div class="panel-toolbar resources-toolbar">
+          <div class="type-filter" role="group" aria-label="Filter by type">
+            <button class="type-btn active" data-type="all">All</button>
+            <button class="type-btn" data-type="video">🎥 Video</button>
+            <button class="type-btn" data-type="link">🔗 Link</button>
+            <button class="type-btn" data-type="book">📚 Book</button>
+            <button class="type-btn" data-type="podcast">🎧 Podcast</button>
+          </div>
+          <button class="btn-primary" id="new-resource-btn">+ Add Resource</button>
+        </div>
+
+        <div class="resource-form hidden" id="resource-form">
+          <div class="resource-form-grid">
+            <select id="res-type" class="form-select">
+              <option value="link">🔗 Link</option>
+              <option value="video">🎥 Video</option>
+              <option value="book">📚 Book</option>
+              <option value="podcast">🎧 Podcast</option>
+            </select>
+            <input id="res-title" class="form-input" type="text" placeholder="Title *">
+            <input id="res-url"   class="form-input" type="url"  placeholder="URL (optional)">
+            <input id="res-notes" class="form-input" type="text" placeholder="Your notes (optional)">
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="save-resource-btn">Add Resource</button>
+            <button class="btn-ghost"   id="cancel-resource-btn">Cancel</button>
+          </div>
+        </div>
+
+        <div id="resources-list" class="resources-list"></div>
+      </div>
+
+      <!-- ── TIMER PANEL ──────────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-timer" role="tabpanel">
+        <div class="timer-area">
+          <div class="timer-display-wrap">
+            <div class="timer-pulse" id="timer-pulse"></div>
+            <div class="timer-display" id="timer-display">00:00:00</div>
+          </div>
+
+          <div class="timer-controls">
+            <button class="btn-ghost timer-btn" id="timer-start">Start</button>
+            <button class="btn-ghost timer-btn" id="timer-stop" disabled>Stop</button>
+            <button class="btn-ghost timer-btn" id="timer-reset">Reset</button>
+          </div>
+
+          <div class="activity-selector" role="group" aria-label="Activity type">
+            <label class="activity-option">
+              <input type="radio" name="activity" value="reading" checked>
+              <span class="activity-label">📖 Reading</span>
+            </label>
+            <label class="activity-option">
+              <input type="radio" name="activity" value="watching">
+              <span class="activity-label">🎥 Watching</span>
+            </label>
+            <label class="activity-option">
+              <input type="radio" name="activity" value="writing">
+              <span class="activity-label">✍️ Writing</span>
+            </label>
+            <label class="activity-option">
+              <input type="radio" name="activity" value="thinking">
+              <span class="activity-label">💭 Thinking</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Save-session form (shown after Stop) -->
+        <div class="session-save-form hidden" id="session-save-form">
+          <p class="session-duration-label" id="session-duration-label"></p>
+          <textarea id="session-notes-input" class="form-input session-notes" placeholder="Optional notes about this session…"></textarea>
+          <div class="form-actions">
+            <button class="btn-primary" id="confirm-save-session">Save Session</button>
+            <button class="btn-ghost"   id="discard-session">Discard</button>
+          </div>
+        </div>
+
+        <!-- Timer stats -->
+        <div class="timer-stats">
+          <span id="timer-today">Today: 0 min</span>
+          <span id="timer-alltime">All time: 0 min</span>
+        </div>
+
+        <!-- Session history -->
+        <div class="sessions-section">
+          <h3 class="sessions-heading">Session History</h3>
+          <div id="sessions-items"></div>
+        </div>
+      </div>
+
+      <!-- ── RAPPORT PANEL ────────────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-rapport" role="tabpanel">
+        <div class="rapport-bar">
+          <div class="rapport-bar-left">
+            <span class="rapport-badge">✍️ Rapport personnel — sans IA</span>
+            <span class="rapport-wordcount" id="rapport-wordcount">0 mot</span>
+          </div>
+          <div class="rapport-bar-right">
+            <span class="save-indicator" id="rapport-saved-indicator"></span>
+            <div class="rapport-mode-toggle">
+              <button class="rapport-mode-btn active" id="rapport-edit-btn">Éditer</button>
+              <button class="rapport-mode-btn" id="rapport-preview-btn">Aperçu</button>
+            </div>
+          </div>
+        </div>
+        <textarea id="rapport-textarea" class="rapport-textarea"
+          placeholder="Écrivez votre rapport personnel ici. Pas d'IA — uniquement votre propre réflexion, vos propres mots, votre propre pensée..."></textarea>
+        <div id="rapport-preview" class="rapport-preview hidden"></div>
+      </div>
+
+      <!-- ── VOIX PANEL ──────────────────────────────────────────── -->
+      <div class="tab-panel hidden" id="panel-voix" role="tabpanel">
+        <div class="voice-recorder-area">
+
+          <!-- Idle state -->
+          <div class="voice-state" id="voice-idle">
+            <button class="voice-mic-btn" id="voice-start-btn" aria-label="Démarrer l'enregistrement">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
+            <p class="voice-hint">Cliquez pour enregistrer une note vocale</p>
+          </div>
+
+          <!-- Recording state -->
+          <div class="voice-state hidden" id="voice-recording">
+            <div class="voice-pulse-ring">
+              <div class="voice-pulse-dot"></div>
+            </div>
+            <div class="voice-rec-timer" id="voice-rec-timer">0:00</div>
+            <p class="voice-rec-label">Enregistrement en cours...</p>
+            <button class="btn-danger voice-stop-btn" id="voice-stop-btn">⏹ Arrêter</button>
+          </div>
+
+          <!-- Preview state -->
+          <div class="voice-state hidden" id="voice-preview">
+            <audio id="voice-preview-audio" controls class="voice-audio-preview"></audio>
+            <input id="voice-title-input" class="form-input voice-title-field" type="text" placeholder="Titre de la note (optionnel)">
+            <div class="form-actions voice-preview-actions">
+              <button class="btn-primary" id="voice-save-btn">Sauvegarder</button>
+              <button class="btn-ghost"   id="voice-discard-btn">Supprimer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice notes list -->
+        <div class="voice-notes-section">
+          <h3 class="sessions-heading">Notes vocales enregistrées</h3>
+          <div id="voice-notes-list"></div>
+        </div>
+      </div>
+
+    </div><!-- /question-view -->
+  </main>
+
+  <!-- ── AI Panel ──────────────────────────────────────────────── -->
+  <aside class="ai-panel" id="ai-panel">
+    <div class="ai-panel-header">
+      <span class="ai-panel-title" id="ai-panel-title-text">AI Assistant</span>
+      <button class="btn-icon" id="toggle-ai-panel" title="Collapse panel" aria-label="Toggle AI panel">›</button>
+    </div>
+    <div class="ai-panel-body" id="ai-panel-body">
+      <div class="ai-mode-tabs" role="tablist" aria-label="AI mode">
+        <button class="ai-tab active" role="tab" data-mode="socratic">Socratic</button>
+        <button class="ai-tab" role="tab" data-mode="summary">Summary</button>
+        <button class="ai-tab" role="tab" data-mode="explorer">Explorer</button>
+        <button class="ai-tab" role="tab" data-mode="devils_advocate">Devil's Adv.</button>
+      </div>
+      <div class="ai-generate-row">
+        <button class="btn-primary" id="ai-generate-btn">Generate</button>
+      </div>
+      <div class="ai-response-scroll" id="ai-response-area">
+        <p class="ai-placeholder"><em>Select a mode and click Generate.</em></p>
+      </div>
+      <div class="ai-panel-footer">
+        <button class="btn-ghost hidden" id="ai-regenerate-btn">Regenerate</button>
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /app-layout -->
+
+<!-- ── Tutorial ───────────────────────────────────────────────── -->
+<div id="tour-overlay" aria-hidden="true"></div>
+<div id="tour-spotlight-ring" aria-hidden="true"></div>
+
+<div id="tour-card" class="tour-card hidden" role="dialog" aria-label="Tutoriel PhiloWeek" aria-modal="true">
+  <div class="tour-card-header">
+    <span class="tour-step-count" id="tour-step-count"></span>
+    <button class="tour-skip-btn" id="tour-skip">Skip</button>
+  </div>
+  <div class="tour-emoji-wrap" id="tour-emoji"></div>
+  <h3 class="tour-title" id="tour-title"></h3>
+  <p class="tour-body-text" id="tour-body"></p>
+  <div class="tour-progress">
+    <div class="tour-progress-fill" id="tour-progress-fill"></div>
+  </div>
+  <div class="tour-footer">
+    <button class="btn-ghost tour-nav-btn" id="tour-prev">← Retour</button>
+    <button class="btn-primary tour-nav-btn" id="tour-next">Suivant →</button>
+  </div>
+</div>
+
+<!-- ── Context Menu ──────────────────────────────────────────────────────── -->
+<div id="ctx-menu" class="ctx-menu hidden" role="menu" aria-label="Options">
+  <button class="ctx-item" id="ctx-edit" role="menuitem">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Modifier
+  </button>
+  <div class="ctx-sep" id="ctx-sep"></div>
+  <button class="ctx-item ctx-danger" id="ctx-delete" role="menuitem">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    Supprimer
+  </button>
+</div>
+
+<!-- ── Confirm Modal ─────────────────────────────────────────────────────── -->
+<div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon" id="confirm-icon">🗑️</div>
+    <h3 class="confirm-title" id="confirm-title">Confirmer</h3>
+    <p class="confirm-body" id="confirm-body"></p>
+    <div class="form-actions confirm-actions">
+      <button class="btn-danger" id="confirm-ok">Supprimer</button>
+      <button class="btn-ghost"  id="confirm-cancel">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
