@@ -80,8 +80,16 @@ html, body {
 .sidebar-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.logo {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Smooth transitions on themed elements */
@@ -1819,6 +1827,9 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
 
 .citations-library-header {
   margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .citations-library-title-row {
@@ -2181,6 +2192,30 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
 }
 
 .tour-nav-btn { padding: 8px 20px; }
+
+/* ── Loading bar ─────────────────────────────────────────────────────────── */
+.loading-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  z-index: 9999;
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+body.loading .loading-bar {
+  opacity: 1;
+  animation: loading-sweep 0.9s ease-in-out infinite;
+}
+@keyframes loading-sweep {
+  0%   { transform: scaleX(0);   transform-origin: left;  }
+  50%  { transform: scaleX(0.6); transform-origin: left;  }
+  50.01% { transform-origin: right; }
+  100% { transform: scaleX(0);   transform-origin: right; }
+}
 
 /* ── Utilities ───────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
@@ -2560,6 +2595,7 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
   /* ── Citations library ──────────────────────────────────────────────────── */
   .citations-library { padding: 20px 16px 40px; }
   .citations-library-title { font-size: 1.2rem; }
+  body.citations-lib-open .mobile-nav { display: none !important; }
 
   /* ── Tour card ──────────────────────────────────────────────────────────── */
   .tour-card { max-width: calc(100vw - 32px); }

@@ -221,6 +221,8 @@ async function selectQuestion(id) {
   const q = state.questions.find(q => q.id === id);
   if (!q) return;
   state.currentQuestion = q;
+  document.body.classList.add('loading');
+  document.body.classList.remove('citations-lib-open');
 
   // Activate in DB
   await PUT(`/api/questions/${id}/activate`).catch(() => {});
@@ -242,10 +244,11 @@ async function selectQuestion(id) {
 
   // Load data
   await Promise.all([
-    loadStats(), loadNotes(), loadJournal(), loadResources(),
+    loadStats(), loadNotes(), loadResources(),
     loadSessions(), loadProgramme(), loadRapport(), loadVoiceNotes(), loadCitations(),
   ]);
 
+  document.body.classList.remove('loading');
   updateVisibleTabs();
   switchTab('programme');
   if (isMobile()) showMobileDetail();
@@ -258,7 +261,7 @@ function showMobileDetail() {
   if (state.currentQuestion) el('mobile-q-title').textContent = state.currentQuestion.title;
 }
 function showMobileHome() {
-  document.body.classList.remove('mobile-detail');
+  document.body.classList.remove('mobile-detail', 'citations-lib-open');
 }
 
 // ── Question modal ─────────────────────────────────────────────────────────────
@@ -347,7 +350,6 @@ async function loadStats() {
   state.stats = s;
   el('stat-time').textContent      = s.total_time;
   el('stat-notes').textContent     = s.notes_count;
-  el('stat-journal').textContent   = s.journal_days > 0 ? '✓' : '–';
   el('stat-resources').textContent = `${s.resources_watched}/${s.resources_total}`;
   el('timer-today').textContent    = `Today: ${s.today_time} min`;
   el('timer-alltime').textContent  = `All time: ${s.total_time} min`;
@@ -355,15 +357,14 @@ async function loadStats() {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const TAB_LABELS = {
-  notes: 'Notes', journal: 'Journal', rapport: 'Rapport',
+  notes: 'Notes', rapport: 'Rapport',
   voix: 'Voix', citations: 'Citations', resources: 'Ressources', timer: 'Timer',
 };
-const ALL_OPTIONAL_TABS = ['notes', 'journal', 'rapport', 'voix', 'citations', 'resources', 'timer'];
+const ALL_OPTIONAL_TABS = ['notes', 'rapport', 'voix', 'citations', 'resources', 'timer'];
 
 function updateVisibleTabs() {
   if (!el('tab-add-btn')) return;
   if (state.notes.length > 0)              state.visibleTabs.add('notes');
-  if (state.journalEntry?.content?.trim()) state.visibleTabs.add('journal');
   if (state.rapport?.content?.trim())      state.visibleTabs.add('rapport');
   if (state.voiceNotes.length > 0)         state.visibleTabs.add('voix');
   if (state.citations.length > 0)          state.visibleTabs.add('citations');
@@ -394,7 +395,6 @@ function switchTab(tab) {
   });
   if (tab === 'programme') renderProgramme();
   if (tab === 'notes')     renderNotesList();
-  if (tab === 'journal')   loadJournalContent();
   if (tab === 'rapport')   renderRapport();
   if (tab === 'voix')      renderVoiceNotes();
   if (tab === 'resources') renderResourcesList();
@@ -534,7 +534,7 @@ function pasteImage(e) {
   e.preventDefault();
 
   const ta = e.currentTarget;
-  const previewMap = { 'note-content': 'note-preview', 'journal-textarea': 'journal-preview' };
+  const previewMap = { 'note-content': 'note-preview' };
   const preview = previewMap[ta.id] ? el(previewMap[ta.id]) : null;
 
   const file = imageItem.getAsFile();
@@ -1338,6 +1338,7 @@ async function showCitationsLibrary() {
   if (isMobile()) {
     el('mobile-q-title').textContent = 'Bibliothèque';
     el('mobile-edit-btn').style.visibility = 'hidden';
+    document.body.classList.add('citations-lib-open');
     showMobileDetail();
   }
   const all = await GET('/api/citations/all');
@@ -1538,10 +1539,6 @@ function bindGlobalEvents() {
   el('note-content').addEventListener('input', updateNotePreview);
   el('note-content').addEventListener('paste', pasteImage);
 
-  // Journal
-  el('journal-textarea').addEventListener('input', scheduleJournalSave);
-  el('journal-textarea').addEventListener('paste', pasteImage);
-
   // Citations
   el('new-citation-btn').addEventListener('click', () => {
     el('citation-form').classList.toggle('hidden');
@@ -1655,6 +1652,38 @@ function bindGlobalEvents() {
 
   // Citations library
   el('citations-library-btn').addEventListener('click', showCitationsLibrary);
+
+  // Library: new citation form
+  el('lib-new-citation-btn').addEventListener('click', () => {
+    const form = el('lib-citation-form');
+    const isHidden = form.classList.contains('hidden');
+    form.classList.toggle('hidden');
+    if (isHidden) {
+      // Populate question select
+      const sel = el('lib-citation-question');
+      sel.innerHTML = state.questions.map(q =>
+        `<option value="${q.id}">${escapeHtml(q.title)}</option>`
+      ).join('');
+      el('lib-citation-text').focus();
+    }
+  });
+  el('lib-cancel-citation-btn').addEventListener('click', () => {
+    el('lib-citation-form').classList.add('hidden');
+  });
+  el('lib-save-citation-btn').addEventListener('click', async () => {
+    const content = el('lib-citation-text').value.trim();
+    if (!content) { toast('La citation ne peut pas être vide.'); return; }
+    const question_id = Number(el('lib-citation-question').value);
+    const author = el('lib-citation-author').value.trim();
+    const source = el('lib-citation-source').value.trim();
+    await POST('/api/citations', { question_id, content, author, source });
+    el('lib-citation-form').classList.add('hidden');
+    el('lib-citation-text').value   = '';
+    el('lib-citation-author').value = '';
+    el('lib-citation-source').value = '';
+    await showCitationsLibrary();
+    toast('Citation ajoutée.');
+  });
   el('citations-library-body').addEventListener('click', async e => {
     const btn = e.target.closest('.citation-delete-btn');
     if (!btn) return;
@@ -1765,14 +1794,6 @@ const Tour = {
       emoji: '📝',
       title: 'Notes structurées',
       body: 'L\'éditeur Markdown en vue fractionnée vous permet d\'écrire à gauche et de prévisualiser à droite. Une barre d\'outils gère le gras, l\'italique, les titres et les citations. Ajoutez des tags pour retrouver vos idées.',
-    },
-    // 6 ── Journal tab
-    {
-      target: '[data-tab="journal"]',
-      position: 'bottom',
-      emoji: '🗓️',
-      title: 'Journal de réflexion',
-      body: 'Un espace libre pour noter vos pensées et réflexions sur la question. Le journal se sauvegarde automatiquement.',
     },
     // 7 ── Programme tab
     {
@@ -1944,13 +1965,17 @@ const Tour = {
     if (s.target && s.position !== 'center') {
       const target = document.querySelector(s.target);
       if (target) {
-        overlay.style.background = 'transparent';
-        ring.style.display = 'block';
-        this._placeRing(target);
-        card.classList.remove('tour-center');
-        card.style.transform = 'none';
-        this._placeCard(target, s.position);
-        return;
+        const r = target.getBoundingClientRect();
+        const visible = r.width > 0 && r.height > 0;
+        if (visible) {
+          overlay.style.background = 'transparent';
+          ring.style.display = 'block';
+          this._placeRing(target);
+          card.classList.remove('tour-center');
+          card.style.transform = 'none';
+          this._placeCard(target, s.position);
+          return;
+        }
       }
     }
     // Fallback / center steps

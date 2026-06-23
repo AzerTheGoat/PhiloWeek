@@ -11,6 +11,9 @@
 </head>
 <body>
 
+<!-- Loading bar -->
+<div id="loading-bar" class="loading-bar"></div>
+
 <!-- Toast container -->
 <div id="toast-container" aria-live="polite"></div>
 
@@ -87,7 +90,23 @@
           <h2 class="citations-library-title">❝ Bibliothèque des citations</h2>
           <span class="citations-library-count" id="citations-library-count"></span>
         </div>
+        <button class="btn-primary" id="lib-new-citation-btn">+ Nouvelle citation</button>
       </div>
+
+      <div class="citation-form hidden" id="lib-citation-form">
+        <select id="lib-citation-question" class="form-select"></select>
+        <textarea id="lib-citation-text" class="form-input citation-text-input" rows="4"
+          placeholder="« La citation, l'extrait, la pensée que vous voulez retenir… »"></textarea>
+        <div class="citation-meta-row">
+          <input id="lib-citation-author" class="form-input" type="text" placeholder="Auteur (optionnel)">
+          <input id="lib-citation-source" class="form-input" type="text" placeholder="Source, ouvrage… (optionnel)">
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" id="lib-save-citation-btn">Sauvegarder</button>
+          <button class="btn-ghost"   id="lib-cancel-citation-btn">Annuler</button>
+        </div>
+      </div>
+
       <div id="citations-library-body" class="citations-library-body"></div>
     </div>
 
@@ -117,10 +136,6 @@
           <span class="stat-label">Notes</span>
         </div>
         <div class="stat-card">
-          <span class="stat-number" id="stat-journal">–</span>
-          <span class="stat-label">Journal</span>
-        </div>
-        <div class="stat-card">
           <span class="stat-number" id="stat-resources">0</span>
           <span class="stat-label">Resources</span>
         </div>
@@ -130,7 +145,6 @@
       <div class="tabs-bar" role="tablist">
         <button class="tab-btn active" role="tab" aria-selected="true"  data-tab="programme">Programme</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="notes">Notes</button>
-        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="journal">Journal</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="rapport">Rapport</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="voix">Voix</button>
         <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="citations">Citations</button>
@@ -227,42 +241,6 @@
 
         <!-- Notes list -->
         <div id="notes-list" class="notes-list"></div>
-      </div>
-
-      <!-- ── JOURNAL PANEL ────────────────────────────────────── -->
-      <div class="tab-panel hidden" id="panel-journal" role="tabpanel">
-        <div class="md-toolbar" aria-label="Formatting" data-target="journal-textarea" data-preview="journal-preview">
-          <button class="md-btn" data-action="bold"      title="Gras"><strong>B</strong></button>
-          <button class="md-btn" data-action="italic"    title="Italique"><em>I</em></button>
-          <button class="md-btn" data-action="underline" title="Souligné"><u>U</u></button>
-          <button class="md-btn" data-action="strike"    title="Barré"><s>S</s></button>
-          <span class="md-sep"></span>
-          <button class="md-btn" data-action="h1" title="Titre 1">H1</button>
-          <button class="md-btn" data-action="h2" title="Titre 2">H2</button>
-          <button class="md-btn" data-action="h3" title="Titre 3">H3</button>
-          <span class="md-sep"></span>
-          <button class="md-btn" data-action="ul"    title="Liste à puces">• ≡</button>
-          <button class="md-btn" data-action="ol"    title="Liste numérotée">1. ≡</button>
-          <span class="md-sep"></span>
-          <button class="md-btn" data-action="quote" title="Citation">❝</button>
-          <button class="md-btn" data-action="code"  title="Code">&lt;/&gt;</button>
-          <button class="md-btn" data-action="table" title="Tableau">⊞</button>
-          <button class="md-btn" data-action="hr"    title="Séparateur">—</button>
-          <span class="md-sep"></span>
-          <button class="md-btn" data-action="link"  title="Lien">🔗</button>
-          <span class="md-sep"></span>
-          <button class="md-btn md-color-btn" data-color-type="color"     title="Couleur du texte"><span class="cp-label">A</span></button>
-          <button class="md-btn md-color-btn" data-color-type="highlight" title="Surligner"><span class="cp-label cp-hl">A</span></button>
-        </div>
-        <div class="md-split" style="flex:1;min-height:0;">
-          <textarea id="journal-textarea" class="md-input" placeholder="Notez vos réflexions sur cette question…" spellcheck="true"></textarea>
-          <div id="journal-preview" class="md-preview">
-            <p class="preview-placeholder"><em>La preview apparaîtra ici…</em></p>
-          </div>
-        </div>
-        <div class="journal-footer">
-          <span class="save-indicator" id="journal-saved-indicator"></span>
-        </div>
       </div>
 
       <!-- ── CITATIONS PANEL ────────────────────────────────────── -->
@@ -484,10 +462,6 @@
   <button class="mobile-nav-btn" data-tab="notes" aria-label="Notes">
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="3" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 8h8M7 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
     <span>Notes</span>
-  </button>
-  <button class="mobile-nav-btn" data-tab="journal" aria-label="Journal">
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="5" y="3" width="12" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 7H4a1 1 0 000 2h1M5 12H4a1 1 0 000 2h1" stroke="currentColor" stroke-width="1.4"/></svg>
-    <span>Journal</span>
   </button>
   <button class="mobile-nav-btn" data-tab="resources" aria-label="Ressources">
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.6"/><path d="M7 9h8M7 13h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
