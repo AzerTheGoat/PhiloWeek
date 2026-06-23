@@ -309,7 +309,7 @@ html, body {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  background: var(--surface);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 4px;
@@ -597,7 +597,7 @@ html, body {
 .cp-popup {
   position: fixed;
   z-index: 9999;
-  background: var(--surface);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
