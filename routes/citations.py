@@ -6,6 +6,19 @@ from models import CitationCreate
 router = APIRouter(prefix="/api/citations", tags=["citations"])
 
 
+@router.get("/all")
+def list_all_citations():
+    conn = get_db()
+    rows = [dict(r) for r in conn.execute(
+        """SELECT c.*, q.title as question_title
+           FROM citations c
+           JOIN questions q ON c.question_id = q.id
+           ORDER BY c.created_at DESC""",
+    )]
+    conn.close()
+    return rows
+
+
 @router.get("")
 def list_citations(question_id: int):
     conn = get_db()

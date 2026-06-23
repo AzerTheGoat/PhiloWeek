@@ -229,6 +229,8 @@ async function selectQuestion(id) {
 
   // Show question view
   el('root-empty-state').classList.add('hidden');
+  el('citations-library').classList.add('hidden');
+  el('mobile-edit-btn').style.visibility = '';
   el('question-view').classList.remove('hidden');
 
   // Render header
@@ -1328,6 +1330,65 @@ async function generateAI() {
   }
 }
 
+// ── Citations library (global) ────────────────────────────────────────────────
+async function showCitationsLibrary() {
+  el('root-empty-state').classList.add('hidden');
+  el('question-view').classList.add('hidden');
+  el('citations-library').classList.remove('hidden');
+  if (isMobile()) {
+    el('mobile-q-title').textContent = 'Bibliothèque';
+    el('mobile-edit-btn').style.visibility = 'hidden';
+    showMobileDetail();
+  }
+  const all = await GET('/api/citations/all');
+  renderCitationsLibrary(all);
+}
+
+function hideCitationsLibrary() {
+  el('citations-library').classList.add('hidden');
+  if (isMobile()) el('mobile-edit-btn').style.visibility = '';
+}
+
+function renderCitationsLibrary(citations) {
+  const count = el('citations-library-count');
+  const body  = el('citations-library-body');
+  count.textContent = citations.length
+    ? `${citations.length} citation${citations.length > 1 ? 's' : ''}`
+    : '';
+
+  if (!citations.length) {
+    body.innerHTML = '<p class="empty-state"><em>Aucune citation enregistrée. Ouvrez une question et ajoutez vos premières citations.</em></p>';
+    return;
+  }
+
+  // Group by question
+  const groups = {};
+  const order  = [];
+  for (const c of citations) {
+    if (!groups[c.question_id]) { groups[c.question_id] = []; order.push(c); }
+    groups[c.question_id].push(c);
+  }
+
+  body.innerHTML = order
+    .filter((c, i, arr) => arr.findIndex(x => x.question_id === c.question_id) === i)
+    .map(first => {
+      const items = groups[first.question_id];
+      return `
+        <div class="citations-library-section">
+          <div class="citations-library-section-title">${escapeHtml(first.question_title)}</div>
+          ${items.map(c => `
+            <div class="citation-card" data-citation-id="${c.id}">
+              <button class="citation-delete-btn btn-icon" data-id="${c.id}" title="Supprimer">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              </button>
+              <blockquote class="citation-text">${escapeHtml(c.content)}</blockquote>
+              ${c.author || c.source ? `<p class="citation-attribution">— ${[c.author, c.source].filter(Boolean).map(escapeHtml).join(' · ')}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>`;
+    }).join('');
+}
+
 // ── Citations ─────────────────────────────────────────────────────────────────
 async function loadCitations() {
   if (!state.currentQuestion) return;
@@ -1589,6 +1650,23 @@ function bindGlobalEvents() {
     btn.addEventListener('click', () => {
       el('mobile-sheet').classList.remove('open');
       switchTab(btn.dataset.tab);
+    });
+  });
+
+  // Citations library
+  el('citations-library-btn').addEventListener('click', showCitationsLibrary);
+  el('citations-library-body').addEventListener('click', async e => {
+    const btn = e.target.closest('.citation-delete-btn');
+    if (!btn) return;
+    showConfirm({
+      icon: '❝',
+      title: 'Supprimer cette citation ?',
+      body: 'Cette citation sera supprimée définitivement.',
+      label: 'Supprimer',
+      onConfirm: async () => {
+        await DEL(`/api/citations/${btn.dataset.id}`);
+        showCitationsLibrary();
+      },
     });
   });
 

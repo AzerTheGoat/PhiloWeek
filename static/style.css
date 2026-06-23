@@ -1807,6 +1807,65 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
 
 .voice-note-delete:hover { color: var(--danger); background: var(--danger-dim); }
 
+/* ── Citations library (global view) ────────────────────────────────────── */
+.citations-library {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px 40px;
+  gap: 0;
+}
+
+.citations-library-header {
+  margin-bottom: 28px;
+}
+
+.citations-library-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.citations-library-title {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.citations-library-count {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.citations-library-body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.citations-library-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.citations-library-section-title {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── Citations ───────────────────────────────────────────────────────────── */
 .citations-list {
   display: flex;
@@ -2497,6 +2556,10 @@ textarea.form-input { resize: vertical; line-height: 1.6; }
 
   /* ── Voice ──────────────────────────────────────────────────────────────── */
   .voice-note-card { flex-wrap: wrap; }
+
+  /* ── Citations library ──────────────────────────────────────────────────── */
+  .citations-library { padding: 20px 16px 40px; }
+  .citations-library-title { font-size: 1.2rem; }
 
   /* ── Tour card ──────────────────────────────────────────────────────────── */
   .tour-card { max-width: calc(100vw - 32px); }
