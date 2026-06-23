@@ -245,13 +245,17 @@ async function selectQuestion(id) {
 
   updateVisibleTabs();
   switchTab('programme');
-  closeMobileSidebar();
+  if (isMobile()) showMobileDetail();
 }
 
-// ── Mobile sidebar ────────────────────────────────────────────────────────────
-function closeMobileSidebar() {
-  el('sidebar').classList.remove('mobile-open');
-  el('sidebar-backdrop').classList.remove('visible');
+// ── Mobile navigation ─────────────────────────────────────────────────────────
+function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+function showMobileDetail() {
+  document.body.classList.add('mobile-detail');
+  if (state.currentQuestion) el('mobile-q-title').textContent = state.currentQuestion.title;
+}
+function showMobileHome() {
+  document.body.classList.remove('mobile-detail');
 }
 
 // ── Question modal ─────────────────────────────────────────────────────────────
@@ -377,6 +381,9 @@ function switchTab(tab) {
     const active = b.dataset.tab === tab;
     b.classList.toggle('active', active);
     b.setAttribute('aria-selected', active);
+  });
+  document.querySelectorAll('.mobile-nav-btn[data-tab]').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
   document.querySelectorAll('.tab-panel').forEach(p => {
     p.classList.toggle('hidden', p.id !== `panel-${tab}`);
@@ -1493,12 +1500,29 @@ function bindGlobalEvents() {
     });
   });
 
-  // Mobile sidebar
-  el('sidebar-toggle').addEventListener('click', () => {
-    el('sidebar').classList.toggle('mobile-open');
-    el('sidebar-backdrop').classList.toggle('visible');
+  // Mobile navigation
+  el('mobile-back-btn').addEventListener('click', showMobileHome);
+  el('mobile-edit-btn').addEventListener('click', openEditQuestion);
+  document.querySelectorAll('.mobile-nav-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
-  el('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
+  el('mobile-more-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    el('mobile-sheet').classList.add('open');
+  });
+  el('mobile-sheet-backdrop').addEventListener('click', () => {
+    el('mobile-sheet').classList.remove('open');
+  });
+  el('mobile-export-btn').addEventListener('click', () => {
+    el('mobile-sheet').classList.remove('open');
+    exportMarkdown();
+  });
+  document.querySelectorAll('.mobile-sheet-item[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el('mobile-sheet').classList.remove('open');
+      switchTab(btn.dataset.tab);
+    });
+  });
 
   // Tour controls
   el('tour-launch').addEventListener('click', () => Tour.start());
