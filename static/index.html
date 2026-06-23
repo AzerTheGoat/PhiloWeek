@@ -60,6 +60,14 @@
   <!-- ── Main Content ──────────────────────────────────────────── -->
   <main class="main-content" id="main-content">
 
+    <!-- Mobile top bar -->
+    <div class="mobile-topbar">
+      <button class="btn-hamburger" id="sidebar-toggle" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <span class="mobile-brand">PhiloWeek</span>
+    </div>
+
     <!-- Empty state -->
     <div class="root-empty-state" id="root-empty-state">
       <p><em>No question selected. Begin by creating a question that troubles you.</em></p>
@@ -424,6 +432,10 @@
   </aside>
 
 </div><!-- /app-layout -->
+
+<!-- Mobile sidebar backdrop -->
+<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
 
 <!-- ── Tutorial ───────────────────────────────────────────────── -->
 <div id="tour-overlay" aria-hidden="true"></div>

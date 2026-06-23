@@ -245,6 +245,13 @@ async function selectQuestion(id) {
 
   updateVisibleTabs();
   switchTab('programme');
+  closeMobileSidebar();
+}
+
+// ── Mobile sidebar ────────────────────────────────────────────────────────────
+function closeMobileSidebar() {
+  el('sidebar').classList.remove('mobile-open');
+  el('sidebar-backdrop').classList.remove('visible');
 }
 
 // ── Question modal ─────────────────────────────────────────────────────────────
@@ -1485,6 +1492,13 @@ function bindGlobalEvents() {
       state.aiMode = btn.dataset.mode;
     });
   });
+
+  // Mobile sidebar
+  el('sidebar-toggle').addEventListener('click', () => {
+    el('sidebar').classList.toggle('mobile-open');
+    el('sidebar-backdrop').classList.toggle('visible');
+  });
+  el('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
 
   // Tour controls
   el('tour-launch').addEventListener('click', () => Tour.start());
