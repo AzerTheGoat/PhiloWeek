@@ -508,6 +508,38 @@ async function deleteNoteById(id) {
   toast('Note supprimée.');
 }
 
+// Image paste into note
+function pasteImageIntoNote(e) {
+  const items = [...(e.clipboardData?.items ?? [])];
+  const imageItem = items.find(item => item.type.startsWith('image/'));
+  if (!imageItem) return;
+
+  e.preventDefault();
+  const file = imageItem.getAsFile();
+  const objectUrl = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    const MAX_W = 1200;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(objectUrl);
+
+    const dataUrl = canvas.toDataURL('image/webp', 0.85);
+    const ta = el('note-content');
+    const pos = ta.selectionStart;
+    const insertion = `\n![image](${dataUrl})\n`;
+    ta.value = ta.value.slice(0, pos) + insertion + ta.value.slice(ta.selectionEnd);
+    ta.selectionStart = ta.selectionEnd = pos + insertion.length;
+    updateNotePreview();
+  };
+  img.src = objectUrl;
+}
+
 // Markdown toolbar
 function applyMdAction(action) {
   const ta = el('note-content');
@@ -1283,6 +1315,7 @@ function bindGlobalEvents() {
   el('cancel-note-btn').addEventListener('click', closeNoteEditor);
   el('delete-note-btn').addEventListener('click', deleteNote);
   el('note-content').addEventListener('input', updateNotePreview);
+  el('note-content').addEventListener('paste', pasteImageIntoNote);
   document.querySelectorAll('.md-btn').forEach(btn => {
     btn.addEventListener('click', () => applyMdAction(btn.dataset.action));
   });

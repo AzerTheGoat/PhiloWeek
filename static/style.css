@@ -561,6 +561,7 @@ html, body {
 .md-preview a { color: var(--accent); }
 .md-preview strong { font-weight: 600; }
 .md-preview em { font-style: italic; }
+.md-preview img { max-width: 100%; border-radius: 6px; margin: 8px 0; display: block; }
 
 .editor-footer {
   display: flex;
