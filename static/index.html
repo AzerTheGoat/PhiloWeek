@@ -91,8 +91,8 @@
           <span class="stat-label">Notes</span>
         </div>
         <div class="stat-card">
-          <span class="stat-number" id="stat-journal">0/7</span>
-          <span class="stat-label">Journal Days</span>
+          <span class="stat-number" id="stat-journal">–</span>
+          <span class="stat-label">Journal</span>
         </div>
         <div class="stat-card">
           <span class="stat-number" id="stat-resources">0</span>
@@ -103,12 +103,16 @@
       <!-- Tab bar -->
       <div class="tabs-bar" role="tablist">
         <button class="tab-btn active" role="tab" aria-selected="true"  data-tab="programme">Programme</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="notes">Notes</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="journal">Journal</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="rapport">Rapport</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="voix">Voix</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="resources">Ressources</button>
-        <button class="tab-btn"        role="tab" aria-selected="false" data-tab="timer">Timer</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="notes">Notes</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="journal">Journal</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="rapport">Rapport</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="voix">Voix</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="resources">Ressources</button>
+        <button class="tab-btn hidden"  role="tab" aria-selected="false" data-tab="timer">Timer</button>
+        <div class="tab-add-wrapper">
+          <button class="tab-add-btn" id="tab-add-btn" title="Ajouter une section" aria-label="Ajouter une section">+</button>
+          <div class="tab-add-menu hidden" id="tab-add-menu"></div>
+        </div>
       </div>
 
       <!-- ── PROGRAMME PANEL ─────────────────────────────────────── -->
@@ -184,10 +188,8 @@
 
       <!-- ── JOURNAL PANEL ────────────────────────────────────── -->
       <div class="tab-panel hidden" id="panel-journal" role="tabpanel">
-        <div class="journal-days" id="journal-days" role="group" aria-label="Select day"></div>
         <div class="journal-body">
-          <div class="journal-day-label" id="journal-day-label">Day 1</div>
-          <textarea id="journal-textarea" class="journal-textarea" placeholder="Write your thoughts for today…" spellcheck="true"></textarea>
+          <textarea id="journal-textarea" class="journal-textarea" placeholder="Notez vos réflexions sur cette question…" spellcheck="true"></textarea>
           <div class="journal-footer">
             <span class="save-indicator" id="journal-saved-indicator"></span>
           </div>

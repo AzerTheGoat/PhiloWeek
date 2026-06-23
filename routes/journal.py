@@ -32,8 +32,8 @@ def get_journal_entry(question_id: int, day: int):
 
 @router.put("/{question_id}/{day}")
 def save_journal_entry(question_id: int, day: int, data: JournalSave):
-    if not 1 <= day <= 7:
-        raise HTTPException(400, "Day must be between 1 and 7")
+    if day < 1:
+        raise HTTPException(400, "Invalid day")
     conn = get_db()
     conn.execute(
         """INSERT INTO journal_entries (question_id, day_number, content)

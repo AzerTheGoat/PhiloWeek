@@ -284,6 +284,57 @@ html, body {
   border-bottom-color: var(--accent);
 }
 
+/* ── Tab add button ─────────────────────────────────────────────────────── */
+.tab-add-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.tab-add-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-add-btn:hover { color: var(--text); border-color: var(--text); }
+
+.tab-add-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 200;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tab-add-item {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.12s;
+}
+.tab-add-item:hover { background: var(--hover); }
+
 /* ── Tab Panels ─────────────────────────────────────────────────────────── */
 .tab-panel {
   flex: 1;

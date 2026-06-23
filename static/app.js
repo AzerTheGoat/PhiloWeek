@@ -8,7 +8,7 @@ const state = {
   currentQuestion:  null,
   notes:            [],
   currentNote:      null,
-  journalEntries:   {},
+  journalEntry:     null,
   resources:        [],
   sessions:         [],
   programme:        [],
@@ -17,7 +17,7 @@ const state = {
   voiceNotes:       [],
   stats:            null,
   activeTab:        'programme',
-  activeJournalDay: 1,
+  visibleTabs:      new Set(['programme']),
   aiMode:           'socratic',
   resourceFilter:   'all',
   aiPanelCollapsed: false,
@@ -234,12 +234,16 @@ async function selectQuestion(id) {
   el('q-title').textContent = q.title;
   el('q-desc').textContent  = q.description || '';
 
+  // Reset visible tabs for this question
+  state.visibleTabs = new Set(['programme']);
+
   // Load data
   await Promise.all([
     loadStats(), loadNotes(), loadJournal(), loadResources(),
     loadSessions(), loadProgramme(), loadRapport(), loadVoiceNotes(),
   ]);
 
+  updateVisibleTabs();
   switchTab('programme');
 }
 
@@ -329,13 +333,37 @@ async function loadStats() {
   state.stats = s;
   el('stat-time').textContent      = s.total_time;
   el('stat-notes').textContent     = s.notes_count;
-  el('stat-journal').textContent   = `${s.journal_days}/7`;
+  el('stat-journal').textContent   = s.journal_days > 0 ? '✓' : '–';
   el('stat-resources').textContent = `${s.resources_watched}/${s.resources_total}`;
   el('timer-today').textContent    = `Today: ${s.today_time} min`;
   el('timer-alltime').textContent  = `All time: ${s.total_time} min`;
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
+const TAB_LABELS = {
+  notes: 'Notes', journal: 'Journal', rapport: 'Rapport',
+  voix: 'Voix', resources: 'Ressources', timer: 'Timer',
+};
+const ALL_OPTIONAL_TABS = ['notes', 'journal', 'rapport', 'voix', 'resources', 'timer'];
+
+function updateVisibleTabs() {
+  if (!el('tab-add-btn')) return;
+  if (state.notes.length > 0)              state.visibleTabs.add('notes');
+  if (state.journalEntry?.content?.trim()) state.visibleTabs.add('journal');
+  if (state.rapport?.content?.trim())      state.visibleTabs.add('rapport');
+  if (state.voiceNotes.length > 0)         state.visibleTabs.add('voix');
+  if (state.resources.length > 0)          state.visibleTabs.add('resources');
+  if (state.sessions.length > 0)           state.visibleTabs.add('timer');
+
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+    if (btn.dataset.tab === 'programme') return;
+    btn.classList.toggle('hidden', !state.visibleTabs.has(btn.dataset.tab));
+  });
+
+  const hasHidden = ALL_OPTIONAL_TABS.some(t => !state.visibleTabs.has(t));
+  el('tab-add-btn').classList.toggle('hidden', !hasHidden);
+}
+
 function switchTab(tab) {
   state.activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => {
@@ -348,7 +376,7 @@ function switchTab(tab) {
   });
   if (tab === 'programme') renderProgramme();
   if (tab === 'notes')     renderNotesList();
-  if (tab === 'journal')   renderJournalDays();
+  if (tab === 'journal')   loadJournalContent();
   if (tab === 'rapport')   renderRapport();
   if (tab === 'voix')      renderVoiceNotes();
   if (tab === 'resources') renderResourcesList();
@@ -360,6 +388,7 @@ async function loadNotes() {
   if (!state.currentQuestion) return;
   state.notes = await GET(`/api/notes?question_id=${state.currentQuestion.id}`);
   if (state.activeTab === 'notes') renderNotesList();
+  updateVisibleTabs();
 }
 
 function renderNotesList() {
@@ -524,71 +553,22 @@ function applyMdAction(action) {
 // ── Journal ───────────────────────────────────────────────────────────────────
 async function loadJournal() {
   if (!state.currentQuestion) return;
-  const entries = await GET(`/api/journal/${state.currentQuestion.id}`);
-  state.journalEntries = {};
-  entries.forEach(e => { state.journalEntries[e.day_number] = e; });
-  if (state.activeTab === 'journal') renderJournalDays();
+  const entry = await GET(`/api/journal/${state.currentQuestion.id}/1`);
+  state.journalEntry = entry;
+  if (state.activeTab === 'journal') loadJournalContent();
+  updateVisibleTabs();
 }
 
-function renderJournalDays() {
-  const container = el('journal-days');
-  container.innerHTML = Array.from({ length: 7 }, (_, i) => {
-    const day  = i + 1;
-    const entry = state.journalEntries[day];
-    const hasContent = entry && entry.content && entry.content.trim();
-    const isCurrent  = day === state.activeJournalDay;
-    let cls = 'day-circle';
-    if (hasContent) cls += ' completed';
-    else if (isCurrent) cls += ' current';
-    if (isCurrent) cls += ' selected';
-    return `<button class="${cls}" data-day="${day}" aria-label="Day ${day}">${day}</button>`;
-  }).join('');
-
-  container.querySelectorAll('.day-circle').forEach(btn => {
-    const day = parseInt(btn.dataset.day);
-    btn.addEventListener('click', () => selectJournalDay(day));
-    btn.addEventListener('contextmenu', e => {
-      e.preventDefault(); e.stopPropagation();
-      const entry = state.journalEntries[day];
-      if (!entry?.content?.trim()) return;
-      CtxMenu.show(e.clientX, e.clientY, {
-        delete: () => showConfirm({
-          icon: '📔',
-          title: `Effacer le jour ${day} ?`,
-          body: 'Le contenu de ce jour sera supprimé définitivement.',
-          onConfirm: async () => {
-            await saveJournalDay(day, '');
-            state.journalEntries[day] = { ...state.journalEntries[day], content: '' };
-            if (state.activeJournalDay === day) el('journal-textarea').value = '';
-            renderJournalDays();
-          },
-        }),
-      });
-    });
-  });
-
-  loadJournalDay(state.activeJournalDay);
-}
-
-function selectJournalDay(day) {
-  // Autosave current before switching
-  saveJournalDay(state.activeJournalDay, el('journal-textarea').value);
-  state.activeJournalDay = day;
-  renderJournalDays();
-}
-
-function loadJournalDay(day) {
-  const entry = state.journalEntries[day];
-  el('journal-textarea').value = entry ? entry.content : '';
-  el('journal-day-label').textContent = `Day ${day}`;
+function loadJournalContent() {
+  el('journal-textarea').value = state.journalEntry?.content ?? '';
   el('journal-saved-indicator').textContent = '';
 }
 
 let journalSaveTimer = null;
-async function saveJournalDay(day, content) {
+async function saveJournal(content) {
   if (!state.currentQuestion) return;
-  const entry = await PUT(`/api/journal/${state.currentQuestion.id}/${day}`, { content });
-  state.journalEntries[day] = entry;
+  const entry = await PUT(`/api/journal/${state.currentQuestion.id}/1`, { content });
+  state.journalEntry = entry;
   loadStats();
 }
 
@@ -596,10 +576,9 @@ function scheduleJournalSave() {
   clearTimeout(journalSaveTimer);
   journalSaveTimer = setTimeout(async () => {
     const content = el('journal-textarea').value;
-    await saveJournalDay(state.activeJournalDay, content);
+    await saveJournal(content);
     el('journal-saved-indicator').textContent = 'Saved';
     setTimeout(() => { el('journal-saved-indicator').textContent = ''; }, 1500);
-    renderJournalDays();
   }, 800);
 }
 
@@ -608,6 +587,7 @@ async function loadResources() {
   if (!state.currentQuestion) return;
   state.resources = await GET(`/api/resources?question_id=${state.currentQuestion.id}`);
   if (state.activeTab === 'resources') renderResourcesList();
+  updateVisibleTabs();
 }
 
 const TYPE_EMOJI = { video: '🎥', link: '🔗', book: '📚', podcast: '🎧' };
@@ -726,7 +706,7 @@ async function loadProgramme() {
 function renderProgramme() {
   const list = el('programme-list');
   if (!state.programme.length) {
-    list.innerHTML = emptyState('Aucune activité planifiée. Commencez par définir ce que vous allez lire, regarder ou explorer cette semaine.');
+    list.innerHTML = emptyState('Aucune activité planifiée. Commencez par définir ce que vous allez lire, regarder ou explorer pour ce sujet.');
     return;
   }
   list.innerHTML = state.programme.map((item, idx) => {
@@ -880,6 +860,7 @@ async function loadRapport() {
   if (!state.currentQuestion) return;
   state.rapport = await GET(`/api/rapport/${state.currentQuestion.id}`);
   if (state.activeTab === 'rapport') renderRapport();
+  updateVisibleTabs();
 }
 
 function renderRapport() {
@@ -925,6 +906,7 @@ async function loadVoiceNotes() {
   if (!state.currentQuestion) return;
   state.voiceNotes = await GET(`/api/voice?question_id=${state.currentQuestion.id}`);
   if (state.activeTab === 'voix') renderVoiceNotes();
+  updateVisibleTabs();
 }
 
 function renderVoiceNotes() {
@@ -1140,6 +1122,7 @@ async function loadSessions() {
   if (!state.currentQuestion) return;
   state.sessions = await GET(`/api/sessions?question_id=${state.currentQuestion.id}`);
   if (state.activeTab === 'timer') renderSessionsList();
+  updateVisibleTabs();
 }
 
 const ACTIVITY_EMOJI = { reading: '📖', watching: '🎥', writing: '✍️', thinking: '💭' };
@@ -1265,8 +1248,33 @@ function bindGlobalEvents() {
   el('edit-question-btn').addEventListener('click', openEditQuestion);
 
   // Tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // "+" add-tab button
+  el('tab-add-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    const menu = el('tab-add-menu');
+    const hidden = ALL_OPTIONAL_TABS.filter(t => !state.visibleTabs.has(t));
+    menu.innerHTML = hidden.map(t =>
+      `<button class="tab-add-item" data-tab="${t}">${TAB_LABELS[t]}</button>`
+    ).join('');
+    menu.classList.toggle('hidden');
+  });
+
+  el('tab-add-menu').addEventListener('click', e => {
+    const btn = e.target.closest('.tab-add-item');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    state.visibleTabs.add(tab);
+    el('tab-add-menu').classList.add('hidden');
+    updateVisibleTabs();
+    switchTab(tab);
+  });
+
+  document.addEventListener('click', () => {
+    el('tab-add-menu').classList.add('hidden');
   });
 
   // Notes
@@ -1395,7 +1403,7 @@ const Tour = {
       emoji: '🧠',
       title: 'Bienvenue dans PhiloWeek',
       titleReturn: 'Visite guidée de PhiloWeek',
-      body: 'Un espace focalisé pour l\'enquête philosophique. Une question par semaine — explorée à travers des notes, un journal, des ressources et un assistant IA.',
+      body: 'Un espace focalisé pour l\'enquête philosophique. Une question à la fois — explorée à travers des notes, un journal, des ressources et un assistant IA.',
       bodyReturn: 'Rappel rapide de tout ce que vous pouvez faire dans PhiloWeek. Prenez 2 minutes ou cliquez sur Skip.',
     },
     // 1 ── Sidebar
@@ -1436,7 +1444,7 @@ const Tour = {
       position: 'bottom',
       emoji: '📊',
       title: 'Progression en un coup d\'œil',
-      body: 'Quatre indicateurs clés : minutes d\'étude, notes rédigées, jours de journal complétés sur 7 et ressources consultées. Ils se mettent à jour en temps réel.',
+      body: 'Quatre indicateurs clés : minutes d\'étude, notes rédigées, journal rédigé et ressources consultées. Ils se mettent à jour en temps réel.',
     },
     // 5 ── Notes tab
     {
@@ -1451,8 +1459,8 @@ const Tour = {
       target: '[data-tab="journal"]',
       position: 'bottom',
       emoji: '🗓️',
-      title: 'Journal quotidien',
-      body: 'Sélectionnez un jour parmi les 7 cercles en haut et écrivez votre réflexion du jour. Le journal se sauvegarde automatiquement. Les cercles remplis indiquent les jours complétés.',
+      title: 'Journal de réflexion',
+      body: 'Un espace libre pour noter vos pensées et réflexions sur la question. Le journal se sauvegarde automatiquement.',
     },
     // 7 ── Programme tab
     {
@@ -1516,7 +1524,7 @@ const Tour = {
       position: 'bottom',
       emoji: '📥',
       title: 'Exporter en Markdown',
-      body: 'En fin de semaine, exportez tout en un clic : votre question, les stats, toutes vos notes, chaque entrée de journal, vos ressources et l\'historique des sessions. Un fichier .md propre et structuré.',
+      body: 'Exportez tout en un clic : votre question, les stats, toutes vos notes, votre journal, vos ressources et l\'historique des sessions. Un fichier .md propre et structuré.',
     },
     // 11 ── Theme toggle
     {
@@ -1526,7 +1534,15 @@ const Tour = {
       title: 'Mode sombre / clair',
       body: 'Basculez entre le mode clair et le mode sombre à tout moment. Votre préférence est sauvegardée automatiquement.',
     },
-    // 12 ── Finish (no spotlight)
+    // 12 ── Add-tab button
+    {
+      target: '#tab-add-btn',
+      position: 'bottom',
+      emoji: '➕',
+      title: 'Sections à la demande',
+      body: 'Les onglets n\'apparaissent que quand vous avez du contenu. Cliquez sur "+" pour ouvrir une section vide — Journal, Notes, Timer, etc.',
+    },
+    // 13 ── Finish (no spotlight)
     {
       target: null,
       position: 'center',
