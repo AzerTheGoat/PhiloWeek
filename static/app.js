@@ -1445,19 +1445,31 @@ function exportMarkdown() {
 
 // ── Full JSON backup export / import ──────────────────────────────────────────
 
-function exportAll() {
-  const a = document.createElement('a');
-  a.href = '/api/export-all';
-  a.download = '';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  toast('Export téléchargé.');
+async function exportAll() {
+  try {
+    const res = await fetch('/api/export-all');
+    if (!res.ok) throw new Error(`Erreur serveur ${res.status}`);
+    const blob = await res.blob();
+    const cd = res.headers.get('content-disposition') || '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const filename = match ? match[1] : 'philoweek_backup.json';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    toast('Données exportées : ' + filename);
+  } catch (err) {
+    toast('Erreur export : ' + err.message);
+  }
 }
 
 function importAll(file) {
   if (!file) return;
   const reader = new FileReader();
+  reader.onerror = () => toast('Impossible de lire le fichier.');
   reader.onload = (e) => {
     let data;
     try {
