@@ -109,12 +109,18 @@ def import_all(payload: ImportPayload):
             conn.execute(f"DELETE FROM {table}")
 
         def insert_rows(table, rows):
-            cols = _COLUMNS[table]
-            placeholders = ", ".join("?" for _ in cols)
-            col_str = ", ".join(cols)
+            known = set(_COLUMNS[table])
             for row in rows:
-                # Fall back to None for any column not present in the row
-                vals = [row.get(c) for c in cols]
+                # Only insert columns that exist in the current schema AND in the row.
+                # Extra keys from old/future JSON versions are silently discarded.
+                # Missing keys fall back to the DB column DEFAULT via omission.
+                present = {k: v for k, v in row.items() if k in known}
+                if not present:
+                    continue
+                cols = list(present.keys())
+                vals = list(present.values())
+                placeholders = ", ".join("?" for _ in cols)
+                col_str = ", ".join(cols)
                 conn.execute(
                     f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({placeholders})",
                     vals,

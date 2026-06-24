@@ -1446,8 +1446,13 @@ function exportMarkdown() {
 // ── Full JSON backup export / import ──────────────────────────────────────────
 
 function exportAll() {
-  window.location.href = '/api/export-all';
-  toast('Export lancé — vérifiez vos téléchargements.');
+  const a = document.createElement('a');
+  a.href = '/api/export-all';
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast('Export téléchargé.');
 }
 
 function importAll(file) {
