@@ -38,6 +38,39 @@ Si tu ajoutes un onglet "Mindmap" avec l'id `#tab-mindmap` :
 },
 ```
 
+## Règle absolue : compatibilité entre versions via export/import
+
+L'application évoluera (schéma BDD, nouvelles tables, nouveaux champs). La stratégie de migration entre versions repose **uniquement** sur un export/import JSON complet — pas de scripts de migration SQL.
+
+### Contrat
+
+- Il doit **toujours** exister un bouton "Exporter tout" qui sérialise l'intégralité des données utilisateur en un seul fichier `.json`.
+- Il doit **toujours** exister un bouton "Importer" qui recharge ce fichier dans la BDD courante.
+- Le format d'export doit être **versionné** : inclure un champ `"version"` (ex. `"1.0"`) à la racine du JSON pour que l'import sache comment interpréter la structure.
+
+### Règles pour chaque nouvelle feature
+
+Quand tu ajoutes une table ou un champ :
+1. **Inclure dans l'export** : ajoute les nouvelles données dans la route `/export-all` (ou son équivalent).
+2. **Gérer à l'import** : dans la route `/import-all`, lis le champ `version` et adapte le mapping si la structure a changé (champ absent → valeur par défaut, table inexistante → créer à la volée).
+3. **Ne jamais casser l'import d'un fichier d'une version antérieure** : tout champ manquant doit avoir un fallback explicite, pas un crash.
+
+### Format minimal attendu
+
+```json
+{
+  "version": "1.0",
+  "sujets": [...],
+  "notes": [...],
+  "citations": [...],
+  "...": "toute nouvelle entité ajoutée ici"
+}
+```
+
+> **Pourquoi ?** L'utilisateur met à jour l'appli localement (git pull). Son ancienne BDD SQLite reste sur disque avec l'ancien schéma. Le seul filet de sécurité universel est : exporter avant, réinstaller, réimporter.
+
+---
+
 ## Stack technique
 
 - **Backend** : Python FastAPI + SQLite3 (`main.py`, `database.py`, `ai.py`, `export.py`)

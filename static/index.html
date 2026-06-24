@@ -50,6 +50,13 @@
         <button class="btn-icon" id="theme-toggle" title="Changer le thème" aria-label="Basculer mode sombre/clair">
           <!-- icon injected by JS -->
         </button>
+        <button class="btn-icon" id="export-all-btn" title="Exporter toutes les données (JSON)" aria-label="Exporter toutes les données">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12v1.5A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="btn-icon" id="import-all-btn" title="Importer des données (JSON)" aria-label="Importer des données">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10V2M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12v1.5A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none">
         <button class="btn-icon" id="citations-library-btn" title="Bibliothèque des citations" aria-label="Toutes les citations">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 3.5C2 2.67 2.67 2 3.5 2H6v5H3.5A1.5 1.5 0 012 5.5V3.5z" fill="currentColor" opacity=".35"/><path d="M8 3.5C8 2.67 8.67 2 9.5 2H12v5H9.5A1.5 1.5 0 018 5.5V3.5z" fill="currentColor" opacity=".35"/><path d="M2 3.5C2 2.67 2.67 2 3.5 2H6v5H3.5A1.5 1.5 0 012 5.5V3.5zM8 3.5C8 2.67 8.67 2 9.5 2H12v5H9.5A1.5 1.5 0 018 5.5V3.5z" stroke="currentColor" stroke-width="1.4"/><path d="M6 7v4a4 4 0 004 4M10 7v4a4 4 0 01-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>

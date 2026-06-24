@@ -1443,6 +1443,43 @@ function exportMarkdown() {
   window.location.href = `/export/${state.currentQuestion.id}`;
 }
 
+// ── Full JSON backup export / import ──────────────────────────────────────────
+
+function exportAll() {
+  window.location.href = '/api/export-all';
+  toast('Export lancé — vérifiez vos téléchargements.');
+}
+
+function importAll(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch {
+      toast('Fichier JSON invalide.');
+      return;
+    }
+    showConfirm({
+      icon: '📥',
+      title: 'Importer et écraser ?',
+      body: 'Toutes vos données actuelles seront remplacées par celles du fichier. Cette action est irréversible.',
+      label: 'Importer',
+      onConfirm: async () => {
+        try {
+          await POST('/api/import-all', data);
+          toast('Import réussi — rechargement…');
+          setTimeout(() => window.location.reload(), 800);
+        } catch (err) {
+          toast('Erreur import : ' + err.message);
+        }
+      },
+    });
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function escapeHtml(s) {
   return String(s)
@@ -1461,6 +1498,14 @@ function capitalize(s) {
 function bindGlobalEvents() {
   // Theme toggle
   el('theme-toggle').addEventListener('click', toggleTheme);
+
+  // Backup export / import
+  el('export-all-btn').addEventListener('click', exportAll);
+  el('import-all-btn').addEventListener('click', () => el('import-file-input').click());
+  el('import-file-input').addEventListener('change', e => {
+    importAll(e.target.files[0]);
+    e.target.value = '';
+  });
 
   // Sidebar new question
   el('new-question-btn').addEventListener('click', openNewQuestion);
@@ -1883,7 +1928,15 @@ const Tour = {
       title: 'Sections à la demande',
       body: 'Les onglets n\'apparaissent que quand vous avez du contenu. Cliquez sur "+" pour ouvrir une section vide — Journal, Notes, Timer, etc.',
     },
-    // 14 ── Finish (no spotlight)
+    // 14 ── Export / Import
+    {
+      target: '#export-all-btn',
+      position: 'right',
+      emoji: '💾',
+      title: 'Sauvegarde & migration',
+      body: 'Exportez toutes vos données en un seul fichier JSON (flèche bas). Avant une mise à jour ou un changement de machine, exportez, puis ré-importez (flèche haut) — rien ne se perd.',
+    },
+    // 15 ── Finish (no spotlight)
     {
       target: null,
       position: 'center',
