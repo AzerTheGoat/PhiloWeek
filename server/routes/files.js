@@ -4,11 +4,11 @@ const { getDb, updateTags, updateLinks } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 
 // GET /api/files — full tree
-router.get('/', async (req, res) => {
-  const db = await getDb()
-  const rows = await db.all(
+router.get('/', (req, res) => {
+  const db = getDb()
+  const rows = db.prepare(
     'SELECT id, parent_id, name, type, sort_order, created_at, updated_at FROM files ORDER BY type DESC, sort_order ASC, name ASC'
-  )
+  ).all()
   const map = {}
   rows.forEach(r => (map[r.id] = { ...r, children: [] }))
   const roots = []
@@ -20,74 +20,69 @@ router.get('/', async (req, res) => {
 })
 
 // GET /api/files/search?q=
-router.get('/search', async (req, res) => {
-  const db = await getDb()
+router.get('/search', (req, res) => {
+  const db = getDb()
   const { q } = req.query
   if (!q || q.length < 2) return res.json([])
-  const results = await db.all(
+  const results = db.prepare(
     `SELECT id, name, type, parent_id,
       substr(content, max(1, instr(lower(content), lower(?)) - 60), 160) as excerpt
      FROM files WHERE type = 'file' AND (lower(name) LIKE lower(?) OR lower(content) LIKE lower(?))
-     LIMIT 20`,
-    [q, `%${q}%`, `%${q}%`]
-  )
+     LIMIT 20`
+  ).all(q, `%${q}%`, `%${q}%`)
   res.json(results)
 })
 
 // GET /api/files/names — for [[link]] autocomplete
-router.get('/names', async (req, res) => {
-  const db = await getDb()
-  const files = await db.all("SELECT id, name, parent_id FROM files WHERE type = 'file' ORDER BY name")
-  res.json(files)
+router.get('/names', (req, res) => {
+  const db = getDb()
+  res.json(db.prepare("SELECT id, name, parent_id FROM files WHERE type = 'file' ORDER BY name").all())
 })
 
 // GET /api/files/:id
-router.get('/:id', async (req, res) => {
-  const db = await getDb()
-  const file = await db.get('SELECT * FROM files WHERE id = ?', [req.params.id])
+router.get('/:id', (req, res) => {
+  const db = getDb()
+  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   if (file.type === 'locked_folder') {
     return res.json({ id: file.id, name: file.name, type: file.type, parent_id: file.parent_id, locked: true })
   }
 
-  const tags = (await db.all('SELECT tag FROM file_tags WHERE file_id = ?', [file.id])).map(r => r.tag)
-  const links = await db.all(
-    `SELECT f.id, f.name FROM file_links fl JOIN files f ON f.id = fl.target_id WHERE fl.source_id = ?`,
-    [file.id]
-  )
-  const backlinks = await db.all(
-    `SELECT f.id, f.name FROM file_links fl JOIN files f ON f.id = fl.source_id WHERE fl.target_id = ?`,
-    [file.id]
-  )
+  const tags = db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').all(file.id).map(r => r.tag)
+  const links = db.prepare(
+    `SELECT f.id, f.name FROM file_links fl JOIN files f ON f.id = fl.target_id WHERE fl.source_id = ?`
+  ).all(file.id)
+  const backlinks = db.prepare(
+    `SELECT f.id, f.name FROM file_links fl JOIN files f ON f.id = fl.source_id WHERE fl.target_id = ?`
+  ).all(file.id)
   res.json({ ...file, tags, links, backlinks })
 })
 
 // POST /api/files
-router.post('/', async (req, res) => {
-  const db = await getDb()
+router.post('/', (req, res) => {
+  const db = getDb()
   const { parent_id, name, type, content } = req.body
   if (!name || !type) return res.status(400).json({ error: 'name and type required' })
 
   const id = uuidv4()
   const now = new Date().toISOString()
-  await db.run(
-    'INSERT INTO files (id, parent_id, name, type, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, parent_id || null, name, type, content || null, now, now]
-  )
+  db.prepare(
+    'INSERT INTO files (id, parent_id, name, type, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, parent_id || null, name, type, content || null, now, now)
 
   if (content) {
-    await updateTags(db, id, content)
-    await updateLinks(db, id, content)
+    updateTags(db, id, content)
+    updateLinks(db, id, content)
   }
 
-  res.status(201).json(await db.get('SELECT * FROM files WHERE id = ?', [id]))
+  res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(id))
 })
 
 // PUT /api/files/:id
-router.put('/:id', async (req, res) => {
-  const db = await getDb()
-  const file = await db.get('SELECT * FROM files WHERE id = ?', [req.params.id])
+router.put('/:id', (req, res) => {
+  const db = getDb()
+  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   const { name, content, parent_id, sort_order } = req.body
@@ -104,37 +99,35 @@ router.put('/:id', async (req, res) => {
 
   sets.push('updated_at = ?')
   vals.push(now, req.params.id)
-
-  await db.run(`UPDATE files SET ${sets.join(', ')} WHERE id = ?`, vals)
+  db.prepare(`UPDATE files SET ${sets.join(', ')} WHERE id = ?`).run(...vals)
 
   if (content !== undefined) {
-    await updateTags(db, req.params.id, content)
-    await updateLinks(db, req.params.id, content)
+    updateTags(db, req.params.id, content)
+    updateLinks(db, req.params.id, content)
   }
 
-  res.json(await db.get('SELECT * FROM files WHERE id = ?', [req.params.id]))
+  res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id))
 })
 
 // DELETE /api/files/:id
-router.delete('/:id', async (req, res) => {
-  const db = await getDb()
-  const file = await db.get('SELECT * FROM files WHERE id = ?', [req.params.id])
+router.delete('/:id', (req, res) => {
+  const db = getDb()
+  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
   if (file.name === 'Journal' && !file.parent_id) {
     return res.status(403).json({ error: 'Cannot delete the Journal folder' })
   }
-  await db.run('DELETE FROM files WHERE id = ?', [req.params.id])
+  db.prepare('DELETE FROM files WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
 })
 
 // PUT /api/files/:id/move
-router.put('/:id/move', async (req, res) => {
-  const db = await getDb()
+router.put('/:id/move', (req, res) => {
+  const db = getDb()
   const { parent_id, sort_order } = req.body
-  await db.run(
-    "UPDATE files SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?",
-    [parent_id || null, sort_order ?? 0, req.params.id]
-  )
+  db.prepare(
+    "UPDATE files SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?"
+  ).run(parent_id || null, sort_order ?? 0, req.params.id)
   res.json({ ok: true })
 })
 
@@ -142,19 +135,18 @@ router.put('/:id/move', async (req, res) => {
 router.post('/:id/unlock', async (req, res) => {
   const bcrypt = require('bcrypt')
   const crypto = require('crypto')
-  const db = await getDb()
+  const db = getDb()
   const { password } = req.body
 
-  const folder = await db.get(
-    "SELECT * FROM files WHERE id = ? AND type = 'locked_folder'",
-    [req.params.id]
-  )
+  const folder = db.prepare(
+    "SELECT * FROM files WHERE id = ? AND type = 'locked_folder'"
+  ).get(req.params.id)
   if (!folder) return res.status(404).json({ error: 'Not found' })
 
   const valid = await bcrypt.compare(password, folder.password_hash)
   if (!valid) return res.status(401).json({ error: 'Wrong password' })
 
-  const children = await db.all('SELECT * FROM files WHERE parent_id = ?', [req.params.id])
+  const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
   const decrypted = children.map(child => {
@@ -178,7 +170,7 @@ router.post('/:id/unlock', async (req, res) => {
 router.post('/:id/lock', async (req, res) => {
   const bcrypt = require('bcrypt')
   const crypto = require('crypto')
-  const db = await getDb()
+  const db = getDb()
   const { password } = req.body
   if (!password || password.length < 4) {
     return res.status(400).json({ error: 'Password must be at least 4 characters' })
@@ -187,18 +179,17 @@ router.post('/:id/lock', async (req, res) => {
   const hash = await bcrypt.hash(password, 10)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
-  await db.run("UPDATE files SET type = 'locked_folder', password_hash = ? WHERE id = ?", [hash, req.params.id])
+  db.prepare("UPDATE files SET type = 'locked_folder', password_hash = ? WHERE id = ?").run(hash, req.params.id)
 
-  const children = await db.all('SELECT * FROM files WHERE parent_id = ?', [req.params.id])
+  const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
+  const updateEnc = db.prepare('UPDATE files SET encrypted_content = ?, content = NULL WHERE id = ?')
   for (const child of children) {
     if (!child.content) continue
     const iv = crypto.randomBytes(16)
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
     let enc = cipher.update(child.content, 'utf8', 'hex')
     enc += cipher.final('hex')
-    await db.run('UPDATE files SET encrypted_content = ?, content = NULL WHERE id = ?', [
-      iv.toString('hex') + enc, child.id
-    ])
+    updateEnc.run(iv.toString('hex') + enc, child.id)
   }
 
   res.json({ ok: true })

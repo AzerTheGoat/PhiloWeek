@@ -5,9 +5,9 @@ const matter = require('gray-matter')
 const { getDb } = require('../db')
 
 router.get('/obsidian', async (req, res) => {
-  const db = await getDb()
+  const db = getDb()
   const zip = new JSZip()
-  const allFiles = await db.all('SELECT * FROM files ORDER BY type DESC, sort_order, name')
+  const allFiles = db.prepare('SELECT * FROM files ORDER BY type DESC, sort_order, name').all()
 
   const pathMap = {}
   function getPath(id) {
@@ -22,7 +22,6 @@ router.get('/obsidian', async (req, res) => {
   for (const file of allFiles) {
     if (file.type !== 'file') continue
 
-    // Skip files inside locked folders
     let curr = file
     let locked = false
     while (curr.parent_id) {
@@ -38,7 +37,7 @@ router.get('/obsidian', async (req, res) => {
     try { parsed = matter(rawContent) }
     catch (_) { parsed = { data: {}, content: rawContent } }
 
-    const tags = (await db.all('SELECT tag FROM file_tags WHERE file_id = ?', [file.id])).map(r => r.tag)
+    const tags = db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').all(file.id).map(r => r.tag)
 
     const frontmatter = {
       ...parsed.data,

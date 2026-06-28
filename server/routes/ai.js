@@ -44,25 +44,24 @@ router.post('/generate', async (req, res) => {
   const { file_id, mode } = req.body
   if (!SYSTEM_PROMPTS[mode]) return res.status(400).json({ error: `Unknown mode: ${mode}` })
 
-  const db = await getDb()
+  const db = getDb()
   let userContent = ''
 
   if (mode === 'profile') {
-    const allFiles = await db.all(
+    const allFiles = db.prepare(
       "SELECT name, content FROM files WHERE type = 'file' AND content IS NOT NULL AND length(content) > 50"
-    )
+    ).all()
     userContent = allFiles.map(f => `=== ${f.name} ===\n${f.content}`).join('\n\n---\n\n')
     if (!userContent) {
       return res.json({ text: "Aucune note trouvée. Commence à écrire des notes pour que je puisse analyser ta philosophie." })
     }
   } else if (file_id) {
-    const file = await db.get('SELECT * FROM files WHERE id = ?', [file_id])
+    const file = db.prepare('SELECT * FROM files WHERE id = ?').get(file_id)
     if (file) {
       userContent = `# ${file.name}\n\n${file.content || ''}`
-      const linked = await db.all(
-        `SELECT f.name, f.content FROM file_links fl JOIN files f ON f.id = fl.target_id WHERE fl.source_id = ?`,
-        [file_id]
-      )
+      const linked = db.prepare(
+        `SELECT f.name, f.content FROM file_links fl JOIN files f ON f.id = fl.target_id WHERE fl.source_id = ?`
+      ).all(file_id)
       if (linked.length > 0) {
         userContent += '\n\n---\n*Notes liées :*\n'
         linked.forEach(l => { userContent += `\n## ${l.name}\n${(l.content || '').slice(0, 800)}\n` })
