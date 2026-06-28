@@ -3,14 +3,18 @@ import * as api from '../api'
 
 const Ctx = createContext(null)
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+}
+
 const init = {
   tree: [],
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life'
   theme: localStorage.getItem('pw-theme') || 'dark',
-  showAI: true,
-  sidebarOpen: true,
+  showAI: !isMobileViewport(),
+  sidebarOpen: !isMobileViewport(),
   toasts: [],
   contextMenu: null,
   modal: null,
@@ -22,14 +26,39 @@ function reducer(state, action) {
   switch (action.type) {
     case 'SET_TREE': return { ...state, tree: action.payload }
     case 'SET_FILE_NAMES': return { ...state, fileNames: action.payload }
-    case 'OPEN_FILE': return { ...state, openFile: action.payload, openFileId: action.payload?.id || null, view: 'editor' }
-    case 'SET_VIEW': return { ...state, view: action.payload }
+    case 'OPEN_FILE': return {
+      ...state,
+      openFile: action.payload,
+      openFileId: action.payload?.id || null,
+      view: 'editor',
+      sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+    }
+    case 'SET_VIEW': return {
+      ...state,
+      view: action.payload,
+      sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+      showAI: isMobileViewport() && action.payload !== 'editor' ? false : state.showAI,
+    }
     case 'SET_THEME': {
       localStorage.setItem('pw-theme', action.payload)
       return { ...state, theme: action.payload }
     }
-    case 'TOGGLE_AI': return { ...state, showAI: !state.showAI }
-    case 'TOGGLE_SIDEBAR': return { ...state, sidebarOpen: !state.sidebarOpen }
+    case 'TOGGLE_AI': {
+      const showAI = !state.showAI
+      return {
+        ...state,
+        showAI,
+        sidebarOpen: isMobileViewport() && showAI ? false : state.sidebarOpen,
+      }
+    }
+    case 'TOGGLE_SIDEBAR': {
+      const sidebarOpen = !state.sidebarOpen
+      return {
+        ...state,
+        sidebarOpen,
+        showAI: isMobileViewport() && sidebarOpen ? false : state.showAI,
+      }
+    }
     case 'ADD_TOAST': return { ...state, toasts: [...state.toasts, action.payload] }
     case 'REMOVE_TOAST': return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) }
     case 'SET_CONTEXT_MENU': return { ...state, contextMenu: action.payload }

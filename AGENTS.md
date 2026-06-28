@@ -129,3 +129,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le rapport IA (`POST /api/life/report`) agrège les notes modifiées, citations, idées, ressources, sessions timer et notes vocales sur la durée choisie.
 - Le rapport doit rester prudent : hypothèses sur l'état mental, pas de diagnostic médical.
 - L'export Obsidian ajoute les citations dans `_PhiloWeek/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
+
+## Experience mobile
+
+- Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers/IA en tiroirs plein ecran.
+- Sur mobile, la sidebar et le panneau IA ne sont pas ouverts par defaut. Ouvrir une note referme automatiquement la sidebar.
+- Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
+- Les vues Editeur, Journal, Timer, Inbox et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
+- Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.
