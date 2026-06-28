@@ -7,16 +7,88 @@ import * as api from '../api'
 const AUTOSAVE_DELAY = 800
 
 export default function Editor() {
-  const { openFile, openFileId, isDirty, updateContent, saveFile, toast, fileNames, insertRef } = useApp()
-  const [mode, setMode] = useState('split') // 'edit' | 'split' | 'preview'
+  const { openFile, openFileId, saveFile, toast, fileNames, insertRef } = useApp()
+
+  // Content is LOCAL state — never dispatched to global context
+  const [content, setContent] = useState(openFile?.content || '')
+  const [isDirty, setIsDirty] = useState(false)
+  const [mode, setMode] = useState('split')
   const [wordCount, setWordCount] = useState(0)
   const [saving, setSaving] = useState(false)
-  const [wikiQuery, setWikiQuery] = useState(null) // { query, openPos }
-  const textareaRef = useRef(null)
-  const saveTimer = useRef(null)
-  const activeTimer = useRef(null)
+  const [wikiQuery, setWikiQuery] = useState(null)
+  // Debounced content for Preview — avoids re-rendering preview on every keystroke
+  const [previewContent, setPreviewContent] = useState(openFile?.content || '')
 
-  const content = openFile?.content || ''
+  const textareaRef = useRef(null)
+  const saveTimerRef = useRef(null)
+  const activeTimerRef = useRef(null)
+  const previewTimerRef = useRef(null)
+  const wordCountTimerRef = useRef(null)
+
+  // Always-fresh refs — safe to use inside useCallback without deps
+  const contentRef = useRef(content)
+  const wikiQueryRef = useRef(wikiQuery)
+  const isDirtyRef = useRef(isDirty)
+  const prevFileIdRef = useRef(openFileId)
+  // Holds latest openFileId + saveFile — avoids callback recreation
+  const saveRef = useRef({ openFileId, saveFile })
+
+  contentRef.current = content
+  wikiQueryRef.current = wikiQuery
+  isDirtyRef.current = isDirty
+  saveRef.current = { openFileId, saveFile }
+
+  // Stable save trigger — no deps needed, reads from refs
+  const triggerSave = useCallback((value) => {
+    clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      const { openFileId: fid, saveFile: fn } = saveRef.current
+      if (!fid) return
+      setSaving(true)
+      try {
+        await fn(fid, value)
+        setIsDirty(false)
+      } catch (_) {
+        // toast shown by saveFile in context
+      } finally {
+        setSaving(false)
+      }
+    }, AUTOSAVE_DELAY)
+  }, [])
+
+  // Sync content when the opened file changes
+  useEffect(() => {
+    const prevId = prevFileIdRef.current
+    // Save pending changes before switching files
+    if (prevId && prevId !== openFileId && isDirtyRef.current) {
+      clearTimeout(saveTimerRef.current)
+      const { saveFile: fn } = saveRef.current
+      fn(prevId, contentRef.current)
+    }
+    prevFileIdRef.current = openFileId
+    const newContent = openFile?.content || ''
+    setContent(newContent)
+    setPreviewContent(newContent)
+    setIsDirty(false)
+    clearTimeout(saveTimerRef.current)
+  }, [openFile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced word count
+  useEffect(() => {
+    clearTimeout(wordCountTimerRef.current)
+    wordCountTimerRef.current = setTimeout(() => {
+      const text = content.replace(/^---[\s\S]*?---\n?/, '').replace(/[#*`_~\[\]]/g, '')
+      setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0)
+    }, 400)
+    return () => clearTimeout(wordCountTimerRef.current)
+  }, [content])
+
+  // Debounced preview — only updates 350ms after typing stops
+  useEffect(() => {
+    clearTimeout(previewTimerRef.current)
+    previewTimerRef.current = setTimeout(() => setPreviewContent(content), 350)
+    return () => clearTimeout(previewTimerRef.current)
+  }, [content])
 
   // Wire up "Insert into note" for AI panel
   useEffect(() => {
@@ -24,36 +96,23 @@ export default function Editor() {
       const ta = textareaRef.current
       if (!ta) return
       const pos = ta.selectionStart
-      const newContent = content.slice(0, pos) + '\n\n' + text + '\n\n' + content.slice(pos)
-      updateContent(newContent)
+      setContent(prev => {
+        const newContent = prev.slice(0, pos) + '\n\n' + text + '\n\n' + prev.slice(pos)
+        triggerSave(newContent)
+        return newContent
+      })
+      setIsDirty(true)
       ta.focus()
     }
     return () => { insertRef.current = null }
-  }, [content, updateContent, insertRef])
-
-  // Word count
-  useEffect(() => {
-    const text = content.replace(/^---[\s\S]*?---\n?/, '').replace(/[#*`_~\[\]]/g, '')
-    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0)
-  }, [content])
-
-  // Autosave
-  const triggerSave = useCallback((value) => {
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true)
-      await saveFile(openFileId, value)
-      setSaving(false)
-    }, AUTOSAVE_DELAY)
-  }, [openFileId, saveFile])
+  }, [insertRef, triggerSave])
 
   // AI active mode trigger (90s without typing)
   useEffect(() => {
     if (!openFile) return
     const reset = () => {
-      clearTimeout(activeTimer.current)
-      activeTimer.current = setTimeout(async () => {
-        // Get current paragraph around cursor
+      clearTimeout(activeTimerRef.current)
+      activeTimerRef.current = setTimeout(async () => {
         const ta = textareaRef.current
         if (!ta) return
         const pos = ta.selectionStart
@@ -71,23 +130,23 @@ export default function Editor() {
     window.addEventListener('keydown', reset)
     return () => {
       window.removeEventListener('keydown', reset)
-      clearTimeout(activeTimer.current)
+      clearTimeout(activeTimerRef.current)
     }
   }, [openFile, toast])
 
   const handleChange = useCallback((e) => {
     const value = e.target.value
-    updateContent(value)
+    setContent(value)
+    setIsDirty(true)
     triggerSave(value)
     checkWikiLink(e.target)
-  }, [updateContent, triggerSave])
+  }, [triggerSave])
 
   function checkWikiLink(ta) {
     const pos = ta.selectionStart
     const before = ta.value.slice(0, pos)
     const lastOpen = before.lastIndexOf('[[')
     const lastClose = before.lastIndexOf(']]')
-
     if (lastOpen > lastClose && lastOpen >= 0) {
       const query = before.slice(lastOpen + 2)
       if (!query.includes('\n') && query.length <= 50) {
@@ -100,38 +159,41 @@ export default function Editor() {
 
   function insertWikiLink(fileName) {
     const ta = textareaRef.current
-    if (!ta || !wikiQuery) return
+    if (!ta) return
+    const wq = wikiQueryRef.current
+    if (!wq) return
     const pos = ta.selectionStart
-    const value = ta.value
+    const cur = contentRef.current
     const name = fileName.replace(/\.md$/i, '')
-    const newValue = value.slice(0, wikiQuery.openPos) + `[[${name}]]` + value.slice(pos)
-    updateContent(newValue)
+    const newValue = cur.slice(0, wq.openPos) + `[[${name}]]` + cur.slice(pos)
+    setContent(newValue)
+    setIsDirty(true)
     triggerSave(newValue)
     setWikiQuery(null)
     setTimeout(() => {
-      const newPos = wikiQuery.openPos + name.length + 4
+      const newPos = wq.openPos + name.length + 4
       ta.setSelectionRange(newPos, newPos)
       ta.focus()
     }, 0)
   }
 
-  // Toolbar format actions
+  // Toolbar format actions — stable, reads content from ref
   const format = useCallback((before, after = '') => {
     const ta = textareaRef.current
     if (!ta) return
+    const cur = contentRef.current
     const start = ta.selectionStart
     const end = ta.selectionEnd
-    const sel = content.slice(start, end)
-    const newContent = content.slice(0, start) + before + sel + after + content.slice(end)
-    updateContent(newContent)
+    const sel = cur.slice(start, end)
+    const newContent = cur.slice(0, start) + before + sel + after + cur.slice(end)
+    setContent(newContent)
+    setIsDirty(true)
     triggerSave(newContent)
     setTimeout(() => {
-      const newStart = start + before.length
-      const newEnd = newStart + sel.length
-      ta.setSelectionRange(newStart, newEnd)
+      ta.setSelectionRange(start + before.length, start + before.length + sel.length)
       ta.focus()
     }, 0)
-  }, [content, updateContent, triggerSave])
+  }, [triggerSave])
 
   // Image paste → WebP base64
   const handlePaste = useCallback(async (e) => {
@@ -139,7 +201,6 @@ export default function Editor() {
     const imageItem = items.find(i => i.type.startsWith('image/'))
     if (!imageItem) return
     e.preventDefault()
-
     const blob = imageItem.getAsFile()
     const bmp = await createImageBitmap(blob)
     const canvas = document.createElement('canvas')
@@ -149,50 +210,50 @@ export default function Editor() {
     canvas.height = Math.round(bmp.height * ratio)
     canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height)
     const dataUrl = canvas.toDataURL('image/webp', 0.85)
-
     const imgMarkdown = `![image](${dataUrl})`
     const ta = textareaRef.current
     const pos = ta.selectionStart
-    const newContent = content.slice(0, pos) + imgMarkdown + content.slice(pos)
-    updateContent(newContent)
+    const cur = contentRef.current
+    const newContent = cur.slice(0, pos) + imgMarkdown + cur.slice(pos)
+    setContent(newContent)
+    setIsDirty(true)
     triggerSave(newContent)
-  }, [content, updateContent, triggerSave])
+  }, [triggerSave])
 
-  // Key shortcuts in textarea
+  // Key shortcuts — stable, reads from refs (no stale closures)
   const handleKeyDown = useCallback((e) => {
-    // Close wiki autocomplete on Escape
-    if (e.key === 'Escape' && wikiQuery) {
+    if (e.key === 'Escape' && wikiQueryRef.current) {
       setWikiQuery(null)
       return
     }
-    // Tab → indent
     if (e.key === 'Tab') {
       e.preventDefault()
       const ta = textareaRef.current
       const start = ta.selectionStart
-      const newContent = content.slice(0, start) + '  ' + content.slice(start)
-      updateContent(newContent)
+      const cur = contentRef.current
+      const newContent = cur.slice(0, start) + '  ' + cur.slice(start)
+      setContent(newContent)
+      setIsDirty(true)
+      triggerSave(newContent)
       setTimeout(() => ta.setSelectionRange(start + 2, start + 2), 0)
     }
-    // Ctrl/Cmd+S → save immediately
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault()
-      clearTimeout(saveTimer.current)
-      saveFile(openFileId, content)
+      clearTimeout(saveTimerRef.current)
+      const { openFileId: fid, saveFile: fn } = saveRef.current
+      fn(fid, contentRef.current)
+      setIsDirty(false)
     }
-  }, [wikiQuery, content, updateContent, openFileId, saveFile])
+  }, [triggerSave])
 
   const filteredFiles = wikiQuery
-    ? fileNames
-        .filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase()))
-        .slice(0, 8)
+    ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
     : []
 
   if (!openFile) return null
 
   return (
     <div className="editor-container">
-      {/* Title bar */}
       <div className="editor-titlebar">
         <h2 className="editor-filename">{openFile.name.replace(/\.md$/i, '')}</h2>
         <div className="editor-meta">
@@ -208,10 +269,8 @@ export default function Editor() {
         </div>
       </div>
 
-      {/* Toolbar */}
       {mode !== 'preview' && <EditorToolbar format={format} />}
 
-      {/* Editor body */}
       <div className={`editor-body mode-${mode}`}>
         {mode !== 'preview' && (
           <div className="editor-write-pane">
@@ -226,8 +285,6 @@ export default function Editor() {
               autoComplete="off"
               placeholder="Commence à écrire… (supporte Markdown et [[liens]])"
             />
-
-            {/* Wiki link autocomplete */}
             {wikiQuery && filteredFiles.length > 0 && (
               <div className="wiki-autocomplete">
                 <div className="wiki-ac-header">Lier une note ([[{wikiQuery.query}…)</div>
@@ -244,10 +301,9 @@ export default function Editor() {
             )}
           </div>
         )}
-
         {mode !== 'edit' && (
           <div className="editor-preview-pane">
-            <Preview content={content} />
+            <Preview content={previewContent} />
           </div>
         )}
       </div>

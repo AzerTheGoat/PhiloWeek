@@ -1,11 +1,10 @@
-import { useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/AppContext'
 
-// Configure marked
 marked.setOptions({ breaks: true, gfm: true })
 
-export default function Preview({ content }) {
+const Preview = memo(function Preview({ content }) {
   const { fileNames, openFile } = useApp()
 
   const nameToId = useMemo(() => {
@@ -51,4 +50,6 @@ export default function Preview({ content }) {
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
-}
+})
+
+export default Preview

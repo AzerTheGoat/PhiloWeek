@@ -7,7 +7,6 @@ const init = {
   tree: [],
   openFileId: null,
   openFile: null,
-  isDirty: false,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox'
   theme: localStorage.getItem('pw-theme') || 'dark',
   showAI: true,
@@ -15,7 +14,7 @@ const init = {
   toasts: [],
   contextMenu: null,
   modal: null,
-  fileNames: [], // lightweight list for [[link]] autocomplete
+  fileNames: [],
   showFilePicker: false,
 }
 
@@ -23,9 +22,7 @@ function reducer(state, action) {
   switch (action.type) {
     case 'SET_TREE': return { ...state, tree: action.payload }
     case 'SET_FILE_NAMES': return { ...state, fileNames: action.payload }
-    case 'OPEN_FILE': return { ...state, openFile: action.payload, openFileId: action.payload?.id || null, isDirty: false, view: 'editor' }
-    case 'UPDATE_CONTENT': return { ...state, openFile: { ...state.openFile, content: action.payload }, isDirty: true }
-    case 'SAVED': return { ...state, isDirty: false }
+    case 'OPEN_FILE': return { ...state, openFile: action.payload, openFileId: action.payload?.id || null, view: 'editor' }
     case 'SET_VIEW': return { ...state, view: action.payload }
     case 'SET_THEME': {
       localStorage.setItem('pw-theme', action.payload)
@@ -44,7 +41,7 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, init)
-  const insertRef = useRef(null) // callback for "Insert into note" from AI
+  const insertRef = useRef(null)
 
   const loadTree = useCallback(async () => {
     try {
@@ -66,16 +63,11 @@ export function AppProvider({ children }) {
     }
   }, [])
 
-  const updateContent = useCallback((content) => {
-    dispatch({ type: 'UPDATE_CONTENT', payload: content })
-  }, [])
-
   const saveFile = useCallback(async (id, content) => {
     try {
       await api.updateFile(id, { content })
-      dispatch({ type: 'SAVED' })
     } catch (err) {
-      toast(err.message, 'error')
+      toast(err.message || 'Erreur lors de la sauvegarde', 'error')
     }
   }, [])
 
@@ -102,22 +94,15 @@ export function AppProvider({ children }) {
   }, [])
 
   const openJournalToday = useCallback(async () => {
-    // Find or create today's entry in the /Journal/ folder
     const today = new Date().toISOString().slice(0, 10)
     const fileName = `${today}.md`
-
-    // Find Journal folder
     const flat = flattenTree(state.tree)
     const journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id && f.type === 'folder')
     if (!journalFolder) { toast('Dossier Journal introuvable', 'error'); return }
-
-    // Find today's file
     const todayFile = flat.find(f => f.name === fileName && f.parent_id === journalFolder.id)
-
     if (todayFile) {
       await openFile(todayFile.id)
     } else {
-      // Create it
       try {
         const date = new Date()
         const header = `---\ntitle: Journal du ${date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\ntags: [journal]\ncreated: ${date.toISOString()}\n---\n\n`
@@ -141,7 +126,6 @@ export function AppProvider({ children }) {
     dispatch,
     loadTree,
     openFile,
-    updateContent,
     saveFile,
     toast,
     showContextMenu,
@@ -157,14 +141,10 @@ export function AppProvider({ children }) {
 
 export const useApp = () => useContext(Ctx)
 
-// Helper
 function flattenTree(nodes) {
   const result = []
   function walk(arr) {
-    arr.forEach(n => {
-      result.push(n)
-      if (n.children) walk(n.children)
-    })
+    arr.forEach(n => { result.push(n); if (n.children) walk(n.children) })
   }
   walk(nodes)
   return result

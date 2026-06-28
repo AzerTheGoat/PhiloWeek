@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import * as api from '../api'
 
@@ -20,13 +20,12 @@ export default function Modals() {
 function NewFileModal({ modal, hideModal }) {
   const { loadTree, openFile, toast } = useApp()
   const [name, setName] = useState('')
-  const inputRef = useRef(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
     const fileName = name.trim().endsWith('.md') ? name.trim() : name.trim() + '.md'
     try {
       const f = await api.createFile({
@@ -41,6 +40,7 @@ function NewFileModal({ modal, hideModal }) {
       toast(`"${fileName}" créé`)
     } catch (err) {
       toast(err.message, 'error')
+      setSubmitting(false)
     }
   }
 
@@ -52,7 +52,7 @@ function NewFileModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
-          ref={inputRef}
+          autoFocus
           type="text"
           placeholder="Nom du fichier"
           value={name}
@@ -63,7 +63,9 @@ function NewFileModal({ modal, hideModal }) {
           <p className="modal-hint">Sera créé dans le dossier sélectionné</p>
         )}
         <div className="modal-actions">
-          <button type="submit" className="btn-primary" disabled={!name.trim()}>Créer</button>
+          <button type="submit" className="btn-primary" disabled={!name.trim() || submitting}>
+            {submitting ? 'Création…' : 'Créer'}
+          </button>
           <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
         </div>
       </form>
@@ -74,13 +76,12 @@ function NewFileModal({ modal, hideModal }) {
 function NewFolderModal({ modal, hideModal }) {
   const { loadTree, toast } = useApp()
   const [name, setName] = useState('')
-  const inputRef = useRef(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
     try {
       await api.createFile({
         parent_id: modal.data?.parent_id || null,
@@ -92,6 +93,7 @@ function NewFolderModal({ modal, hideModal }) {
       toast(`Dossier "${name.trim()}" créé`)
     } catch (err) {
       toast(err.message, 'error')
+      setSubmitting(false)
     }
   }
 
@@ -103,7 +105,7 @@ function NewFolderModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
-          ref={inputRef}
+          autoFocus
           type="text"
           placeholder="Nom du dossier"
           value={name}
@@ -111,7 +113,9 @@ function NewFolderModal({ modal, hideModal }) {
           className="modal-input"
         />
         <div className="modal-actions">
-          <button type="submit" className="btn-primary" disabled={!name.trim()}>Créer</button>
+          <button type="submit" className="btn-primary" disabled={!name.trim() || submitting}>
+            {submitting ? 'Création…' : 'Créer'}
+          </button>
           <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
         </div>
       </form>
@@ -123,14 +127,14 @@ function LockFolderModal({ modal, hideModal }) {
   const { loadTree, toast } = useApp()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const inputRef = useRef(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
+  const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (submitting) return
     if (password !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return }
     if (password.length < 4) { toast('Minimum 4 caractères', 'error'); return }
+    setSubmitting(true)
     try {
       await api.lockFolder(modal.data.id, password)
       await loadTree()
@@ -138,6 +142,7 @@ function LockFolderModal({ modal, hideModal }) {
       toast('Dossier verrouillé')
     } catch (err) {
       toast(err.message, 'error')
+      setSubmitting(false)
     }
   }
 
@@ -152,7 +157,7 @@ function LockFolderModal({ modal, hideModal }) {
           Le contenu sera chiffré AES-256. Sans le mot de passe, les fichiers seront inaccessibles.
         </p>
         <input
-          ref={inputRef}
+          autoFocus
           type="password"
           placeholder="Mot de passe"
           value={password}
@@ -167,7 +172,9 @@ function LockFolderModal({ modal, hideModal }) {
           className="modal-input"
         />
         <div className="modal-actions">
-          <button type="submit" className="btn-danger" disabled={!password || !confirm}>Verrouiller</button>
+          <button type="submit" className="btn-danger" disabled={!password || !confirm || submitting}>
+            {submitting ? 'Verrouillage…' : 'Verrouiller'}
+          </button>
           <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
         </div>
       </form>
