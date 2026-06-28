@@ -26,7 +26,7 @@
   --radius: 6px;
   --radius-lg: 10px;
   --sidebar-w: 260px;
-  --ai-w: 320px;
+  --ai-w: 360px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   --font-prose: 'Georgia', 'Charter', 'Times New Roman', serif;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -656,6 +656,94 @@ kbd {
   background: var(--accent-dim);
 }
 .ai-context strong { color: var(--text) }
+
+.ai-settings {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ai-provider-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ai-provider-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  transition: background 0.1s, color 0.1s;
+}
+.ai-provider-btn:hover { background: var(--bg-hover); color: var(--text) }
+.ai-provider-btn.active { background: var(--accent-dim); color: var(--accent-hover) }
+
+.ai-field {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ai-field select,
+.ai-field input {
+  min-width: 0;
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.ai-field select:focus,
+.ai-field input:focus { border-color: var(--border-focus) }
+
+.ai-model-desc {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+.ai-token-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.ai-cost {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: baseline;
+  padding: 7px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+.ai-cost span { color: var(--text-2) }
+.ai-cost strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--success);
+}
+.ai-cost small {
+  grid-column: 1 / -1;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+.ai-cost.muted {
+  display: block;
+  color: var(--text-3);
+}
 
 .ai-modes {
   display: grid;

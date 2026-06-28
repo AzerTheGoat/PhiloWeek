@@ -29,8 +29,10 @@ export const unlockFolder = (id, password) => req('POST', `/files/${id}/unlock`,
 export const lockFolder = (id, password) => req('POST', `/files/${id}/lock`, { password })
 
 // AI
-export const generateAI = (file_id, mode, content_override) =>
-  req('POST', '/ai/generate', { file_id, mode, content_override })
+export const getAIModels = () => req('GET', '/ai/models')
+export const estimateAI = data => req('POST', '/ai/estimate', data)
+export const generateAI = (file_id, mode, options = {}) =>
+  req('POST', '/ai/generate', { file_id, mode, ...options })
 export const activeAI = paragraph => req('POST', '/ai/active', { paragraph })
 
 // Export / Import
