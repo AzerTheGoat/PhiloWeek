@@ -1,0 +1,224 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useApp } from '../context/AppContext'
+import * as api from '../api'
+
+const ACTIVITIES = [
+  { id: 'reading', label: 'Lecture', icon: '📖' },
+  { id: 'watching', label: 'Visionnage', icon: '🎥' },
+  { id: 'writing', label: 'Écriture', icon: '✍' },
+  { id: 'thinking', label: 'Réflexion', icon: '💭' },
+]
+
+export default function Timer() {
+  const { openFileId, openFile, toast, dispatch, openJournalToday } = useApp()
+  const [seconds, setSeconds] = useState(0)
+  const [running, setRunning] = useState(false)
+  const [activity, setActivity] = useState('thinking')
+  const [sessions, setSessions] = useState([])
+  const [stats, setStats] = useState({ today_seconds: 0, total_seconds: 0 })
+  const [pendingSave, setPendingSave] = useState(false)
+  const [sessionNotes, setSessionNotes] = useState('')
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const [s, st] = await Promise.all([api.getTimerSessions(), api.getTimerStats()])
+      setSessions(s)
+      setStats(st)
+    } catch (_) {}
+  }
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
+    } else {
+      clearInterval(intervalRef.current)
+    }
+    return () => clearInterval(intervalRef.current)
+  }, [running])
+
+  const fmt = (s) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    return h > 0
+      ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  }
+
+  const fmtMin = (s) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`
+  }
+
+  const stop = useCallback(() => {
+    setRunning(false)
+    if (seconds >= 10) setPendingSave(true)
+    else setSeconds(0)
+  }, [seconds])
+
+  const reset = useCallback(() => {
+    setRunning(false)
+    setSeconds(0)
+    setPendingSave(false)
+    setSessionNotes('')
+  }, [])
+
+  const saveSession = useCallback(async (addToJournal = false) => {
+    try {
+      await api.saveTimerSession({
+        file_id: openFileId || null,
+        duration_seconds: seconds,
+        activity_type: activity,
+        notes: sessionNotes || null
+      })
+
+      if (addToJournal) {
+        // Open today's journal
+        await openJournalToday()
+        // The journal will be open in editor; the content insert happens via insertRef
+        toast('Session sauvegardée. Ajoute des notes dans ton journal.')
+      } else {
+        toast('Session sauvegardée')
+      }
+
+      await loadData()
+      reset()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }, [seconds, activity, sessionNotes, openFileId, openJournalToday, toast, reset])
+
+  const deleteSession = useCallback(async (id) => {
+    await api.deleteTimerSession(id)
+    await loadData()
+    toast('Session supprimée')
+  }, [loadData, toast])
+
+  return (
+    <div className="timer-view">
+      <div className="timer-header">
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })}>←</button>
+        <h2>Timer de travail</h2>
+      </div>
+
+      {openFile && (
+        <div className="timer-context">
+          Fichier actif : <strong>{openFile.name.replace(/\.md$/i, '')}</strong>
+        </div>
+      )}
+
+      {/* Clock */}
+      <div className={`timer-display ${running ? 'running' : ''}`}>
+        {fmt(seconds)}
+      </div>
+
+      {/* Controls */}
+      {!pendingSave ? (
+        <div className="timer-controls">
+          {!running ? (
+            <button className="btn-primary timer-start" onClick={() => setRunning(true)}>
+              ▶ Démarrer
+            </button>
+          ) : (
+            <button className="btn-danger timer-stop" onClick={stop}>
+              ⏹ Arrêter
+            </button>
+          )}
+          {seconds > 0 && !running && (
+            <button className="btn-ghost" onClick={reset}>Réinitialiser</button>
+          )}
+        </div>
+      ) : (
+        <div className="timer-save-panel">
+          <div className="timer-save-info">
+            Session de <strong>{fmtMin(seconds)}</strong>
+          </div>
+          <div className="activity-picker">
+            {ACTIVITIES.map(a => (
+              <button
+                key={a.id}
+                className={`activity-btn ${activity === a.id ? 'active' : ''}`}
+                onClick={() => setActivity(a.id)}
+              >
+                {a.icon} {a.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="session-notes"
+            placeholder="Notes optionnelles sur cette session…"
+            value={sessionNotes}
+            onChange={e => setSessionNotes(e.target.value)}
+            rows={3}
+          />
+          <div className="timer-save-actions">
+            <button className="btn-primary" onClick={() => saveSession(false)}>
+              Sauvegarder
+            </button>
+            <button className="btn-ghost" onClick={() => saveSession(true)}>
+              + Ajouter au journal
+            </button>
+            <button className="btn-ghost danger" onClick={reset}>
+              Ignorer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Activity type selector (when not in save mode) */}
+      {!pendingSave && (
+        <div className="activity-picker">
+          {ACTIVITIES.map(a => (
+            <button
+              key={a.id}
+              className={`activity-btn ${activity === a.id ? 'active' : ''}`}
+              onClick={() => setActivity(a.id)}
+            >
+              {a.icon} {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="timer-stats">
+        <div className="timer-stat">
+          <span className="stat-label">Aujourd'hui</span>
+          <span className="stat-value">{fmtMin(stats.today_seconds)}</span>
+        </div>
+        <div className="timer-stat">
+          <span className="stat-label">Total</span>
+          <span className="stat-value">{fmtMin(stats.total_seconds)}</span>
+        </div>
+      </div>
+
+      {/* Session history */}
+      <div className="timer-history">
+        <h3>Historique récent</h3>
+        {sessions.length === 0 && <div className="history-empty">Aucune session</div>}
+        {sessions.slice(0, 15).map(s => {
+          const act = ACTIVITIES.find(a => a.id === s.activity_type) || ACTIVITIES[3]
+          return (
+            <div key={s.id} className="session-row">
+              <span className="session-icon">{act.icon}</span>
+              <span className="session-duration">{fmtMin(s.duration_seconds)}</span>
+              <span className="session-date">{new Date(s.created_at).toLocaleDateString('fr-FR')}</span>
+              {s.notes && <span className="session-notes-text">{s.notes}</span>}
+              <button
+                className="session-delete"
+                onClick={() => deleteSession(s.id)}
+                title="Supprimer"
+              >✕</button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

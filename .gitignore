@@ -1,9 +1,13 @@
 .env
+node_modules/
 __pycache__/
 *.py[cod]
 *.db
+*.db-shm
+*.db-wal
 exports/
 recordings/
 *.egg-info/
 .venv/
 venv/
+server/public/
