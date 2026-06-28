@@ -1,6 +1,7 @@
 .env
 node_modules/
 __pycache__/
+*.py
 *.py[cod]
 *.db
 *.db-shm
