@@ -7,17 +7,17 @@ import * as api from '../api'
 const AUTOSAVE_DELAY = 800
 
 export default function Editor() {
-  const { openFile, openFileId, saveFile, toast, fileNames, insertRef } = useApp()
+  const { currentFile, openFileId, saveFile, toast, fileNames, insertRef } = useApp()
 
   // Content is LOCAL state — never dispatched to global context
-  const [content, setContent] = useState(openFile?.content || '')
+  const [content, setContent] = useState(currentFile?.content || '')
   const [isDirty, setIsDirty] = useState(false)
   const [mode, setMode] = useState('split')
   const [wordCount, setWordCount] = useState(0)
   const [saving, setSaving] = useState(false)
   const [wikiQuery, setWikiQuery] = useState(null)
   // Debounced content for Preview — avoids re-rendering preview on every keystroke
-  const [previewContent, setPreviewContent] = useState(openFile?.content || '')
+  const [previewContent, setPreviewContent] = useState(currentFile?.content || '')
 
   const textareaRef = useRef(null)
   const saveTimerRef = useRef(null)
@@ -66,12 +66,12 @@ export default function Editor() {
       fn(prevId, contentRef.current)
     }
     prevFileIdRef.current = openFileId
-    const newContent = openFile?.content || ''
+    const newContent = currentFile?.content || ''
     setContent(newContent)
     setPreviewContent(newContent)
     setIsDirty(false)
     clearTimeout(saveTimerRef.current)
-  }, [openFile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentFile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced word count
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function Editor() {
 
   // AI active mode trigger (90s without typing)
   useEffect(() => {
-    if (!openFile) return
+    if (!currentFile) return
     const reset = () => {
       clearTimeout(activeTimerRef.current)
       activeTimerRef.current = setTimeout(async () => {
@@ -132,7 +132,7 @@ export default function Editor() {
       window.removeEventListener('keydown', reset)
       clearTimeout(activeTimerRef.current)
     }
-  }, [openFile, toast])
+  }, [currentFile, toast])
 
   const handleChange = useCallback((e) => {
     const value = e.target.value
@@ -250,12 +250,12 @@ export default function Editor() {
     ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
     : []
 
-  if (!openFile) return null
+  if (!currentFile) return null
 
   return (
     <div className="editor-container">
       <div className="editor-titlebar">
-        <h2 className="editor-filename">{openFile.name.replace(/\.md$/i, '')}</h2>
+        <h2 className="editor-filename">{currentFile.name.replace(/\.md$/i, '')}</h2>
         <div className="editor-meta">
           <span className="word-count">{wordCount} mots</span>
           <span className={`save-status ${isDirty ? 'dirty' : ''}`}>

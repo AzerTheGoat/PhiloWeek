@@ -42,12 +42,15 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, init)
   const insertRef = useRef(null)
+  const openRequestRef = useRef(0)
 
   const loadTree = useCallback(async () => {
     try {
-      const tree = await api.getFileTree()
+      const [tree, names] = await Promise.all([
+        api.getFileTree(),
+        api.getFileNames(),
+      ])
       dispatch({ type: 'SET_TREE', payload: tree })
-      const names = await api.getFileNames()
       dispatch({ type: 'SET_FILE_NAMES', payload: names })
     } catch (err) {
       console.error('loadTree:', err)
@@ -55,8 +58,10 @@ export function AppProvider({ children }) {
   }, [])
 
   const openFile = useCallback(async (id) => {
+    const requestId = ++openRequestRef.current
     try {
       const file = await api.getFile(id)
+      if (requestId !== openRequestRef.current) return
       dispatch({ type: 'OPEN_FILE', payload: file })
     } catch (err) {
       toast(err.message, 'error')
@@ -123,6 +128,7 @@ export function AppProvider({ children }) {
 
   const value = {
     ...state,
+    currentFile: state.openFile,
     dispatch,
     loadTree,
     openFile,

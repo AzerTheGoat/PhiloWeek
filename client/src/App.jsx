@@ -20,7 +20,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { theme, showAI, sidebarOpen, view, openFile, loadTree, contextMenu, hideContextMenu, showFilePicker } = useApp()
+  const { theme, showAI, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker } = useApp()
 
   useEffect(() => { loadTree() }, [])
 
@@ -47,7 +47,7 @@ function AppShell() {
           <Journal />
         ) : view === 'inbox' ? (
           <InboxPage />
-        ) : openFile ? (
+        ) : currentFile ? (
           <Editor />
         ) : (
           <Welcome />

@@ -10,7 +10,7 @@ const ACTIVITIES = [
 ]
 
 export default function Timer() {
-  const { openFileId, openFile, toast, dispatch, openJournalToday } = useApp()
+  const { openFileId, currentFile, toast, dispatch, openJournalToday } = useApp()
   const [seconds, setSeconds] = useState(0)
   const [running, setRunning] = useState(false)
   const [activity, setActivity] = useState('thinking')
@@ -107,9 +107,9 @@ export default function Timer() {
         <h2>Timer de travail</h2>
       </div>
 
-      {openFile && (
+      {currentFile && (
         <div className="timer-context">
-          Fichier actif : <strong>{openFile.name.replace(/\.md$/i, '')}</strong>
+          Fichier actif : <strong>{currentFile.name.replace(/\.md$/i, '')}</strong>
         </div>
       )}
 

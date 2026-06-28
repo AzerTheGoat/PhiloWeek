@@ -10,7 +10,7 @@ const MODES = [
 ]
 
 export default function AIPanel() {
-  const { openFileId, openFile, toast, insertRef, dispatch } = useApp()
+  const { openFileId, currentFile, toast, insertRef, dispatch } = useApp()
   const [mode, setMode] = useState('socratic')
   const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
@@ -86,9 +86,9 @@ export default function AIPanel() {
       </div>
 
       {/* Context indicator */}
-      {openFile && (
+      {currentFile && (
         <div className="ai-context">
-          Contexte : <strong>{openFile.name.replace(/\.md$/i, '')}</strong>
+          Contexte : <strong>{currentFile.name.replace(/\.md$/i, '')}</strong>
         </div>
       )}
 
