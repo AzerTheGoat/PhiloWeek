@@ -78,6 +78,13 @@ export const deleteIdea = id => req('DELETE', `/inbox/ideas/${id}`)
 export const sendIdeaToFile = (id, fileId) =>
   req('POST', `/inbox/ideas/${id}/send-to-file`, { fileId })
 
+// Life / Quotes
+export const getQuotes = () => req('GET', '/life/quotes')
+export const createQuote = data => req('POST', '/life/quotes', data)
+export const updateQuote = (id, data) => req('PUT', `/life/quotes/${id}`, data)
+export const deleteQuote = id => req('DELETE', `/life/quotes/${id}`)
+export const generateLifeReport = data => req('POST', '/life/report', data)
+
 // Timer
 export const getTimerSessions = file_id =>
   req('GET', `/timer${file_id ? `?file_id=${file_id}` : ''}`)

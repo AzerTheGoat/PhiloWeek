@@ -51,9 +51,34 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
       const updateFile = db.prepare(
         "UPDATE files SET content = ?, updated_at = datetime('now') WHERE id = ?"
       )
+      const insertQuote = db.prepare(
+        `INSERT INTO quotes (id, quote, author, source, notes, tags, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
+          const parsedSpecial = safeMatter(rawContent)
+          if (parsedSpecial.data.philoweek_type === 'quotes') {
+            const quotes = parseQuotesExport(parsedSpecial.content)
+            for (const quote of quotes) {
+              const id = uuidv4()
+              const now = new Date().toISOString()
+              insertQuote.run(
+                id,
+                quote.quote,
+                quote.author,
+                quote.source,
+                quote.notes,
+                quote.tags,
+                quote.created_at || now,
+                now
+              )
+              report.imported++
+            }
+            continue
+          }
+
           const parts = relativePath.split('/')
           const fileName = parts[parts.length - 1]
           const dirParts = parts.slice(0, -1)
@@ -150,3 +175,45 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 })
 
 module.exports = router
+
+function safeMatter(rawContent) {
+  try { return matter(rawContent) }
+  catch (_) { return { data: {}, content: rawContent } }
+}
+
+function parseQuotesExport(content) {
+  return String(content || '')
+    .split(/\n---\n/g)
+    .map(block => block.trim())
+    .filter(Boolean)
+    .map(block => {
+      const lines = block.split('\n')
+      const quoteLines = []
+      let i = 0
+      while (i < lines.length && lines[i].startsWith('>')) {
+        quoteLines.push(lines[i].replace(/^>\s?/, ''))
+        i++
+      }
+      const rest = lines.slice(i).join('\n').trim()
+      const author = matchLine(rest, 'Auteur')
+      const source = matchLine(rest, 'Source')
+      const tags = matchLine(rest, 'Tags') || '[]'
+      const created = matchLine(rest, 'Ajoute')
+      const notesMatch = rest.match(/Notes:\n([\s\S]*)$/)
+      return {
+        quote: quoteLines.join('\n').trim(),
+        author,
+        source,
+        tags,
+        created_at: created,
+        notes: notesMatch ? notesMatch[1].trim() : null,
+      }
+    })
+    .filter(q => q.quote)
+}
+
+function matchLine(text, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = String(text || '').match(new RegExp(`^${escaped}:\\s*(.+)$`, 'm'))
+  return match ? match[1].trim() : null
+}

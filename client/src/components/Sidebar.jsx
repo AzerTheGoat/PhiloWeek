@@ -52,6 +52,11 @@ export default function Sidebar() {
             onClick={() => dispatch({ type: 'SET_VIEW', payload: 'inbox' })}
           >💡</button>
           <button
+            title="Vie intérieure"
+            className={`icon-btn ${view === 'life' ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'life' })}
+          >◈</button>
+          <button
             title="Timer"
             className="icon-btn"
             onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timer' })}

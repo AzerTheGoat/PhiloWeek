@@ -20,6 +20,7 @@ app.use('/api/import', require('./routes/import'))
 app.use('/api/voice', require('./routes/voice'))
 app.use('/api/timer', require('./routes/timer'))
 app.use('/api/inbox', require('./routes/inbox'))
+app.use('/api/life', require('./routes/life'))
 
 // Serve built React app
 const clientBuild = path.join(__dirname, 'public')

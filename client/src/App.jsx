@@ -6,6 +6,7 @@ import AIPanel from './components/AIPanel'
 import Journal from './components/Journal'
 import Timer from './components/Timer'
 import InboxPage from './components/InboxPage'
+import LifePage from './components/LifePage'
 import FilePicker from './components/FilePicker'
 import Toast from './components/Toast'
 import ContextMenu from './components/ContextMenu'
@@ -47,6 +48,8 @@ function AppShell() {
           <Journal />
         ) : view === 'inbox' ? (
           <InboxPage />
+        ) : view === 'life' ? (
+          <LifePage />
         ) : currentFile ? (
           <Editor />
         ) : (
@@ -54,7 +57,7 @@ function AppShell() {
         )}
       </main>
 
-      {showAI && view !== 'inbox' && <AIPanel />}
+      {showAI && view !== 'inbox' && view !== 'life' && <AIPanel />}
 
       {showFilePicker && <FilePicker />}
 
@@ -99,6 +102,12 @@ function MobileNav() {
         onClick={() => dispatch({ type: 'TOGGLE_AI' })}
       >
         <span>✦</span><span>IA</span>
+      </button>
+      <button
+        className={`mobile-nav-btn ${view === 'life' ? 'active' : ''}`}
+        onClick={() => dispatch({ type: 'SET_VIEW', payload: 'life' })}
+      >
+        <span>◈</span><span>Vie</span>
       </button>
     </nav>
   )

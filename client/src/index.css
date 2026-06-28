@@ -1839,7 +1839,7 @@ kbd {
 @media (max-width: 768px) {
   .inbox-mobile-tabs { display: flex }
 
-  .mobile-nav { grid-template-columns: repeat(5, 1fr) }
+  .mobile-nav { grid-template-columns: repeat(6, 1fr) }
 
   .inbox-layout {
     grid-template-columns: 1fr;
@@ -1852,4 +1852,199 @@ kbd {
   .inbox-layout.mobile-tab-ideas .inbox-section:nth-child(2) { display: flex }
 
   .picker-panel { width: 100% }
+}
+
+/* Life page */
+.life-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.life-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.life-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.life-layout {
+  flex: 1;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+}
+
+.life-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.life-section:last-child { border-right: none }
+
+.life-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  flex-shrink: 0;
+}
+.life-section-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+.life-section-header span { font-size: 12px; color: var(--text-3) }
+
+.quote-form {
+  padding: 0 12px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quote-form-grid,
+.report-ai-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.life-input {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 10px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.life-input:focus { border-color: var(--border-focus) }
+
+.quote-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.quote-card {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.quote-card blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-prose);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.quote-meta,
+.quote-notes {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.quote-notes { margin-top: 6px; line-height: 1.45 }
+.quote-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.quote-tags span {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--tag-bg);
+  color: var(--tag-text);
+}
+.quote-delete {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.quote-delete:hover { color: var(--danger) }
+
+.report-controls {
+  padding: 0 12px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.period-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.report-generate { width: 100% }
+
+.life-report {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+.report-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.report-counts span {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+.report-text {
+  max-width: 760px;
+  font-family: var(--font-prose);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.report-text h4 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  margin: 18px 0 6px;
+  color: var(--accent-hover);
+}
+.report-text p { margin: 0 0 8px }
+
+.life-empty {
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 24px 16px;
+  text-align: center;
+}
+.report-empty { max-width: 520px; margin: 40px auto }
+
+@media (max-width: 900px) {
+  .life-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .life-section {
+    min-height: 520px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
 }

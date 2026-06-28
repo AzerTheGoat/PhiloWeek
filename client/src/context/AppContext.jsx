@@ -7,7 +7,7 @@ const init = {
   tree: [],
   openFileId: null,
   openFile: null,
-  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox'
+  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life'
   theme: localStorage.getItem('pw-theme') || 'dark',
   showAI: true,
   sidebarOpen: true,

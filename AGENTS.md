@@ -56,6 +56,7 @@ file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
 timer_sessions — id, file_id, duration_seconds, activity_type, notes
 voice_notes  — id, file_id, filename, duration_seconds, title
+quotes       — id, quote, author, source, notes, tags, created_at, updated_at
 ```
 
 ## Règle absolue : toute nouvelle feature doit être ajoutée au tutoriel
@@ -120,3 +121,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le dossier `Journal` racine ne doit pas être déplaçable.
 - Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
 - Les dossiers verrouillés ne peuvent pas recevoir de nouveaux fichiers tant qu'ils ne sont pas déverrouillés.
+
+## Vie intérieure : citations et rapport IA
+
+- La vue `Vie` contient une bibliothèque de citations et un générateur de rapport IA par période.
+- Les citations sont stockées dans la table `quotes` avec auteur, source, notes et tags.
+- Le rapport IA (`POST /api/life/report`) agrège les notes modifiées, citations, idées, ressources, sessions timer et notes vocales sur la durée choisie.
+- Le rapport doit rester prudent : hypothèses sur l'état mental, pas de diagnostic médical.
+- L'export Obsidian ajoute les citations dans `_PhiloWeek/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.

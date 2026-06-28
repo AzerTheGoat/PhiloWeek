@@ -52,6 +52,25 @@ router.get('/obsidian', async (req, res) => {
     zip.file(zipPath, finalContent)
   }
 
+  const quotes = db.prepare('SELECT * FROM quotes ORDER BY created_at DESC').all()
+  if (quotes.length > 0) {
+    const body = quotes.map(q => {
+      const meta = [
+        q.author ? `Auteur: ${q.author}` : null,
+        q.source ? `Source: ${q.source}` : null,
+        q.tags ? `Tags: ${q.tags}` : null,
+        `Ajoute: ${q.created_at}`,
+      ].filter(Boolean).join('\n')
+      return `> ${q.quote.replace(/\n/g, '\n> ')}\n\n${meta}${q.notes ? `\n\nNotes:\n${q.notes}` : ''}`
+    }).join('\n\n---\n\n')
+
+    zip.file('_PhiloWeek/Citations.md', matter.stringify(body, {
+      title: 'Citations',
+      philoweek_type: 'quotes',
+      exported: new Date().toISOString(),
+    }))
+  }
+
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   const date = new Date().toISOString().slice(0, 10)
   res.setHeader('Content-Type', 'application/zip')
