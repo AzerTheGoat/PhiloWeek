@@ -113,3 +113,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le backend expose `GET /api/ai/models` pour la liste des modèles/prix, `POST /api/ai/estimate` pour l'estimation, et `POST /api/ai/generate` pour l'appel réel.
 - L'estimation de coût est calculée avec les tokens d'entrée estimés côté serveur et les tokens de sortie prédits par l'utilisateur. Après génération, le coût affiché utilise les tokens réels si le fournisseur les renvoie.
 - Les prix sont stockés dans `server/routes/ai.js` en USD par million de tokens input/output. Les mettre à jour quand OpenAI ou Anthropic changent leurs tarifs.
+
+## Déplacement des fichiers et dossiers
+
+- Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.
+- Le dossier `Journal` racine ne doit pas être déplaçable.
+- Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
+- Les dossiers verrouillés ne peuvent pas recevoir de nouveaux fichiers tant qu'ils ne sont pas déverrouillés.

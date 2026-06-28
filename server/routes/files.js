@@ -125,9 +125,41 @@ router.delete('/:id', (req, res) => {
 router.put('/:id/move', (req, res) => {
   const db = getDb()
   const { parent_id, sort_order } = req.body
+  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
+  if (!file) return res.status(404).json({ error: 'Not found' })
+  if (file.name === 'Journal' && !file.parent_id) {
+    return res.status(403).json({ error: 'Cannot move the Journal folder' })
+  }
+
+  const nextParentId = parent_id || null
+  if (nextParentId) {
+    if (nextParentId === req.params.id) {
+      return res.status(400).json({ error: 'Cannot move a folder into itself' })
+    }
+
+    const parent = db.prepare('SELECT id, parent_id, type FROM files WHERE id = ?').get(nextParentId)
+    if (!parent) return res.status(404).json({ error: 'Target folder not found' })
+    if (parent.type === 'locked_folder') {
+      return res.status(403).json({ error: 'Unlock the folder before moving files into it' })
+    }
+    if (parent.type !== 'folder') {
+      return res.status(400).json({ error: 'Target must be a folder' })
+    }
+
+    let cursor = parent
+    while (cursor) {
+      if (cursor.id === req.params.id) {
+        return res.status(400).json({ error: 'Cannot move a folder into one of its children' })
+      }
+      cursor = cursor.parent_id
+        ? db.prepare('SELECT id, parent_id FROM files WHERE id = ?').get(cursor.parent_id)
+        : null
+    }
+  }
+
   db.prepare(
     "UPDATE files SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(parent_id || null, sort_order ?? 0, req.params.id)
+  ).run(nextParentId, sort_order ?? 0, req.params.id)
   res.json({ ok: true })
 })
 
