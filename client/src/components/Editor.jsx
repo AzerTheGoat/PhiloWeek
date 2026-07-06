@@ -267,6 +267,7 @@ export default function Editor() {
       <div className="editor-titlebar">
         <h2 className="editor-filename">{currentFile.name.replace(/\.md$/i, '')}</h2>
         <div className="editor-meta">
+          <LinkedQuizLauncher currentFile={currentFile} />
           <span className="word-count">{wordCount} mots</span>
           <span className={`save-status ${isDirty ? 'dirty' : ''}`}>
             {saving ? 'Enregistrement…' : isDirty ? '● non sauvegardé' : '✓ sauvegardé'}
@@ -318,5 +319,152 @@ export default function Editor() {
         )}
       </div>
     </div>
+  )
+}
+
+function LinkedQuizLauncher({ currentFile }) {
+  const { toast } = useApp()
+  const [linked, setLinked] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [session, setSession] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [answer, setAnswer] = useState('')
+  const [revealed, setRevealed] = useState(false)
+  const [startedAt, setStartedAt] = useState(Date.now())
+
+  useEffect(() => {
+    let cancelled = false
+    setLinked([])
+    setSession([])
+    if (!currentFile?.id) return
+    api.getLinkedQuestionnaires(currentFile.id)
+      .then(rows => { if (!cancelled) setLinked(rows) })
+      .catch(() => { if (!cancelled) setLinked([]) })
+    return () => { cancelled = true }
+  }, [currentFile?.id])
+
+  const startQuiz = useCallback(async () => {
+    if (!currentFile?.id || loading) return
+    setLoading(true)
+    try {
+      const result = await api.getQuestionnaireSession({
+        scope: 'linked_file',
+        file_id: currentFile.id,
+        limit: 12,
+      })
+      if (!result.questions.length) {
+        toast('Aucun quiz lie a cette note', 'error')
+        return
+      }
+      setSession(result.questions)
+      setCurrentIndex(0)
+      setAnswer('')
+      setRevealed(false)
+      setStartedAt(Date.now())
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [currentFile?.id, loading, toast])
+
+  const currentQuestion = session[currentIndex] || null
+  const done = session.length > 0 && currentIndex >= session.length
+
+  const recordResult = useCallback(async (correct) => {
+    if (!currentQuestion) return
+    try {
+      await api.saveQuestionnaireResult({
+        question_key: currentQuestion.question_key,
+        questionnaire_file_id: currentQuestion.questionnaire_file_id,
+        questionnaire_title: currentQuestion.questionnaire_title,
+        question_id: currentQuestion.question_id,
+        question_text: currentQuestion.prompt,
+        answer_text: answer,
+        expected_answer: currentQuestion.answer,
+        correct,
+        score: correct ? 1 : 0,
+        response_ms: Date.now() - startedAt,
+      })
+      const nextIndex = currentIndex + 1
+      setAnswer('')
+      setRevealed(false)
+      setStartedAt(Date.now())
+      if (nextIndex >= session.length) {
+        setCurrentIndex(session.length)
+        toast('Quiz termine')
+      } else {
+        setCurrentIndex(nextIndex)
+      }
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }, [answer, currentIndex, currentQuestion, session.length, startedAt, toast])
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn-ghost editor-quiz-btn"
+        onClick={startQuiz}
+        disabled={loading || linked.length === 0}
+        title={linked.length === 0 ? 'Aucun questionnaire lie a cette note' : `${linked.length} questionnaire(s) lie(s)`}
+      >
+        <Icon name="question" size={15} /> Quiz
+      </button>
+
+      {session.length > 0 && (
+        <div className="linked-quiz-panel">
+          <div className="linked-quiz-head">
+            <strong>Quiz lie</strong>
+            <span>{done ? session.length : Math.min(currentIndex + 1, session.length)} / {session.length}</span>
+            <button type="button" className="icon-btn" onClick={() => setSession([])}>
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+
+          {done ? (
+            <div className="linked-quiz-done">
+              <strong>Session terminee</strong>
+              <button type="button" className="btn-primary" onClick={startQuiz}>Relancer</button>
+            </div>
+          ) : (
+            <div className="linked-quiz-live">
+              <span>{currentQuestion?.questionnaire_title}</span>
+              <h3>{currentQuestion?.prompt}</h3>
+              {currentQuestion?.choices?.length > 0 && (
+                <div className="quiz-choices">
+                  {currentQuestion.choices.map(choice => (
+                    <button key={choice} type="button" onClick={() => setAnswer(choice)}>
+                      {choice}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <textarea
+                value={answer}
+                onChange={event => setAnswer(event.target.value)}
+                placeholder="Ta reponse..."
+              />
+              {!revealed ? (
+                <button type="button" className="btn-ghost" onClick={() => setRevealed(true)}>
+                  Voir la correction
+                </button>
+              ) : (
+                <div className="quiz-correction">
+                  <strong>Correction</strong>
+                  <p>{currentQuestion?.answer || 'Pas de correction renseignee.'}</p>
+                  {currentQuestion?.explanation && <p>{currentQuestion.explanation}</p>}
+                  <div className="quiz-grade-actions">
+                    <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Je me suis trompe</button>
+                    <button type="button" className="btn-primary" onClick={() => recordResult(true)}>J'avais juste</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   )
 }

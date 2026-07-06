@@ -27,6 +27,33 @@ router.post('/session', (req, res) => {
   })
 })
 
+router.get('/linked/:fileId', (req, res) => {
+  const db = getDb()
+  const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(req.params.fileId)
+  if (!target || target.type !== 'file') return res.json([])
+
+  const targetPath = getFilePath(db, target.id)
+  const rows = db.prepare(`
+    SELECT id, parent_id, name, content, created_at, updated_at
+    FROM files
+    WHERE type = 'file' AND content IS NOT NULL
+  `).all()
+
+  const linked = rows
+    .filter(file => isQuestionnaireContent(file.name, file.content))
+    .map(file => ({ file, parsed: parseQuestionnaire(file.content) }))
+    .filter(item => questionnaireMatchesFile(item.parsed, target, targetPath))
+    .map(item => ({
+      id: item.file.id,
+      name: item.file.name,
+      title: item.parsed.title || item.file.name.replace(/\.json$/i, ''),
+      question_count: item.parsed.questions.length,
+      source_paths: item.parsed.source_paths,
+    }))
+
+  res.json(linked)
+})
+
 router.post('/results', (req, res) => {
   const db = getDb()
   const body = req.body || {}
@@ -79,6 +106,14 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId }) {
 
   if (scope === 'file' && fileId) {
     rows = rows.filter(file => file.id === fileId)
+  } else if (scope === 'linked_file' && fileId) {
+    const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(fileId)
+    if (!target || target.type !== 'file') return []
+    const targetPath = getFilePath(db, target.id)
+    rows = rows.filter(file => {
+      if (!isQuestionnaireContent(file.name, file.content)) return false
+      return questionnaireMatchesFile(parseQuestionnaire(file.content), target, targetPath)
+    })
   } else if (scope === 'folders') {
     if (!Array.isArray(folderIds) || folderIds.length === 0) return []
     const allowed = collectFolderScope(db, folderIds)
@@ -118,6 +153,8 @@ function parseQuestionnaire(content) {
       title: parsed.title || 'Questionnaire',
       description: parsed.description || '',
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      source_paths: Array.isArray(parsed.source_paths) ? parsed.source_paths.map(String) : [],
+      source_file_ids: Array.isArray(parsed.source_file_ids) ? parsed.source_file_ids.map(String) : [],
       questions,
     }
   } catch (_) {
@@ -223,4 +260,30 @@ function clampLimit(value) {
 
 function hash(value) {
   return crypto.createHash('sha1').update(String(value)).digest('hex').slice(0, 12)
+}
+
+function questionnaireMatchesFile(questionnaire, file, filePath) {
+  if (!questionnaire) return false
+  const sourceIds = new Set(questionnaire.source_file_ids || [])
+  const sourcePaths = new Set((questionnaire.source_paths || []).map(normalizePath))
+  return sourceIds.has(file.id) ||
+    sourcePaths.has(normalizePath(filePath)) ||
+    sourcePaths.has(normalizePath(file.name)) ||
+    sourcePaths.has(normalizePath(file.name.replace(/\.md$/i, '')))
+}
+
+function getFilePath(db, fileId) {
+  const parts = []
+  let cursor = db.prepare('SELECT id, parent_id, name FROM files WHERE id = ?').get(fileId)
+  while (cursor) {
+    parts.unshift(cursor.name)
+    cursor = cursor.parent_id
+      ? db.prepare('SELECT id, parent_id, name FROM files WHERE id = ?').get(cursor.parent_id)
+      : null
+  }
+  return parts.join('/')
+}
+
+function normalizePath(value) {
+  return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim().toLowerCase()
 }

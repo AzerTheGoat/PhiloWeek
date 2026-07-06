@@ -89,6 +89,7 @@ export const generateLifeReport = data => req('POST', '/life/report', data)
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)
 export const getQuestionnaireResults = () => req('GET', '/questionnaires/results')
+export const getLinkedQuestionnaires = fileId => req('GET', `/questionnaires/linked/${fileId}`)
 
 // Timer
 export const getTimerSessions = file_id =>

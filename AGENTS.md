@@ -152,8 +152,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La sidebar permet de creer un `Quiz`, stocke comme fichier `.json`.
 - Un questionnaire JSON utilise `philoweek_type: questionnaire`, `version`, `id`, `title`, `description`, `tags` et un tableau `questions`.
 - Une question supporte au minimum `id`, `type`, `prompt`, `answer`, `explanation` et `tags`; `type` peut etre `open`, `mcq` ou `true_false`.
+- Un questionnaire peut etre lie a des notes Markdown avec `source_paths`; ces chemins sont preferes aux IDs pour rester compatibles avec export/import.
 - `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
 - L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random.
+- Une note Markdown affiche un bouton `Quiz` quand au moins un questionnaire est lie a cette note.
 - Les resultats de revision sont stockes dans la table `questionnaire_results` avec date, reponse utilisateur, correction attendue et statut juste/faux.
 - Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_PhiloWeek/QuestionnaireResults.json` pour l'historique; l'import recree les deux.

@@ -43,6 +43,11 @@ export default function QuestionnaireEditor() {
   }, [content])
 
   const folderOptions = useMemo(() => collectFolders(tree), [tree])
+  const fileOptions = useMemo(() => collectMarkdownFiles(tree), [tree])
+  const selectedSourcePaths = useMemo(
+    () => new Set((parsed.data?.source_paths || []).map(normalizePath)),
+    [parsed.data?.source_paths]
+  )
   const currentQuestion = session[currentIndex] || null
 
   const triggerSave = useCallback((value) => {
@@ -138,6 +143,37 @@ export default function QuestionnaireEditor() {
     })
   }, [])
 
+  const toggleSourceFile = useCallback((file) => {
+    if (parsed.error) {
+      toast('Corrige le JSON avant de lier des fichiers', 'error')
+      return
+    }
+    try {
+      const json = parseQuestionnaireJson(content)
+      const current = new Set((json.source_paths || []).map(normalizePath))
+      const normalized = normalizePath(file.path)
+      if (current.has(normalized)) current.delete(normalized)
+      else current.add(normalized)
+      const nextPaths = fileOptions
+        .filter(option => current.has(normalizePath(option.path)))
+        .map(option => option.path)
+      const nextIds = fileOptions
+        .filter(option => current.has(normalizePath(option.path)))
+        .map(option => option.id)
+      const next = {
+        ...json,
+        source_paths: nextPaths,
+        source_file_ids: nextIds,
+        modified: new Date().toISOString(),
+      }
+      const formatted = JSON.stringify(next, null, 2)
+      setContent(formatted)
+      triggerSave(formatted)
+    } catch (err) {
+      toast(`JSON invalide : ${err.message}`, 'error')
+    }
+  }, [content, fileOptions, parsed.error, toast, triggerSave])
+
   if (!currentFile) return null
 
   return (
@@ -181,6 +217,11 @@ export default function QuestionnaireEditor() {
         {mode !== 'edit' && (
           <div className="questionnaire-preview-pane">
             <QuestionnairePreview parsed={parsed} />
+            <SourceFilesPanel
+              files={fileOptions}
+              selectedSourcePaths={selectedSourcePaths}
+              onToggle={toggleSourceFile}
+            />
             <QuizPanel
               scope={scope}
               setScope={setScope}
@@ -235,6 +276,34 @@ function QuestionnairePreview({ parsed }) {
             <strong>{question.prompt || question.question || question.text || `Question ${index + 1}`}</strong>
             {(question.answer || question.expected_answer) && <p>{question.answer || question.expected_answer}</p>}
           </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SourceFilesPanel({ files, selectedSourcePaths, onToggle }) {
+  const selectedCount = files.filter(file => selectedSourcePaths.has(normalizePath(file.path))).length
+  return (
+    <section className="questionnaire-card source-files-card">
+      <div className="questionnaire-preview-head">
+        <div>
+          <h3>Fichiers lies</h3>
+          <p>Ces notes Markdown seront considerees comme le sujet de ce questionnaire.</p>
+        </div>
+        <span>{selectedCount} / {files.length}</span>
+      </div>
+      <div className="source-file-list">
+        {files.length === 0 && <p className="questionnaire-muted">Aucun fichier Markdown disponible.</p>}
+        {files.map(file => (
+          <label key={file.id} className="source-file-row">
+            <input
+              type="checkbox"
+              checked={selectedSourcePaths.has(normalizePath(file.path))}
+              onChange={() => onToggle(file)}
+            />
+            <span>{file.path.replace(/\.md$/i, '')}</span>
+          </label>
         ))}
       </div>
     </section>
@@ -366,4 +435,23 @@ function collectFolders(tree) {
   }
   walk(tree || [])
   return folders
+}
+
+function collectMarkdownFiles(tree) {
+  const files = []
+  function walk(nodes, prefix = '') {
+    nodes.forEach(node => {
+      const path = prefix ? `${prefix}/${node.name}` : node.name
+      if (node.type === 'file' && /\.md$/i.test(node.name)) {
+        files.push({ id: node.id, path, name: node.name })
+      }
+      if (node.children) walk(node.children, path)
+    })
+  }
+  walk(tree || [])
+  return files
+}
+
+function normalizePath(value) {
+  return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim().toLowerCase()
 }

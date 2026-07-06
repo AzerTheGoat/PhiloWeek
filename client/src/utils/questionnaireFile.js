@@ -21,6 +21,7 @@ export function createQuestionnaireJson(title) {
     title,
     description: '',
     tags: [],
+    source_paths: [],
     created: now,
     modified: now,
     questions: [
