@@ -9,6 +9,7 @@ import Timer from './components/Timer'
 import InboxPage from './components/InboxPage'
 import LifePage from './components/LifePage'
 import FilePicker from './components/FilePicker'
+import GlobalQuizLauncher from './components/GlobalQuizLauncher'
 import Toast from './components/Toast'
 import ContextMenu from './components/ContextMenu'
 import Modals from './components/Modals'
@@ -23,7 +24,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { theme, showAI, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker } = useApp()
+  const { theme, showAI, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
 
   useEffect(() => { loadTree() }, [])
 
@@ -82,6 +83,7 @@ function AppShell() {
       {showAI && view !== 'inbox' && view !== 'life' && <AIPanel />}
 
       {showFilePicker && <FilePicker />}
+      {showQuizLauncher && <GlobalQuizLauncher />}
 
       <MobileNav />
       <Toast />

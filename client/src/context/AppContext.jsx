@@ -22,6 +22,7 @@ const init = {
   modal: null,
   fileNames: [],
   showFilePicker: false,
+  showQuizLauncher: false,
 }
 
 function reducer(state, action) {
@@ -43,6 +44,7 @@ function reducer(state, action) {
       modal: null,
       contextMenu: null,
       showFilePicker: false,
+      showQuizLauncher: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
       showAI: isMobileViewport() ? false : state.showAI,
     }
@@ -52,6 +54,7 @@ function reducer(state, action) {
       modal: null,
       contextMenu: null,
       showFilePicker: false,
+      showQuizLauncher: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
       showAI: isMobileViewport() && action.payload !== 'editor' ? false : state.showAI,
     }
@@ -68,6 +71,7 @@ function reducer(state, action) {
         modal: null,
         contextMenu: null,
         showFilePicker: false,
+        showQuizLauncher: false,
         sidebarOpen: isMobileViewport() && showAI ? false : state.sidebarOpen,
       }
     }
@@ -79,6 +83,7 @@ function reducer(state, action) {
         modal: null,
         contextMenu: null,
         showFilePicker: false,
+        showQuizLauncher: false,
         showAI: isMobileViewport() && sidebarOpen ? false : state.showAI,
       }
     }
@@ -95,6 +100,7 @@ function reducer(state, action) {
       modal: action.payload,
       contextMenu: action.payload ? null : state.contextMenu,
       showFilePicker: action.payload ? false : state.showFilePicker,
+      showQuizLauncher: action.payload ? false : state.showQuizLauncher,
       sidebarOpen: action.payload && isMobileViewport() ? false : state.sidebarOpen,
       showAI: action.payload && isMobileViewport() ? false : state.showAI,
     }
@@ -103,10 +109,23 @@ function reducer(state, action) {
       return {
         ...state,
         showFilePicker,
+        showQuizLauncher: showFilePicker ? false : state.showQuizLauncher,
         modal: showFilePicker ? null : state.modal,
         contextMenu: showFilePicker ? null : state.contextMenu,
         sidebarOpen: showFilePicker && isMobileViewport() ? false : state.sidebarOpen,
         showAI: showFilePicker && isMobileViewport() ? false : state.showAI,
+      }
+    }
+    case 'TOGGLE_QUIZ_LAUNCHER': {
+      const showQuizLauncher = !state.showQuizLauncher
+      return {
+        ...state,
+        showQuizLauncher,
+        showFilePicker: showQuizLauncher ? false : state.showFilePicker,
+        modal: showQuizLauncher ? null : state.modal,
+        contextMenu: showQuizLauncher ? null : state.contextMenu,
+        sidebarOpen: showQuizLauncher && isMobileViewport() ? false : state.sidebarOpen,
+        showAI: showQuizLauncher && isMobileViewport() ? false : state.showAI,
       }
     }
     default: return state

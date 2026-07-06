@@ -158,6 +158,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
 - L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random.
 - Une note Markdown affiche un bouton `Quiz` quand au moins un questionnaire est lie a cette note.
+- La sidebar contient un bouton global `Reviser` qui ouvre un panneau de selection de notes Markdown et lance les questions des questionnaires lies a ces notes, independamment du fichier ouvert.
 - Les resultats de revision sont stockes dans la table `questionnaire_results` avec date, reponse utilisateur, correction attendue et statut juste/faux.
 - Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_PhiloWeek/QuestionnaireResults.json` pour l'historique; l'import recree les deux.

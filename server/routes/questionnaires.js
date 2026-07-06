@@ -7,8 +7,8 @@ const router = express.Router()
 
 router.post('/session', (req, res) => {
   const db = getDb()
-  const { scope = 'all', folder_ids = [], file_id = null, limit = 12 } = req.body || {}
-  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id })
+  const { scope = 'all', folder_ids = [], file_id = null, file_ids = [], limit = 12 } = req.body || {}
+  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids })
   const stats = getStats(db)
   const questions = []
 
@@ -97,7 +97,7 @@ router.get('/results', (req, res) => {
 
 module.exports = router
 
-function getQuestionnaireFiles(db, { scope, folderIds, fileId }) {
+function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }) {
   let rows = db.prepare(`
     SELECT id, parent_id, name, content, created_at, updated_at
     FROM files
@@ -113,6 +113,19 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId }) {
     rows = rows.filter(file => {
       if (!isQuestionnaireContent(file.name, file.content)) return false
       return questionnaireMatchesFile(parseQuestionnaire(file.content), target, targetPath)
+    })
+  } else if (scope === 'source_files') {
+    const targets = Array.isArray(fileIds)
+      ? fileIds
+        .map(id => db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(String(id)))
+        .filter(file => file && file.type === 'file')
+        .map(file => ({ file, path: getFilePath(db, file.id) }))
+      : []
+    if (targets.length === 0) return []
+    rows = rows.filter(file => {
+      if (!isQuestionnaireContent(file.name, file.content)) return false
+      const parsed = parseQuestionnaire(file.content)
+      return targets.some(target => questionnaireMatchesFile(parsed, target.file, target.path))
     })
   } else if (scope === 'folders') {
     if (!Array.isArray(folderIds) || folderIds.length === 0) return []
@@ -275,7 +288,7 @@ function questionnaireMatchesFile(questionnaire, file, filePath) {
   if (!questionnaire) return false
   const sourceIds = new Set(questionnaire.source_file_ids || [])
   const sourcePaths = new Set((questionnaire.source_paths || []).map(normalizePath))
-  return sourceIds.has(file.id) ||
+  return sourceIds.has(String(file.id)) ||
     sourcePaths.has(normalizePath(filePath)) ||
     sourcePaths.has(normalizePath(file.name)) ||
     sourcePaths.has(normalizePath(file.name.replace(/\.md$/i, '')))

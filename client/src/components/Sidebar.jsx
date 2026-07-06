@@ -133,6 +133,9 @@ export default function Sidebar() {
         <button className="footer-btn" onClick={() => showModal('new-questionnaire', {})} title="Nouveau questionnaire">
           <Icon name="question" size={16} /> Quiz
         </button>
+        <button className="footer-btn" onClick={() => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' })} title="Lancer un questionnaire">
+          <Icon name="play" size={16} /> Reviser
+        </button>
         <button className="footer-btn" onClick={() => showModal('new-folder', {})} title="Nouveau dossier">
           <Icon name="folder" size={16} /> Dossier
         </button>
