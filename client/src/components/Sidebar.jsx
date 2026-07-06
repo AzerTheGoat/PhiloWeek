@@ -148,7 +148,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <div className="sidebar-version" title="Version déployée">v2.0.1</div>
+      <div className="sidebar-version" title="Version déployée">v2.0.2</div>
 
       <button
         className="sidebar-toggle"
