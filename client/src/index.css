@@ -178,6 +178,15 @@ a { color: var(--link) }
 }
 .footer-btn:hover { background: var(--bg-hover); color: var(--text) }
 
+.sidebar-version {
+  flex-shrink: 0;
+  padding: 4px 10px 8px;
+  font-size: 10px;
+  color: var(--text-3);
+  text-align: center;
+  user-select: none;
+}
+
 .sidebar-toggle {
   position: fixed;
   left: calc(var(--sidebar-w) - 12px);
