@@ -19,6 +19,7 @@ export default function QuestionnaireEditor() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answer, setAnswer] = useState('')
   const [revealed, setRevealed] = useState(false)
+  const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [sessionStartedAt, setSessionStartedAt] = useState(Date.now())
   const saveTimerRef = useRef(null)
 
@@ -143,36 +144,28 @@ export default function QuestionnaireEditor() {
     })
   }, [])
 
-  const toggleSourceFile = useCallback((file) => {
+  const saveSourceFiles = useCallback((selectedFiles) => {
     if (parsed.error) {
       toast('Corrige le JSON avant de lier des fichiers', 'error')
       return
     }
     try {
       const json = parseQuestionnaireJson(content)
-      const current = new Set((json.source_paths || []).map(normalizePath))
-      const normalized = normalizePath(file.path)
-      if (current.has(normalized)) current.delete(normalized)
-      else current.add(normalized)
-      const nextPaths = fileOptions
-        .filter(option => current.has(normalizePath(option.path)))
-        .map(option => option.path)
-      const nextIds = fileOptions
-        .filter(option => current.has(normalizePath(option.path)))
-        .map(option => option.id)
       const next = {
         ...json,
-        source_paths: nextPaths,
-        source_file_ids: nextIds,
+        source_paths: selectedFiles.map(file => file.path),
+        source_file_ids: selectedFiles.map(file => file.id),
         modified: new Date().toISOString(),
       }
       const formatted = JSON.stringify(next, null, 2)
       setContent(formatted)
       triggerSave(formatted)
+      setSourceModalOpen(false)
+      toast(`${selectedFiles.length} fichier(s) lie(s) au questionnaire`)
     } catch (err) {
       toast(`JSON invalide : ${err.message}`, 'error')
     }
-  }, [content, fileOptions, parsed.error, toast, triggerSave])
+  }, [content, parsed.error, toast, triggerSave])
 
   if (!currentFile) return null
 
@@ -220,7 +213,7 @@ export default function QuestionnaireEditor() {
             <SourceFilesPanel
               files={fileOptions}
               selectedSourcePaths={selectedSourcePaths}
-              onToggle={toggleSourceFile}
+              onOpen={() => setSourceModalOpen(true)}
             />
             <QuizPanel
               scope={scope}
@@ -243,6 +236,16 @@ export default function QuestionnaireEditor() {
           </div>
         )}
       </div>
+
+      {sourceModalOpen && (
+        <SourceFilesModal
+          tree={tree}
+          files={fileOptions}
+          selectedSourcePaths={selectedSourcePaths}
+          onClose={() => setSourceModalOpen(false)}
+          onValidate={saveSourceFiles}
+        />
+      )}
     </div>
   )
 }
@@ -282,8 +285,8 @@ function QuestionnairePreview({ parsed }) {
   )
 }
 
-function SourceFilesPanel({ files, selectedSourcePaths, onToggle }) {
-  const selectedCount = files.filter(file => selectedSourcePaths.has(normalizePath(file.path))).length
+function SourceFilesPanel({ files, selectedSourcePaths, onOpen }) {
+  const selectedFiles = files.filter(file => selectedSourcePaths.has(normalizePath(file.path)))
   return (
     <section className="questionnaire-card source-files-card">
       <div className="questionnaire-preview-head">
@@ -291,22 +294,176 @@ function SourceFilesPanel({ files, selectedSourcePaths, onToggle }) {
           <h3>Fichiers lies</h3>
           <p>Ces notes Markdown seront considerees comme le sujet de ce questionnaire.</p>
         </div>
-        <span>{selectedCount} / {files.length}</span>
+        <span>{selectedFiles.length} / {files.length}</span>
       </div>
-      <div className="source-file-list">
-        {files.length === 0 && <p className="questionnaire-muted">Aucun fichier Markdown disponible.</p>}
-        {files.map(file => (
-          <label key={file.id} className="source-file-row">
-            <input
-              type="checkbox"
-              checked={selectedSourcePaths.has(normalizePath(file.path))}
-              onChange={() => onToggle(file)}
-            />
-            <span>{file.path.replace(/\.md$/i, '')}</span>
-          </label>
-        ))}
+      <div className="source-files-summary">
+        {selectedFiles.length === 0 ? (
+          <p className="questionnaire-muted">Aucun fichier lie pour l'instant.</p>
+        ) : (
+          selectedFiles.slice(0, 5).map(file => (
+            <span key={file.id}>{file.path.replace(/\.md$/i, '')}</span>
+          ))
+        )}
+        {selectedFiles.length > 5 && <em>+ {selectedFiles.length - 5} autre(s)</em>}
       </div>
+      <button type="button" className="btn-primary source-files-manage" onClick={onOpen}>
+        <Icon name="folder" size={16} /> Gerer les fichiers lies
+      </button>
     </section>
+  )
+}
+
+function SourceFilesModal({ tree, files, selectedSourcePaths, onClose, onValidate }) {
+  const [query, setQuery] = useState('')
+  const [draft, setDraft] = useState(() => new Set(selectedSourcePaths))
+  const selectedFiles = files.filter(file => draft.has(normalizePath(file.path)))
+  const filteredTree = useMemo(() => filterMarkdownTree(tree, query), [tree, query])
+
+  const toggleFile = useCallback((file) => {
+    setDraft(prev => {
+      const next = new Set(prev)
+      const key = normalizePath(file.path)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const selectFolder = useCallback((node, checked) => {
+    const folderFiles = collectMarkdownFiles([node])
+    setDraft(prev => {
+      const next = new Set(prev)
+      folderFiles.forEach(file => {
+        const key = normalizePath(file.path)
+        if (checked) next.add(key)
+        else next.delete(key)
+      })
+      return next
+    })
+  }, [])
+
+  return (
+    <div className="modal-overlay source-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal source-files-modal">
+        <div className="modal-header">
+          <h3>Fichiers du questionnaire</h3>
+          <button type="button" className="icon-btn" onClick={onClose}>
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+        <div className="modal-body source-files-modal-body">
+          <input
+            autoFocus
+            type="search"
+            className="modal-input"
+            placeholder="Rechercher un fichier ou dossier..."
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+
+          <div className="source-modal-layout">
+            <div className="source-modal-tree">
+              {filteredTree.length === 0 ? (
+                <p className="questionnaire-muted">Aucun fichier trouve.</p>
+              ) : (
+                <SourceTree
+                  nodes={filteredTree}
+                  draft={draft}
+                  onToggleFile={toggleFile}
+                  onSelectFolder={selectFolder}
+                />
+              )}
+            </div>
+
+            <aside className="source-modal-selection">
+              <strong>{selectedFiles.length} selectionne(s)</strong>
+              {selectedFiles.length === 0 ? (
+                <p>Aucun fichier choisi.</p>
+              ) : (
+                selectedFiles.map(file => (
+                  <button key={file.id} type="button" onClick={() => toggleFile(file)}>
+                    <span>{file.path.replace(/\.md$/i, '')}</span>
+                    <Icon name="close" size={14} />
+                  </button>
+                ))
+              )}
+            </aside>
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-primary" onClick={() => onValidate(selectedFiles)}>
+              Valider {selectedFiles.length} fichier(s)
+            </button>
+            <button type="button" className="btn-ghost" onClick={onClose}>Annuler</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SourceTree({ nodes, draft, onToggleFile, onSelectFolder, depth = 0 }) {
+  return (
+    <ul className={`source-tree ${depth === 0 ? 'root' : ''}`}>
+      {nodes.map(node => (
+        <SourceTreeNode
+          key={node.id}
+          node={node}
+          draft={draft}
+          onToggleFile={onToggleFile}
+          onSelectFolder={onSelectFolder}
+          depth={depth}
+        />
+      ))}
+    </ul>
+  )
+}
+
+function SourceTreeNode({ node, draft, onToggleFile, onSelectFolder, depth }) {
+  const [expanded, setExpanded] = useState(depth < 1)
+  const isFolder = node.type === 'folder'
+  const children = node.children || []
+  const markdownFiles = isFolder ? collectMarkdownFiles([node]) : []
+  const checkedCount = markdownFiles.filter(file => draft.has(normalizePath(file.path))).length
+  const allChecked = markdownFiles.length > 0 && checkedCount === markdownFiles.length
+  const partial = checkedCount > 0 && checkedCount < markdownFiles.length
+
+  return (
+    <li>
+      {isFolder ? (
+        <div className="source-tree-row is-folder" style={{ paddingLeft: `${8 + depth * 16}px` }}>
+          <button type="button" onClick={() => setExpanded(value => !value)}>
+            {expanded ? '▾' : '▸'}
+          </button>
+          <input
+            type="checkbox"
+            checked={allChecked}
+            ref={el => { if (el) el.indeterminate = partial }}
+            onChange={event => onSelectFolder(node, event.target.checked)}
+          />
+          <span onClick={() => setExpanded(value => !value)}>{node.name}</span>
+          <em>{checkedCount}/{markdownFiles.length}</em>
+        </div>
+      ) : (
+        <label className="source-tree-row" style={{ paddingLeft: `${30 + depth * 16}px` }}>
+          <input
+            type="checkbox"
+            checked={draft.has(normalizePath(node.path))}
+            onChange={() => onToggleFile(node)}
+          />
+          <span>{node.name.replace(/\.md$/i, '')}</span>
+        </label>
+      )}
+      {isFolder && expanded && children.length > 0 && (
+        <SourceTree
+          nodes={children}
+          draft={draft}
+          onToggleFile={onToggleFile}
+          onSelectFolder={onSelectFolder}
+          depth={depth + 1}
+        />
+      )}
+    </li>
   )
 }
 
@@ -437,21 +594,43 @@ function collectFolders(tree) {
   return folders
 }
 
-function collectMarkdownFiles(tree) {
+function collectMarkdownFiles(tree, prefix = '') {
   const files = []
-  function walk(nodes, prefix = '') {
+  function walk(nodes, currentPrefix = '') {
     nodes.forEach(node => {
-      const path = prefix ? `${prefix}/${node.name}` : node.name
+      const path = currentPrefix ? `${currentPrefix}/${node.name}` : node.name
       if (node.type === 'file' && /\.md$/i.test(node.name)) {
         files.push({ id: node.id, path, name: node.name })
       }
       if (node.children) walk(node.children, path)
     })
   }
-  walk(tree || [])
+  walk(tree || [], prefix)
   return files
 }
 
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim().toLowerCase()
+}
+
+function filterMarkdownTree(nodes, query, prefix = '') {
+  const q = normalizePath(query)
+  const result = []
+  for (const node of nodes || []) {
+    if (node.type === 'locked_folder') continue
+    const path = prefix ? `${prefix}/${node.name}` : node.name
+    if (node.type === 'file') {
+      if (/\.md$/i.test(node.name) && (!q || normalizePath(path).includes(q))) {
+        result.push({ ...node, path })
+      }
+      continue
+    }
+    if (node.type === 'folder') {
+      const children = filterMarkdownTree(node.children || [], query, path)
+      if (children.length > 0 || (!q && collectMarkdownFiles([node], prefix).length > 0)) {
+        result.push({ ...node, path, children })
+      }
+    }
+  }
+  return result
 }
