@@ -342,63 +342,91 @@ function SourceFilesModal({ tree, files, selectedSourcePaths, onClose, onValidat
     })
   }, [])
 
+  const selectVisible = useCallback(() => {
+    const visibleFiles = collectMarkdownFiles(filteredTree)
+    setDraft(prev => {
+      const next = new Set(prev)
+      visibleFiles.forEach(file => next.add(normalizePath(file.path)))
+      return next
+    })
+  }, [filteredTree])
+
+  const clearSelection = useCallback(() => setDraft(new Set()), [])
+
   return (
-    <div className="modal-overlay source-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal source-files-modal">
-        <div className="modal-header">
+    <>
+      <div className="picker-backdrop" onClick={onClose} />
+      <div className="picker-panel source-link-panel">
+        <div className="picker-header">
           <h3>Fichiers du questionnaire</h3>
-          <button type="button" className="icon-btn" onClick={onClose}>
-            <Icon name="close" size={18} />
-          </button>
+          <div className="picker-header-actions">
+            <button type="button" className="picker-select-all-btn" onClick={selectVisible}>Tout selectionner</button>
+            <button type="button" className="icon-btn" onClick={onClose}>
+              <Icon name="close" size={18} />
+            </button>
+          </div>
         </div>
-        <div className="modal-body source-files-modal-body">
+
+        <div className="source-link-search">
           <input
             autoFocus
             type="search"
-            className="modal-input"
+            className="search-input"
             placeholder="Rechercher un fichier ou dossier..."
             value={query}
             onChange={event => setQuery(event.target.value)}
           />
+        </div>
 
-          <div className="source-modal-layout">
-            <div className="source-modal-tree">
-              {filteredTree.length === 0 ? (
-                <p className="questionnaire-muted">Aucun fichier trouve.</p>
-              ) : (
-                <SourceTree
-                  nodes={filteredTree}
-                  draft={draft}
-                  onToggleFile={toggleFile}
-                  onSelectFolder={selectFolder}
-                />
-              )}
-            </div>
+        <div className="source-link-summary">
+          {selectedFiles.length === 0 ? (
+            <span>Aucun fichier selectionne</span>
+          ) : (
+            <>
+              <span>{selectedFiles.length} fichier(s) selectionne(s)</span>
+              <button type="button" onClick={clearSelection}>Vider</button>
+            </>
+          )}
+        </div>
 
-            <aside className="source-modal-selection">
-              <strong>{selectedFiles.length} selectionne(s)</strong>
-              {selectedFiles.length === 0 ? (
-                <p>Aucun fichier choisi.</p>
-              ) : (
-                selectedFiles.map(file => (
-                  <button key={file.id} type="button" onClick={() => toggleFile(file)}>
-                    <span>{file.path.replace(/\.md$/i, '')}</span>
-                    <Icon name="close" size={14} />
-                  </button>
-                ))
-              )}
-            </aside>
+        <div className="picker-tree-container source-link-tree-container">
+          {filteredTree.length === 0 ? (
+            <p className="source-link-empty">Aucun fichier trouve.</p>
+          ) : (
+            <SourceTree
+              nodes={filteredTree}
+              draft={draft}
+              onToggleFile={toggleFile}
+              onSelectFolder={selectFolder}
+            />
+          )}
+        </div>
+
+        {selectedFiles.length > 0 && (
+          <div className="source-link-selection-strip">
+            {selectedFiles.slice(0, 4).map(file => (
+              <button key={file.id} type="button" onClick={() => toggleFile(file)}>
+                <span>{file.path.replace(/\.md$/i, '')}</span>
+                <Icon name="close" size={13} />
+              </button>
+            ))}
+            {selectedFiles.length > 4 && <em>+ {selectedFiles.length - 4} autre(s)</em>}
           </div>
+        )}
 
-          <div className="modal-actions">
-            <button type="button" className="btn-primary" onClick={() => onValidate(selectedFiles)}>
-              Valider {selectedFiles.length} fichier(s)
-            </button>
+        <div className="picker-footer">
+          <span className="picker-count">
+            {selectedFiles.length > 0 ? `${selectedFiles.length} fichier(s) lie(s)` : 'Aucun fichier selectionne'}
+          </span>
+          <div className="picker-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Annuler</button>
+            <button type="button" className="btn-primary" onClick={() => onValidate(selectedFiles)}>
+              Valider
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -431,7 +459,7 @@ function SourceTreeNode({ node, draft, onToggleFile, onSelectFolder, depth }) {
   return (
     <li>
       {isFolder ? (
-        <div className="source-tree-row is-folder" style={{ paddingLeft: `${8 + depth * 16}px` }}>
+        <div className="source-tree-row picker-row is-folder" style={{ paddingLeft: `${12 + depth * 16}px` }}>
           <button type="button" onClick={() => setExpanded(value => !value)}>
             {expanded ? '▾' : '▸'}
           </button>
@@ -445,7 +473,7 @@ function SourceTreeNode({ node, draft, onToggleFile, onSelectFolder, depth }) {
           <em>{checkedCount}/{markdownFiles.length}</em>
         </div>
       ) : (
-        <label className="source-tree-row" style={{ paddingLeft: `${30 + depth * 16}px` }}>
+        <label className="source-tree-row picker-row" style={{ paddingLeft: `${34 + depth * 16}px` }}>
           <input
             type="checkbox"
             checked={draft.has(normalizePath(node.path))}
@@ -598,7 +626,7 @@ function collectMarkdownFiles(tree, prefix = '') {
   const files = []
   function walk(nodes, currentPrefix = '') {
     nodes.forEach(node => {
-      const path = currentPrefix ? `${currentPrefix}/${node.name}` : node.name
+      const path = node.path || (currentPrefix ? `${currentPrefix}/${node.name}` : node.name)
       if (node.type === 'file' && /\.md$/i.test(node.name)) {
         files.push({ id: node.id, path, name: node.name })
       }
