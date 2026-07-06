@@ -13,11 +13,14 @@ export default function GlobalQuizLauncher() {
   const [answer, setAnswer] = useState('')
   const [revealed, setRevealed] = useState(false)
   const [startedAt, setStartedAt] = useState(Date.now())
+  const [sessionResults, setSessionResults] = useState([])
+  const [stopped, setStopped] = useState(false)
 
   const selectedFiles = useMemo(() => collectSelectedFiles(tree, selectedIds), [tree, selectedIds])
   const currentQuestion = session[currentIndex] || null
-  const done = session.length > 0 && currentIndex >= session.length
+  const done = session.length > 0 && (currentIndex >= session.length || stopped)
   const choices = getQuestionChoices(currentQuestion)
+  const report = useMemo(() => buildSessionReport(session, sessionResults, stopped), [session, sessionResults, stopped])
 
   const close = () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' })
 
@@ -57,6 +60,8 @@ export default function GlobalQuizLauncher() {
       setAnswer('')
       setRevealed(false)
       setStartedAt(Date.now())
+      setSessionResults([])
+      setStopped(false)
       toast(`${result.questions.length} question(s) chargee(s)`)
     } catch (err) {
       toast(err.message, 'error')
@@ -68,7 +73,7 @@ export default function GlobalQuizLauncher() {
   const recordResult = useCallback(async (correct) => {
     if (!currentQuestion) return
     try {
-      await api.saveQuestionnaireResult({
+      const resultPayload = {
         question_key: currentQuestion.question_key,
         questionnaire_file_id: currentQuestion.questionnaire_file_id,
         questionnaire_title: currentQuestion.questionnaire_title,
@@ -79,7 +84,9 @@ export default function GlobalQuizLauncher() {
         correct,
         score: correct ? 1 : 0,
         response_ms: Date.now() - startedAt,
-      })
+      }
+      await api.saveQuestionnaireResult(resultPayload)
+      setSessionResults(prev => [...prev, resultPayload])
       const nextIndex = currentIndex + 1
       setAnswer('')
       setRevealed(false)
@@ -95,6 +102,21 @@ export default function GlobalQuizLauncher() {
     }
   }, [answer, currentIndex, currentQuestion, session.length, startedAt, toast])
 
+  const stopQuiz = useCallback(() => {
+    setStopped(true)
+    setAnswer('')
+    setRevealed(false)
+  }, [])
+
+  const backToSources = useCallback(() => {
+    setSession([])
+    setSessionResults([])
+    setCurrentIndex(0)
+    setAnswer('')
+    setRevealed(false)
+    setStopped(false)
+  }, [])
+
   return (
     <>
       <div className="picker-backdrop" onClick={close} />
@@ -102,25 +124,29 @@ export default function GlobalQuizLauncher() {
         <div className="picker-header">
           <h3>Reviser</h3>
           <div className="picker-header-actions">
-            <button type="button" className="picker-select-all-btn" onClick={selectAll}>Tout selectionner</button>
+            {session.length === 0 && (
+              <button type="button" className="picker-select-all-btn" onClick={selectAll}>Tout selectionner</button>
+            )}
             <button type="button" className="icon-btn" onClick={close}>
               <Icon name="close" size={18} />
             </button>
           </div>
         </div>
 
-        <div className="global-quiz-settings">
-          <label>
-            Nombre de questions
-            <input
-              type="number"
-              min="1"
-              max="50"
-              value={limit}
-              onChange={event => setLimit(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
-            />
-          </label>
-        </div>
+        {session.length === 0 && (
+          <div className="global-quiz-settings">
+            <label>
+              Nombre de questions
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={limit}
+                onChange={event => setLimit(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
+              />
+            </label>
+          </div>
+        )}
 
         {session.length === 0 ? (
           <div className="picker-tree-container">
@@ -129,10 +155,36 @@ export default function GlobalQuizLauncher() {
         ) : (
           <div className="global-quiz-live">
             {done ? (
-              <div className="quiz-done">
+              <div className="quiz-done global-quiz-report">
                 <Icon name="question" size={28} />
-                <strong>Session terminee</strong>
-                <button type="button" className="btn-primary" onClick={startQuiz}>Relancer</button>
+                <strong>{stopped ? 'Session arretee' : 'Session terminee'}</strong>
+                <div className="global-quiz-score">
+                  <span>{report.percent}%</span>
+                  <p>{report.correct} juste(s) / {report.answered} reponse(s)</p>
+                </div>
+                <div className="global-quiz-report-grid">
+                  <div>
+                    <strong>{report.answered}</strong>
+                    <span>faites</span>
+                  </div>
+                  <div>
+                    <strong>{report.wrong}</strong>
+                    <span>a revoir</span>
+                  </div>
+                  <div>
+                    <strong>{report.remaining}</strong>
+                    <span>restantes</span>
+                  </div>
+                </div>
+                <p>{report.message}</p>
+                {report.weakQuestions.length > 0 && (
+                  <div className="global-quiz-weak-list">
+                    <span>Questions a revoir</span>
+                    {report.weakQuestions.map(question => (
+                      <p key={question.question_key}>{question.question_text}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -196,21 +248,29 @@ export default function GlobalQuizLauncher() {
         <div className="picker-footer">
           <span className="picker-count">
             {session.length > 0
-              ? `${session.length} question(s)`
+              ? `${sessionResults.length} / ${session.length} reponse(s)`
               : selectedFiles.length > 0 ? `${selectedFiles.length} fichier(s)` : 'Aucun fichier selectionne'}
           </span>
           <div className="picker-actions">
-            {session.length > 0 && (
-              <button type="button" className="btn-ghost" onClick={() => setSession([])}>Sources</button>
+            {session.length === 0 && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={startQuiz}
+                disabled={loading || selectedFiles.length === 0}
+              >
+                {loading ? '...' : 'Lancer'}
+              </button>
             )}
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={startQuiz}
-              disabled={loading || selectedFiles.length === 0}
-            >
-              {loading ? '...' : 'Lancer'}
-            </button>
+            {session.length > 0 && !done && (
+              <button type="button" className="btn-danger" onClick={stopQuiz}>Stop</button>
+            )}
+            {session.length > 0 && done && (
+              <>
+                <button type="button" className="btn-ghost" onClick={backToSources}>Sources</button>
+                <button type="button" className="btn-primary" onClick={startQuiz}>Relancer</button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -307,4 +367,22 @@ function getQuestionTypeLabel(type) {
   if (type === 'mcq') return 'QCM'
   if (type === 'true_false') return 'Vrai / Faux'
   return 'Question ouverte'
+}
+
+function buildSessionReport(session, results, stopped) {
+  const answered = results.length
+  const correct = results.filter(result => result.correct).length
+  const wrong = answered - correct
+  const remaining = Math.max(0, session.length - answered)
+  const percent = answered > 0 ? Math.round((correct / answered) * 100) : 0
+  const weakQuestions = results.filter(result => !result.correct).slice(-3).reverse()
+  let message = 'Aucune reponse notee pour cette session.'
+  if (answered > 0 && wrong === 0) {
+    message = stopped ? 'Session courte, mais tout ce qui a ete tente est juste.' : 'Tres propre : aucune erreur sur cette session.'
+  } else if (answered > 0 && percent >= 70) {
+    message = 'Bonne session. Les erreurs notees ressortiront plus souvent.'
+  } else if (answered > 0) {
+    message = 'Session utile : les points rates vont etre renforces dans les prochains tirages.'
+  }
+  return { answered, correct, wrong, remaining, percent, weakQuestions, message }
 }

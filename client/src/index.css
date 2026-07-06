@@ -2264,6 +2264,86 @@ kbd {
   margin-bottom: 10px;
 }
 
+.global-quiz-report {
+  gap: 12px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.global-quiz-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.global-quiz-score span {
+  color: var(--accent-hover);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.global-quiz-score p,
+.global-quiz-report > p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.global-quiz-report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.global-quiz-report-grid div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.global-quiz-report-grid strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.global-quiz-report-grid span {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.global-quiz-weak-list {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  text-align: left;
+}
+
+.global-quiz-weak-list span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.global-quiz-weak-list p {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .questionnaire-editor {
   display: flex;
   flex-direction: column;
