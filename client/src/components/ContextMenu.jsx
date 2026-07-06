@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 
 export default function ContextMenu() {
   const { contextMenu, hideContextMenu } = useApp()

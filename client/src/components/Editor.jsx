@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 import EditorToolbar from './EditorToolbar'
 import Preview from './Preview'
-import GraphEditor, { isGraphFile } from './GraphEditor'
+import GraphEditor from './GraphEditor'
+import { isGraphFile } from '../utils/graphFile'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
@@ -65,7 +66,7 @@ export default function Editor() {
   useEffect(() => {
     const prevId = prevFileIdRef.current
     // Save pending changes before switching files
-    if (prevId && prevId !== openFileId && isDirtyRef.current) {
+    if (prevId && openFileId && prevId !== openFileId && isDirtyRef.current) {
       clearTimeout(saveTimerRef.current)
       const { saveFile: fn } = saveRef.current
       fn(prevId, contentRef.current)

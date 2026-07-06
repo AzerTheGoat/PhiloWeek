@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 import Icon from './Icons'
 import * as api from '../api'
 

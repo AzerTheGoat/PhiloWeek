@@ -143,4 +143,12 @@ function updateLinks(db, fileId, content) {
   }
 }
 
-module.exports = { getDb, initDb, updateTags, updateLinks }
+function updateAllLinks(db) {
+  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file'").all()
+  const tx = db.transaction(() => {
+    for (const file of files) updateLinks(db, file.id, file.content || '')
+  })
+  tx()
+}
+
+module.exports = { getDb, initDb, updateTags, updateLinks, updateAllLinks }

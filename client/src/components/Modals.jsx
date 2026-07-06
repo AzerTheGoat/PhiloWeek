@@ -1,10 +1,19 @@
-import { useState } from 'react'
-import { useApp } from '../context/AppContext'
-import { createGraphMarkdown } from './GraphEditor'
+import { useEffect, useRef, useState } from 'react'
+import { useApp } from '../context/useApp'
+import { createGraphMarkdown } from '../utils/graphFile'
 import * as api from '../api'
 
 function shouldAutoFocus() {
-  return typeof window === 'undefined' || !window.matchMedia('(max-width: 768px)').matches
+  return true
+}
+
+function useModalFocus() {
+  const ref = useRef(null)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => ref.current?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [])
+  return ref
 }
 
 export default function Modals() {
@@ -27,6 +36,7 @@ function NewGraphModal({ modal, hideModal }) {
   const { loadTree, openFile, toast } = useApp()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -60,6 +70,7 @@ function NewGraphModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
+          ref={inputRef}
           autoFocus={shouldAutoFocus()}
           type="text"
           placeholder="Nom du graphe"
@@ -83,6 +94,7 @@ function NewFileModal({ modal, hideModal }) {
   const { loadTree, openFile, toast } = useApp()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -114,6 +126,7 @@ function NewFileModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
+          ref={inputRef}
           autoFocus={shouldAutoFocus()}
           type="text"
           placeholder="Nom du fichier"
@@ -139,6 +152,7 @@ function NewFolderModal({ modal, hideModal }) {
   const { loadTree, toast } = useApp()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -167,6 +181,7 @@ function NewFolderModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
+          ref={inputRef}
           autoFocus={shouldAutoFocus()}
           type="text"
           placeholder="Nom du dossier"
@@ -190,6 +205,7 @@ function LockFolderModal({ modal, hideModal }) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -219,6 +235,7 @@ function LockFolderModal({ modal, hideModal }) {
           Le contenu sera chiffré AES-256. Sans le mot de passe, les fichiers seront inaccessibles.
         </p>
         <input
+          ref={inputRef}
           autoFocus={shouldAutoFocus()}
           type="password"
           placeholder="Mot de passe"

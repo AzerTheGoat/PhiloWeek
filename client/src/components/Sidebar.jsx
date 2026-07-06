@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 import FileTree from './FileTree'
 import Icon from './Icons'
 import * as api from '../api'

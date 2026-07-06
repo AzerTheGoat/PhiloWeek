@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 import * as api from '../api'
 
 // ——— Helpers ———

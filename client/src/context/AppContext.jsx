@@ -1,7 +1,6 @@
-import { createContext, useContext, useReducer, useCallback, useRef } from 'react'
+import { useReducer, useCallback, useRef } from 'react'
+import { Ctx } from './AppContextCore'
 import * as api from '../api'
-
-const Ctx = createContext(null)
 
 function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
@@ -24,19 +23,32 @@ const init = {
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'SET_TREE': return { ...state, tree: action.payload }
+    case 'SET_TREE': {
+      const next = { ...state, tree: action.payload }
+      if (state.openFileId && !treeHasId(action.payload, state.openFileId)) {
+        next.openFile = null
+        next.openFileId = null
+      }
+      return next
+    }
     case 'SET_FILE_NAMES': return { ...state, fileNames: action.payload }
     case 'OPEN_FILE': return {
       ...state,
       openFile: action.payload,
       openFileId: action.payload?.id || null,
       view: 'editor',
+      modal: null,
+      contextMenu: null,
+      showFilePicker: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
       showAI: isMobileViewport() ? false : state.showAI,
     }
     case 'SET_VIEW': return {
       ...state,
       view: action.payload,
+      modal: null,
+      contextMenu: null,
+      showFilePicker: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
       showAI: isMobileViewport() && action.payload !== 'editor' ? false : state.showAI,
     }
@@ -50,6 +62,9 @@ function reducer(state, action) {
         ...state,
         showAI,
         view: isMobileViewport() && showAI ? 'editor' : state.view,
+        modal: null,
+        contextMenu: null,
+        showFilePicker: false,
         sidebarOpen: isMobileViewport() && showAI ? false : state.sidebarOpen,
       }
     }
@@ -58,14 +73,39 @@ function reducer(state, action) {
       return {
         ...state,
         sidebarOpen,
+        modal: null,
+        contextMenu: null,
+        showFilePicker: false,
         showAI: isMobileViewport() && sidebarOpen ? false : state.showAI,
       }
+    }
+    case 'CLEAR_OPEN_FILE': return {
+      ...state,
+      openFile: null,
+      openFileId: null,
     }
     case 'ADD_TOAST': return { ...state, toasts: [...state.toasts, action.payload] }
     case 'REMOVE_TOAST': return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) }
     case 'SET_CONTEXT_MENU': return { ...state, contextMenu: action.payload }
-    case 'SET_MODAL': return { ...state, modal: action.payload }
-    case 'TOGGLE_FILE_PICKER': return { ...state, showFilePicker: !state.showFilePicker }
+    case 'SET_MODAL': return {
+      ...state,
+      modal: action.payload,
+      contextMenu: action.payload ? null : state.contextMenu,
+      showFilePicker: action.payload ? false : state.showFilePicker,
+      sidebarOpen: action.payload && isMobileViewport() ? false : state.sidebarOpen,
+      showAI: action.payload && isMobileViewport() ? false : state.showAI,
+    }
+    case 'TOGGLE_FILE_PICKER': {
+      const showFilePicker = !state.showFilePicker
+      return {
+        ...state,
+        showFilePicker,
+        modal: showFilePicker ? null : state.modal,
+        contextMenu: showFilePicker ? null : state.contextMenu,
+        sidebarOpen: showFilePicker && isMobileViewport() ? false : state.sidebarOpen,
+        showAI: showFilePicker && isMobileViewport() ? false : state.showAI,
+      }
+    }
     default: return state
   }
 }
@@ -88,6 +128,12 @@ export function AppProvider({ children }) {
     }
   }, [])
 
+  const toast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random()
+    dispatch({ type: 'ADD_TOAST', payload: { id, message, type } })
+    setTimeout(() => dispatch({ type: 'REMOVE_TOAST', payload: id }), 3500)
+  }, [])
+
   const openFile = useCallback(async (id) => {
     const requestId = ++openRequestRef.current
     try {
@@ -95,23 +141,33 @@ export function AppProvider({ children }) {
       if (requestId !== openRequestRef.current) return
       dispatch({ type: 'OPEN_FILE', payload: file })
     } catch (err) {
+      if (requestId === openRequestRef.current) {
+        dispatch({ type: 'CLEAR_OPEN_FILE' })
+        await loadTree()
+      }
       toast(err.message, 'error')
     }
-  }, [])
+  }, [loadTree, toast])
 
   const saveFile = useCallback(async (id, content) => {
     try {
       await api.updateFile(id, { content })
     } catch (err) {
+      if (/not found/i.test(err.message || '')) {
+        dispatch({ type: 'CLEAR_OPEN_FILE' })
+        await loadTree()
+      }
       toast(err.message || 'Erreur lors de la sauvegarde', 'error')
     }
-  }, [])
+  }, [loadTree, toast])
 
-  const toast = useCallback((message, type = 'success') => {
-    const id = Date.now() + Math.random()
-    dispatch({ type: 'ADD_TOAST', payload: { id, message, type } })
-    setTimeout(() => dispatch({ type: 'REMOVE_TOAST', payload: id }), 3500)
-  }, [])
+  const deleteFile = useCallback(async (id) => {
+    await api.deleteFile(id)
+    if (state.openFileId === id) {
+      dispatch({ type: 'CLEAR_OPEN_FILE' })
+    }
+    await loadTree()
+  }, [loadTree, state.openFileId])
 
   const showContextMenu = useCallback((x, y, items) => {
     dispatch({ type: 'SET_CONTEXT_MENU', payload: { x, y, items } })
@@ -164,6 +220,7 @@ export function AppProvider({ children }) {
     loadTree,
     openFile,
     saveFile,
+    deleteFile,
     toast,
     showContextMenu,
     hideContextMenu,
@@ -176,8 +233,6 @@ export function AppProvider({ children }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
-export const useApp = () => useContext(Ctx)
-
 function flattenTree(nodes) {
   const result = []
   function walk(arr) {
@@ -185,4 +240,13 @@ function flattenTree(nodes) {
   }
   walk(nodes)
   return result
+}
+
+function treeHasId(nodes, id) {
+  if (!id) return false
+  for (const node of nodes || []) {
+    if (node.id === id) return true
+    if (treeHasId(node.children, id)) return true
+  }
+  return false
 }

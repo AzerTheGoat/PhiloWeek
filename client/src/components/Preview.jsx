@@ -1,6 +1,6 @@
 import { memo, useMemo, useCallback } from 'react'
 import { marked } from 'marked'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 
 marked.setOptions({ breaks: true, gfm: true })
 

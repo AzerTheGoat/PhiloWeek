@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useApp } from '../context/AppContext'
+import { useApp } from '../context/useApp'
 import * as api from '../api'
 
 export default function FileTree({ nodes, depth = 0, dragState, setDragState, dropTargetId, setDropTargetId }) {
@@ -29,7 +29,7 @@ export default function FileTree({ nodes, depth = 0, dragState, setDragState, dr
 
 function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropTargetId }) {
   const {
-    openFileId, openFile, loadTree, toast, showContextMenu, showModal, dispatch
+    openFileId, openFile, loadTree, deleteFile, toast, showContextMenu, showModal, dispatch
   } = useApp()
   const [expanded, setExpanded] = useState(depth === 0)
   const [renaming, setRenaming] = useState(false)
@@ -142,13 +142,12 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   const handleDelete = useCallback(async () => {
     if (!confirm(`Supprimer "${node.name}" ?`)) return
     try {
-      await api.deleteFile(node.id)
-      await loadTree()
+      await deleteFile(node.id)
       toast(`"${node.name}" supprimé`)
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [node, loadTree, toast])
+  }, [deleteFile, node, toast])
 
   const handleRename = useCallback(async () => {
     if (!renameVal.trim() || renameVal === node.name) { setRenaming(false); return }

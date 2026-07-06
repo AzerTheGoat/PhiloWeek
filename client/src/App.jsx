@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { AppProvider, useApp } from './context/AppContext'
+import { AppProvider } from './context/AppContext'
+import { useApp } from './context/useApp'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import AIPanel from './components/AIPanel'

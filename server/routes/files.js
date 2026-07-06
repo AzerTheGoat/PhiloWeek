@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
-const { getDb, updateTags, updateLinks } = require('../db')
+const crypto = require('crypto')
+const { getDb, updateTags, updateLinks, updateAllLinks } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 
 // GET /api/files — full tree
@@ -64,17 +65,23 @@ router.post('/', (req, res) => {
   const db = getDb()
   const { parent_id, name, type, content } = req.body
   if (!name || !type) return res.status(400).json({ error: 'name and type required' })
+  const parentId = parent_id || null
+  const parentCheck = validateParent(db, parentId)
+  if (parentCheck) return res.status(parentCheck.status).json({ error: parentCheck.error })
+  const duplicate = findSiblingByName(db, parentId, name)
+  if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
 
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(
     'INSERT INTO files (id, parent_id, name, type, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, parent_id || null, name, type, content || null, now, now)
+  ).run(id, parentId, name, type, content || null, now, now)
 
   if (content) {
     updateTags(db, id, content)
     updateLinks(db, id, content)
   }
+  if (type === 'file') updateAllLinks(db)
 
   res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(id))
 })
@@ -86,6 +93,14 @@ router.put('/:id', (req, res) => {
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   const { name, content, parent_id, sort_order } = req.body
+  const nextParentId = parent_id !== undefined ? (parent_id || null) : file.parent_id
+  const nextName = name !== undefined ? name : file.name
+  if (name !== undefined || parent_id !== undefined) {
+    const parentCheck = validateParent(db, nextParentId)
+    if (parentCheck) return res.status(parentCheck.status).json({ error: parentCheck.error })
+    const duplicate = findSiblingByName(db, nextParentId, nextName, req.params.id)
+    if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
+  }
   const now = new Date().toISOString()
   const sets = []
   const vals = []
@@ -105,6 +120,7 @@ router.put('/:id', (req, res) => {
     updateTags(db, req.params.id, content)
     updateLinks(db, req.params.id, content)
   }
+  if (name !== undefined) updateAllLinks(db)
 
   res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id))
 })
@@ -132,6 +148,8 @@ router.put('/:id/move', (req, res) => {
   }
 
   const nextParentId = parent_id || null
+  const duplicate = findSiblingByName(db, nextParentId, file.name, req.params.id)
+  if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
   if (nextParentId) {
     if (nextParentId === req.params.id) {
       return res.status(400).json({ error: 'Cannot move a folder into itself' })
@@ -165,8 +183,6 @@ router.put('/:id/move', (req, res) => {
 
 // POST /api/files/:id/unlock
 router.post('/:id/unlock', async (req, res) => {
-  const bcrypt = require('bcrypt')
-  const crypto = require('crypto')
   const db = getDb()
   const { password } = req.body
 
@@ -175,7 +191,7 @@ router.post('/:id/unlock', async (req, res) => {
   ).get(req.params.id)
   if (!folder) return res.status(404).json({ error: 'Not found' })
 
-  const valid = await bcrypt.compare(password, folder.password_hash)
+  const valid = verifyPassword(password, folder.password_hash)
   if (!valid) return res.status(401).json({ error: 'Wrong password' })
 
   const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
@@ -200,15 +216,13 @@ router.post('/:id/unlock', async (req, res) => {
 
 // POST /api/files/:id/lock
 router.post('/:id/lock', async (req, res) => {
-  const bcrypt = require('bcrypt')
-  const crypto = require('crypto')
   const db = getDb()
   const { password } = req.body
   if (!password || password.length < 4) {
     return res.status(400).json({ error: 'Password must be at least 4 characters' })
   }
 
-  const hash = await bcrypt.hash(password, 10)
+  const hash = hashPassword(password)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
   db.prepare("UPDATE files SET type = 'locked_folder', password_hash = ? WHERE id = ?").run(hash, req.params.id)
@@ -228,3 +242,36 @@ router.post('/:id/lock', async (req, res) => {
 })
 
 module.exports = router
+
+function findSiblingByName(db, parentId, name, excludeId = null) {
+  return db.prepare(
+    `SELECT id FROM files
+     WHERE parent_id IS ? AND lower(name) = lower(?) AND (? IS NULL OR id != ?)
+     LIMIT 1`
+  ).get(parentId || null, name, excludeId, excludeId)
+}
+
+function validateParent(db, parentId) {
+  if (!parentId) return null
+  const parent = db.prepare('SELECT id, type FROM files WHERE id = ?').get(parentId)
+  if (!parent) return { status: 404, error: 'Parent folder not found' }
+  if (parent.type === 'locked_folder') return { status: 403, error: 'Unlock the folder before adding files into it' }
+  if (parent.type !== 'folder') return { status: 400, error: 'Parent must be a folder' }
+  return null
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex')
+  return `scrypt$1$${salt}$${hash}`
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash) return false
+  const parts = String(storedHash).split('$')
+  if (parts[0] !== 'scrypt' || parts.length !== 4) return false
+  const [, , salt, expected] = parts
+  const actual = crypto.scryptSync(password, salt, 64)
+  const expectedBuffer = Buffer.from(expected, 'hex')
+  return expectedBuffer.length === actual.length && crypto.timingSafeEqual(expectedBuffer, actual)
+}
