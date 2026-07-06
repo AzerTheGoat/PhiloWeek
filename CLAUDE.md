@@ -15,7 +15,10 @@
 PhiloWeek/
 ├── server/
 │   ├── index.js        ← Express app (port 3001)
-│   ├── db.js           ← SQLite async (getDb, initDb, updateTags, updateLinks)
+│   ├── paths.js        ← Résolution du dossier de données persistant (DB, recordings, backups)
+│   ├── db.js           ← SQLite (getDb, initDb, migrations, backupDb, updateTags/Links)
+│   ├── scripts/
+│   │   └── restore-backup.js  ← Restauration manuelle d'une sauvegarde SQLite
 │   ├── routes/
 │   │   ├── files.js    ← CRUD fichiers + lock/unlock
 │   │   ├── ai.js       ← Claude AI (generate + active mode)
@@ -62,14 +65,40 @@ voice_notes  — id, file_id, filename, duration_seconds, title
 
 Cette app n'a plus de tour interactif intégré. Documente toute nouvelle feature ici dans CLAUDE.md.
 
-## Règle absolue : compatibilité entre versions via export/import Obsidian
+## Règle absolue : ZÉRO perte de données au déploiement (Railway)
 
-L'export ZIP Obsidian (`GET /api/export/obsidian`) est le seul mécanisme de backup.
-Chaque fichier `.md` a un frontmatter YAML géré par `gray-matter`.
+Voir **`RAILWAY.md`** pour la procédure complète. Points clés :
+
+- **Le disque Railway est éphémère** : sans volume persistant, la base et les
+  audios sont effacés à chaque `git push`. La base + les enregistrements +
+  les sauvegardes doivent vivre sur un **Volume Railway** (mount `/data`).
+- `server/paths.js` résout le dossier de données dans cet ordre :
+  `DATA_DIR` → `RAILWAY_VOLUME_MOUNT_PATH` → `server/` (fallback dev local).
+  **Ne jamais** recoder en dur un chemin `path.join(__dirname, 'philoweek_v2.db')`
+  ou `.../recordings` : passe toujours par `paths.js` (`DB_PATH`,
+  `RECORDINGS_DIR`, `BACKUPS_DIR`).
+- Au démarrage, `initDb()` **sauvegarde** la base (`<data>/backups/`, 30 max)
+  **avant** toute migration, puis applique les migrations.
+
+### Migrations sûres (changement de schéma sans rien perdre)
+
+- Le schéma est versionné via `PRAGMA user_version`. Le tableau `MIGRATIONS`
+  dans `server/db.js` contient une fonction par palier de version.
+- **Additif uniquement** : `CREATE TABLE IF NOT EXISTS`, ou
+  `addColumnIfMissing(db, table, col, def)`. **Jamais** de `DROP`/`ALTER … DROP`.
+- Pour changer le schéma : **ajoute** une entrée à la fin de `MIGRATIONS`, ne
+  modifie jamais une migration déjà livrée. Elle ne tournera qu'une fois, sur
+  bases existantes comme neuves.
+
+## Filet de sécurité manuel : export/import Obsidian
+
+L'export ZIP Obsidian (`GET /api/export/obsidian`) reste le backup manuel /
+mécanisme de compatibilité entre versions. Chaque `.md` a un frontmatter YAML
+géré par `gray-matter`.
 
 ### Quand tu ajoutes une table ou un champ
 
-1. Ajoute la création dans `server/db.js` → `initDb()`
+1. Ajoute une **migration** additive dans `server/db.js` → `MIGRATIONS`
 2. Inclure dans l'export (`server/routes/export.js`)
 3. Gérer à l'import (`server/routes/import.js`)
 
@@ -119,7 +148,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Notes importantes pour Claude
 
 - Les handlers Express sont déclarés `(req, res) => {...}` mais les appels DB (`better-sqlite3`) sont **synchrones**, pas besoin de `await` dessus
-- La DB est initialisée au démarrage via `initDb()`, pas besoin de migrations manuelles
+- La DB est initialisée au démarrage via `initDb()` (sauvegarde auto + migrations `user_version`) ; chemins de données via `server/paths.js`, jamais en dur
+- Persistance en prod = **Volume Railway** obligatoire (`RAILWAY.md`), sinon perte de données à chaque deploy
 - Le dossier `Journal` n'est plus protégé ni auto-créé (voir section "Dossier Journal" plus haut)
 - Les dossiers verrouillés (`locked_folder`) : contenu chiffré AES-256 côté serveur
 - `insertRef` dans AppContext : ref vers la fonction "insérer dans la note" de l'éditeur

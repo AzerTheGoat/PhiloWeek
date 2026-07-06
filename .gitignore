@@ -7,8 +7,11 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+*.pre-restore-*
 exports/
 recordings/
+backups/
+server/backups/
 *.egg-info/
 .venv/
 venv/

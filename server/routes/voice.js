@@ -4,10 +4,10 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const { getDb } = require('../db')
+const { RECORDINGS_DIR } = require('../paths')
 const { v4: uuidv4 } = require('uuid')
 
-const RECORDINGS_DIR = path.join(__dirname, '../recordings')
-if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR)
+if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true })
 
 const storage = multer.diskStorage({
   destination: RECORDINGS_DIR,
