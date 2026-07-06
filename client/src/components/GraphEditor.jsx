@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
@@ -8,12 +9,29 @@ const CANVAS_HEIGHT = 900
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
+const MIN_NODE_WIDTH = 180
+const MAX_NODE_WIDTH = 420
+const MIN_NODE_HEIGHT = 120
+const MAX_NODE_HEIGHT = 360
+const DEFAULT_NODE_WIDTH = 240
+const DEFAULT_NODE_HEIGHT = 170
+
+marked.setOptions({ breaks: true, gfm: true })
 
 const NODE_TYPES = [
   { value: 'idea', label: 'Idee', color: '#6ba3e8' },
   { value: 'objective', label: 'Objectif', color: '#4caf7d' },
   { value: 'question', label: 'Question', color: '#d69d55' },
   { value: 'resource', label: 'Ressource', color: '#a08be0' },
+]
+
+const BORDER_COLORS = [
+  '#6ba3e8',
+  '#4caf7d',
+  '#d69d55',
+  '#a08be0',
+  '#e05555',
+  '#d8d8d8',
 ]
 
 const EDGE_TYPES = [
@@ -93,6 +111,9 @@ export default function GraphEditor() {
           type,
           title: meta.label,
           body: '',
+          color: meta.color,
+          width: DEFAULT_NODE_WIDTH,
+          height: DEFAULT_NODE_HEIGHT,
           x: 140 + (prev.nodes.length % 3) * 180,
           y: 120 + Math.floor(prev.nodes.length / 3) * 150,
         },
@@ -240,10 +261,10 @@ export default function GraphEditor() {
                   const from = nodeMap.get(edge.from)
                   const to = nodeMap.get(edge.to)
                   if (!from || !to) return null
-                  const x1 = from.x + 130
-                  const y1 = from.y + 54
-                  const x2 = to.x + 18
-                  const y2 = to.y + 54
+                  const x1 = from.x + getNodeWidth(from)
+                  const y1 = from.y + getNodeHeight(from) / 2
+                  const x2 = to.x
+                  const y2 = to.y + getNodeHeight(to) / 2
                   const mid = Math.max(40, Math.abs(x2 - x1) / 2)
                   return (
                     <path
@@ -258,19 +279,43 @@ export default function GraphEditor() {
 
               {graph.nodes.map(node => {
                 const meta = NODE_TYPES.find(item => item.value === node.type) || NODE_TYPES[0]
+                const borderColor = normalizeColor(node.color, meta.color)
+                const width = getNodeWidth(node)
+                const height = getNodeHeight(node)
+                const markdown = renderNodeMarkdown(node.body)
                 return (
-                  <button
+                  <div
                     key={node.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className={`graph-node ${selectedId === node.id ? 'selected' : ''}`}
-                    style={{ left: node.x, top: node.y, '--node-color': meta.color }}
+                    style={{
+                      left: node.x,
+                      top: node.y,
+                      width,
+                      height,
+                      '--node-color': borderColor,
+                    }}
                     onPointerDown={event => handlePointerDown(event, node)}
                     onClick={event => { event.stopPropagation(); setSelectedId(node.id) }}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setSelectedId(node.id)
+                      }
+                    }}
                   >
                     <span className="graph-node-type">{meta.label}</span>
                     <strong>{node.title || 'Sans titre'}</strong>
-                    {node.body && <small>{node.body}</small>}
-                  </button>
+                    {node.body ? (
+                      <div
+                        className="graph-node-markdown"
+                        dangerouslySetInnerHTML={{ __html: markdown }}
+                      />
+                    ) : (
+                      <span className="graph-node-placeholder">Markdown...</span>
+                    )}
+                  </div>
                 )
               })}
             </div>
@@ -297,9 +342,56 @@ export default function GraphEditor() {
                 <input value={selectedNode.title || ''} onChange={event => updateNode(selectedNode.id, { title: event.target.value })} />
               </label>
               <label className="graph-field">
-                Details
+                Markdown
                 <textarea value={selectedNode.body || ''} onChange={event => updateNode(selectedNode.id, { body: event.target.value })} />
               </label>
+              <label className="graph-field">
+                Couleur du contour
+                <div className="graph-color-row">
+                  {BORDER_COLORS.map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`graph-color-swatch ${normalizeColor(selectedNode.color, NODE_TYPES.find(type => type.value === selectedNode.type)?.color) === color ? 'active' : ''}`}
+                      style={{ '--swatch-color': color }}
+                      title={color}
+                      onClick={() => updateNode(selectedNode.id, { color })}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={normalizeColor(selectedNode.color, NODE_TYPES.find(type => type.value === selectedNode.type)?.color)}
+                    onChange={event => updateNode(selectedNode.id, { color: event.target.value })}
+                    title="Couleur personnalisee"
+                  />
+                </div>
+              </label>
+              <div className="graph-size-grid">
+                <label className="graph-field">
+                  Largeur
+                  <input
+                    type="range"
+                    min={MIN_NODE_WIDTH}
+                    max={MAX_NODE_WIDTH}
+                    step="10"
+                    value={getNodeWidth(selectedNode)}
+                    onChange={event => updateNode(selectedNode.id, { width: Number(event.target.value) })}
+                  />
+                  <span>{getNodeWidth(selectedNode)} px</span>
+                </label>
+                <label className="graph-field">
+                  Hauteur
+                  <input
+                    type="range"
+                    min={MIN_NODE_HEIGHT}
+                    max={MAX_NODE_HEIGHT}
+                    step="10"
+                    value={getNodeHeight(selectedNode)}
+                    onChange={event => updateNode(selectedNode.id, { height: Number(event.target.value) })}
+                  />
+                  <span>{getNodeHeight(selectedNode)} px</span>
+                </label>
+              </div>
 
               <div className="graph-link-box">
                 <strong>Lien sortant</strong>
@@ -383,6 +475,9 @@ function normalizeGraph(graph) {
       type: NODE_TYPES.some(type => type.value === node.type) ? node.type : 'idea',
       title: String(node.title || `Carte ${index + 1}`),
       body: String(node.body || ''),
+      color: normalizeColor(node.color, NODE_TYPES.find(type => type.value === node.type)?.color || NODE_TYPES[0].color),
+      width: clampNumber(node.width, MIN_NODE_WIDTH, MAX_NODE_WIDTH, DEFAULT_NODE_WIDTH),
+      height: clampNumber(node.height, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, DEFAULT_NODE_HEIGHT),
       x: Number.isFinite(Number(node.x)) ? Number(node.x) : 100 + index * 40,
       y: Number.isFinite(Number(node.y)) ? Number(node.y) : 100 + index * 40,
     })),
@@ -431,4 +526,44 @@ function clampZoom(value) {
   const next = Number(value)
   if (!Number.isFinite(next)) return 1
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next * 10) / 10))
+}
+
+function getNodeWidth(node) {
+  return clampNumber(node?.width, MIN_NODE_WIDTH, MAX_NODE_WIDTH, DEFAULT_NODE_WIDTH)
+}
+
+function getNodeHeight(node) {
+  return clampNumber(node?.height, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, DEFAULT_NODE_HEIGHT)
+}
+
+function clampNumber(value, min, max, fallback) {
+  const next = Number(value)
+  if (!Number.isFinite(next)) return fallback
+  return Math.min(max, Math.max(min, Math.round(next)))
+}
+
+function normalizeColor(value, fallback = NODE_TYPES[0].color) {
+  const color = String(value || '').trim()
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback
+}
+
+function renderNodeMarkdown(markdown) {
+  return sanitizeNodeHtml(marked(String(markdown || '')))
+}
+
+function sanitizeNodeHtml(html) {
+  if (typeof document === 'undefined') return html
+  const template = document.createElement('template')
+  template.innerHTML = html
+  template.content.querySelectorAll('script, style, iframe, object, embed').forEach(element => element.remove())
+  template.content.querySelectorAll('*').forEach(element => {
+    Array.from(element.attributes).forEach(attribute => {
+      const name = attribute.name.toLowerCase()
+      const value = attribute.value.trim().toLowerCase()
+      if (name.startsWith('on') || value.startsWith('javascript:')) {
+        element.removeAttribute(attribute.name)
+      }
+    })
+  })
+  return template.innerHTML
 }

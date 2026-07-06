@@ -139,6 +139,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le rapport doit rester prudent : hypothèses sur l'état mental, pas de diagnostic médical.
 - L'export Obsidian ajoute les citations dans `_PhiloWeek/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
 
+## Graphes d'idées
+
+- Les fichiers graphes sont des fichiers `.md` avec `philoweek_type: graph` et un bloc JSON `philoweek-graph`.
+- Chaque bloc du graphe peut contenir du Markdown visible directement dans la carte.
+- La couleur configurable d'un bloc concerne uniquement son contour, pas son fond.
+- La largeur et la hauteur des blocs sont configurables depuis l'inspecteur du graphe.
+- Ces réglages sont stockés dans le JSON du fichier graphe pour rester compatibles avec l'export/import Obsidian.
+
 ## Experience mobile
 
 - Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers/IA en tiroirs plein ecran.
