@@ -82,10 +82,16 @@ export default function QuestionnaireEditor() {
     }
   }, [content, toast, triggerSave])
 
-  const startSession = useCallback(async () => {
+  const startSession = useCallback(async (options = {}) => {
+    const sessionScope = options.scope || scope
+    const hasLinkedFiles = selectedSourcePaths.size > 0
+    if (options.requireLinkedFiles && !hasLinkedFiles) {
+      toast('Lie au moins un fichier avant de lancer ce questionnaire', 'error')
+      return
+    }
     try {
       const result = await api.getQuestionnaireSession({
-        scope,
+        scope: sessionScope,
         folder_ids: Array.from(folderIds),
         file_id: currentFile?.id,
         limit,
@@ -103,7 +109,7 @@ export default function QuestionnaireEditor() {
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [currentFile?.id, folderIds, limit, scope, toast])
+  }, [currentFile?.id, folderIds, limit, scope, selectedSourcePaths.size, toast])
 
   const recordResult = useCallback(async (correct) => {
     if (!currentQuestion) return
@@ -214,6 +220,7 @@ export default function QuestionnaireEditor() {
               files={fileOptions}
               selectedSourcePaths={selectedSourcePaths}
               onOpen={() => setSourceModalOpen(true)}
+              onStart={() => startSession({ scope: 'file', requireLinkedFiles: true })}
             />
             <QuizPanel
               scope={scope}
@@ -285,7 +292,7 @@ function QuestionnairePreview({ parsed }) {
   )
 }
 
-function SourceFilesPanel({ files, selectedSourcePaths, onOpen }) {
+function SourceFilesPanel({ files, selectedSourcePaths, onOpen, onStart }) {
   const selectedFiles = files.filter(file => selectedSourcePaths.has(normalizePath(file.path)))
   return (
     <section className="questionnaire-card source-files-card">
@@ -306,9 +313,14 @@ function SourceFilesPanel({ files, selectedSourcePaths, onOpen }) {
         )}
         {selectedFiles.length > 5 && <em>+ {selectedFiles.length - 5} autre(s)</em>}
       </div>
-      <button type="button" className="btn-primary source-files-manage" onClick={onOpen}>
-        <Icon name="folder" size={16} /> Gerer les fichiers lies
-      </button>
+      <div className="source-files-actions">
+        <button type="button" className="btn-ghost" onClick={onOpen}>
+          <Icon name="folder" size={16} /> Gerer
+        </button>
+        <button type="button" className="btn-primary" onClick={onStart} disabled={selectedFiles.length === 0}>
+          <Icon name="question" size={16} /> Lancer avec ces fichiers
+        </button>
+      </div>
     </section>
   )
 }
@@ -514,6 +526,7 @@ function QuizPanel({
   recordResult,
 }) {
   const done = session.length > 0 && currentIndex >= session.length
+  const choices = getQuestionChoices(currentQuestion)
 
   return (
     <section className="questionnaire-card quiz-card">
@@ -571,11 +584,17 @@ function QuizPanel({
       {currentQuestion && !done && (
         <div className="quiz-live">
           <span className="quiz-origin">{currentQuestion.questionnaire_title}</span>
+          <span className="quiz-type">{getQuestionTypeLabel(currentQuestion.type)}</span>
           <h4>{currentQuestion.prompt}</h4>
-          {currentQuestion.choices?.length > 0 && (
+          {choices.length > 0 && (
             <div className="quiz-choices">
-              {currentQuestion.choices.map(choice => (
-                <button key={choice} type="button" onClick={() => setAnswer(choice)}>
+              {choices.map(choice => (
+                <button
+                  key={choice}
+                  type="button"
+                  className={answer === choice ? 'active' : ''}
+                  onClick={() => setAnswer(choice)}
+                >
                   {choice}
                 </button>
               ))}
@@ -596,8 +615,8 @@ function QuizPanel({
               <p>{currentQuestion.answer || 'Pas de correction renseignee.'}</p>
               {currentQuestion.explanation && <p>{currentQuestion.explanation}</p>}
               <div className="quiz-grade-actions">
-                <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Je me suis trompe</button>
-                <button type="button" className="btn-primary" onClick={() => recordResult(true)}>J'avais juste</button>
+                <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Faux</button>
+                <button type="button" className="btn-primary" onClick={() => recordResult(true)}>Juste</button>
               </div>
             </div>
           )}
@@ -639,6 +658,19 @@ function collectMarkdownFiles(tree, prefix = '') {
 
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim().toLowerCase()
+}
+
+function getQuestionChoices(question) {
+  if (!question) return []
+  if (Array.isArray(question.choices) && question.choices.length > 0) return question.choices
+  if (question.type === 'true_false') return ['Vrai', 'Faux']
+  return []
+}
+
+function getQuestionTypeLabel(type) {
+  if (type === 'mcq') return 'QCM'
+  if (type === 'true_false') return 'Vrai / Faux'
+  return 'Question ouverte'
 }
 
 function filterMarkdownTree(nodes, query, prefix = '') {

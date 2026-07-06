@@ -401,6 +401,7 @@ function LinkedQuizLauncher({ currentFile }) {
       toast(err.message, 'error')
     }
   }, [answer, currentIndex, currentQuestion, session.length, startedAt, toast])
+  const choices = getQuestionChoices(currentQuestion)
 
   return (
     <>
@@ -432,11 +433,17 @@ function LinkedQuizLauncher({ currentFile }) {
           ) : (
             <div className="linked-quiz-live">
               <span>{currentQuestion?.questionnaire_title}</span>
+              <span className="quiz-type">{getQuestionTypeLabel(currentQuestion?.type)}</span>
               <h3>{currentQuestion?.prompt}</h3>
-              {currentQuestion?.choices?.length > 0 && (
+              {choices.length > 0 && (
                 <div className="quiz-choices">
-                  {currentQuestion.choices.map(choice => (
-                    <button key={choice} type="button" onClick={() => setAnswer(choice)}>
+                  {choices.map(choice => (
+                    <button
+                      key={choice}
+                      type="button"
+                      className={answer === choice ? 'active' : ''}
+                      onClick={() => setAnswer(choice)}
+                    >
                       {choice}
                     </button>
                   ))}
@@ -457,8 +464,8 @@ function LinkedQuizLauncher({ currentFile }) {
                   <p>{currentQuestion?.answer || 'Pas de correction renseignee.'}</p>
                   {currentQuestion?.explanation && <p>{currentQuestion.explanation}</p>}
                   <div className="quiz-grade-actions">
-                    <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Je me suis trompe</button>
-                    <button type="button" className="btn-primary" onClick={() => recordResult(true)}>J'avais juste</button>
+                    <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Faux</button>
+                    <button type="button" className="btn-primary" onClick={() => recordResult(true)}>Juste</button>
                   </div>
                 </div>
               )}
@@ -468,4 +475,17 @@ function LinkedQuizLauncher({ currentFile }) {
       )}
     </>
   )
+}
+
+function getQuestionChoices(question) {
+  if (!question) return []
+  if (Array.isArray(question.choices) && question.choices.length > 0) return question.choices
+  if (question.type === 'true_false') return ['Vrai', 'Faux']
+  return []
+}
+
+function getQuestionTypeLabel(type) {
+  if (type === 'mcq') return 'QCM'
+  if (type === 'true_false') return 'Vrai / Faux'
+  return 'Question ouverte'
 }

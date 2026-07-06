@@ -196,13 +196,14 @@ function getStats(db) {
       question_key,
       COUNT(*) AS attempts,
       SUM(CASE WHEN correct = 1 THEN 1 ELSE 0 END) AS correct_count,
+      AVG(COALESCE(score, CASE WHEN correct = 1 THEN 1 ELSE 0 END)) AS average_score,
       MAX(created_at) AS last_seen
     FROM questionnaire_results
     GROUP BY question_key
   `).all()
 
   const latestRows = db.prepare(`
-    SELECT r.question_key, r.correct
+    SELECT r.question_key, r.correct, r.score
     FROM questionnaire_results r
     JOIN (
       SELECT question_key, MAX(created_at) AS last_seen
@@ -211,25 +212,33 @@ function getStats(db) {
     ) latest ON latest.question_key = r.question_key AND latest.last_seen = r.created_at
   `).all()
 
-  const latest = new Map(latestRows.map(row => [row.question_key, Boolean(row.correct)]))
-  return new Map(rows.map(row => [row.question_key, { ...row, last_correct: latest.get(row.question_key) }]))
+  const latest = new Map(latestRows.map(row => [row.question_key, {
+    correct: Boolean(row.correct),
+    score: Number.isFinite(Number(row.score)) ? Number(row.score) : (row.correct ? 1 : 0),
+  }]))
+  return new Map(rows.map(row => [row.question_key, { ...row, latest: latest.get(row.question_key) }]))
 }
 
 function withStats(question, stat) {
   const attempts = Number(stat?.attempts || 0)
   const correct = Number(stat?.correct_count || 0)
   const wrong = Math.max(0, attempts - correct)
-  const accuracy = attempts > 0 ? correct / attempts : null
-  const lastWrongBoost = attempts > 0 && stat?.last_correct === false ? 4 : 0
-  const accuracyBoost = accuracy === null ? 2 : Math.max(0, 1 - accuracy) * 3
-  const weight = 1 + wrong * 2.5 + lastWrongBoost + accuracyBoost
+  const averageScore = attempts > 0 && Number.isFinite(Number(stat?.average_score))
+    ? Number(stat.average_score)
+    : null
+  const lastScore = stat?.latest ? stat.latest.score : null
+  const scoreGap = averageScore === null ? 1 : Math.max(0, 1 - averageScore)
+  const lastWrongBoost = attempts > 0 && lastScore !== null && lastScore < 0.75 ? 5 : 0
+  const weakHistoryBoost = scoreGap * 8
+  const weight = 1 + wrong * 2 + lastWrongBoost + weakHistoryBoost
   return {
     ...question,
     stats: {
       attempts,
       correct,
       wrong,
-      accuracy,
+      average_score: averageScore,
+      last_score: lastScore,
       last_seen: stat?.last_seen || null,
     },
     weight,

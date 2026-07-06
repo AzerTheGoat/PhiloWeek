@@ -33,6 +33,23 @@ export function createQuestionnaireJson(title) {
         explanation: '',
         tags: [],
       },
+      {
+        id: 'q2',
+        type: 'mcq',
+        prompt: 'Quelle proposition correspond le mieux au texte ?',
+        choices: ['Option A', 'Option B', 'Option C'],
+        answer: 'Option A',
+        explanation: '',
+        tags: [],
+      },
+      {
+        id: 'q3',
+        type: 'true_false',
+        prompt: 'Cette affirmation est-elle correcte ?',
+        answer: 'Vrai',
+        explanation: '',
+        tags: [],
+      },
     ],
   }, null, 2)
 }

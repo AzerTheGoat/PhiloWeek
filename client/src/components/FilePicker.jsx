@@ -27,11 +27,28 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
       "answer": "Reponse attendue",
       "explanation": "Pourquoi cette reponse est juste",
       "tags": []
+    },
+    {
+      "id": "q2",
+      "type": "mcq",
+      "prompt": "Question a choix multiple",
+      "choices": ["Option A", "Option B", "Option C"],
+      "answer": "Option A",
+      "explanation": "Pourquoi cette option est juste",
+      "tags": []
+    },
+    {
+      "id": "q3",
+      "type": "true_false",
+      "prompt": "Affirmation a juger",
+      "answer": "Vrai",
+      "explanation": "Pourquoi c'est vrai ou faux",
+      "tags": []
     }
   ]
 }
 
-Fais des questions utiles pour reviser, avec des reponses precises et des explications courtes.`,
+Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec des reponses precises et des explications courtes.`,
   },
   socratique: {
     label: 'Analyse socratique',
