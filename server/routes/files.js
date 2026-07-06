@@ -130,9 +130,6 @@ router.delete('/:id', (req, res) => {
   const db = getDb()
   const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
-  if (file.name === 'Journal' && !file.parent_id) {
-    return res.status(403).json({ error: 'Cannot delete the Journal folder' })
-  }
   db.prepare('DELETE FROM files WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
 })
@@ -143,9 +140,6 @@ router.put('/:id/move', (req, res) => {
   const { parent_id, sort_order } = req.body
   const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
-  if (file.name === 'Journal' && !file.parent_id) {
-    return res.status(403).json({ error: 'Cannot move the Journal folder' })
-  }
 
   const nextParentId = parent_id || null
   const duplicate = findSiblingByName(db, nextParentId, file.name, req.params.id)

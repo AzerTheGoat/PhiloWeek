@@ -6,13 +6,16 @@ function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
 }
 
+// Mets à true si tu veux que le panneau "Penseur" (IA) s'ouvre automatiquement au démarrage
+const AI_PANEL_OPEN_BY_DEFAULT = false
+
 const init = {
   tree: [],
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life'
   theme: localStorage.getItem('pw-theme') || 'dark',
-  showAI: !isMobileViewport(),
+  showAI: AI_PANEL_OPEN_BY_DEFAULT && !isMobileViewport(),
   sidebarOpen: !isMobileViewport(),
   toasts: [],
   contextMenu: null,
@@ -189,9 +192,16 @@ export function AppProvider({ children }) {
     const today = new Date().toISOString().slice(0, 10)
     const fileName = `${today}.md`
     const flat = flattenTree(state.tree)
-    const journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id && f.type === 'folder')
-    if (!journalFolder) { toast('Dossier Journal introuvable', 'error'); return }
-    const todayFile = flat.find(f => f.name === fileName && f.parent_id === journalFolder.id)
+    let journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id && f.type === 'folder')
+    let todayFile = journalFolder && flat.find(f => f.name === fileName && f.parent_id === journalFolder.id)
+    if (!journalFolder) {
+      try {
+        journalFolder = await api.createFile({ parent_id: null, name: 'Journal', type: 'folder' })
+      } catch (err) {
+        toast(err.message, 'error')
+        return
+      }
+    }
     if (todayFile) {
       await openFile(todayFile.id)
     } else {

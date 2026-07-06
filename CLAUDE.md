@@ -2,7 +2,7 @@
 
 ## Stack technique
 
-- **Backend** : Node.js/Express + SQLite (via `sqlite` + `sqlite3`)
+- **Backend** : Node.js/Express + SQLite (via `better-sqlite3`, API **synchrone** : `db.prepare(...).get()/.run()/.all()`, pas de `await` sur ces appels)
 - **Frontend** : React 18 + Vite (vanilla CSS, pas de framework UI)
 - **IA** : Anthropic API, modèle `claude-sonnet-4-6`
 - **Config** : clé API dans `.env` → `ANTHROPIC_API_KEY`
@@ -88,9 +88,27 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Dossier Journal
 
-- Créé automatiquement à l'init (`/Journal/`)
+- N'est **plus** créé automatiquement à l'init (retiré de `server/db.js` → `initDb()`). Le dossier racine `Journal` est un dossier utilisateur comme un autre : renommable, déplaçable, supprimable, sans protection côté `routes/files.js`.
+- Il est créé **à la demande**, la première fois que l'utilisateur clique sur "Journal d'aujourd'hui" (`openJournalToday` dans `AppContext.jsx`) ou sur un jour du calendrier (`Journal.jsx` → `openDay`) : ces deux fonctions créent le dossier racine `Journal` s'il n'existe pas encore, puis l'entrée du jour dedans.
 - Entrées : `YYYY-MM-DD.md`
-- Protégé contre la suppression dans `routes/files.js`
+
+## Panneau IA ("Penseur")
+
+- Contrôlé par la constante `AI_PANEL_OPEN_BY_DEFAULT` en haut de `client/src/context/AppContext.jsx` (actuellement `false`). Elle détermine si le panneau IA s'ouvre automatiquement au chargement de l'app (desktop uniquement, jamais sur mobile).
+
+## Éditeur de note (`Editor.jsx`)
+
+- Vue par défaut à l'ouverture d'un fichier : **Aperçu** (`preview`) sur desktop, **Édition** (`edit`) sur mobile (voir `initialMode()`). Le split n'est plus le mode par défaut ; l'utilisateur peut toujours basculer manuellement via les boutons Éditer/Split/Aperçu.
+
+## Graphe (`GraphEditor.jsx`)
+
+- Sélection multiple de cartes : clic+glisser sur le canvas vide dessine un rectangle de sélection (marquee) ; Shift+clic sur une carte l'ajoute/retire de la sélection. Le panneau latéral bascule sur une vue "N cartes sélectionnées" (couleur groupée, dupliquer, supprimer) quand plus d'une carte est sélectionnée.
+- Touche **Suppr/Retour arrière** : supprime la sélection courante (ignoré si le focus est dans un champ texte de l'inspecteur).
+- Clic droit sur une carte : menu contextuel **Dupliquer**, **Détacher les liens**, **Supprimer** (agit sur toute la sélection si la carte cliquée en fait partie).
+
+## Menu contextuel de l'explorateur de fichiers
+
+- Clic droit sur une zone vide de la liste de fichiers (`Sidebar.jsx` → `.sidebar-content`) : menu **Nouveau fichier / Nouveau graphe / Nouveau dossier / Importer (.zip) / Exporter**. Le clic droit sur un fichier/dossier garde son propre menu (`FileTree.jsx`).
 
 ## Thème
 
@@ -100,8 +118,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Notes importantes pour Claude
 
-- Toutes les routes Express sont **async/await** (db sqlite est asynchrone)
+- Les handlers Express sont déclarés `(req, res) => {...}` mais les appels DB (`better-sqlite3`) sont **synchrones**, pas besoin de `await` dessus
 - La DB est initialisée au démarrage via `initDb()`, pas besoin de migrations manuelles
-- Le dossier `Journal` est protégé (ne pas supprimer, ne pas renommer)
+- Le dossier `Journal` n'est plus protégé ni auto-créé (voir section "Dossier Journal" plus haut)
 - Les dossiers verrouillés (`locked_folder`) : contenu chiffré AES-256 côté serveur
 - `insertRef` dans AppContext : ref vers la fonction "insérer dans la note" de l'éditeur

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useApp } from '../context/useApp'
 import FileTree from './FileTree'
 import Icon from './Icons'
@@ -7,11 +7,12 @@ import * as api from '../api'
 export default function Sidebar() {
   const {
     tree, theme, showAI, sidebarOpen, loadTree, toast,
-    dispatch, showModal, openJournalToday, openFile, view
+    dispatch, showModal, showContextMenu, openJournalToday, openFile, view
   } = useApp()
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [importing, setImporting] = useState(false)
+  const importInputRef = useRef(null)
 
   const handleSearch = useCallback(async (q) => {
     setSearchQ(q)
@@ -35,6 +36,18 @@ export default function Sidebar() {
       e.target.value = ''
     }
   }, [loadTree, toast])
+
+  const handleAreaContextMenu = useCallback((e) => {
+    e.preventDefault()
+    showContextMenu(e.clientX, e.clientY, [
+      { icon: '📄', label: 'Nouveau fichier', action: () => showModal('new-file', {}) },
+      { icon: '◎', label: 'Nouveau graphe', action: () => showModal('new-graph', {}) },
+      { icon: '📁', label: 'Nouveau dossier', action: () => showModal('new-folder', {}) },
+      { separator: true },
+      { icon: '📥', label: 'Importer (.zip)', action: () => importInputRef.current?.click() },
+      { icon: '📤', label: 'Exporter', action: () => api.exportObsidian() },
+    ])
+  }, [showModal, showContextMenu])
 
   return (
     <aside className={`sidebar ${sidebarOpen ? '' : 'hidden'}`}>
@@ -88,7 +101,7 @@ export default function Sidebar() {
         />
       </div>
 
-      <div className="sidebar-content">
+      <div className="sidebar-content" onContextMenu={handleAreaContextMenu}>
         {searchResults ? (
           <div className="search-results">
             {searchResults.length === 0 && (
@@ -125,15 +138,19 @@ export default function Sidebar() {
         </button>
         <label className="footer-btn" title="Importer vault Obsidian (.zip)">
           {importing ? '...' : <><Icon name="upload" size={16} /> Import</>}
-          <input type="file" accept=".zip" hidden onChange={handleImport} />
+          <input ref={importInputRef} type="file" accept=".zip" hidden onChange={handleImport} />
         </label>
         <button className="footer-btn" onClick={() => dispatch({ type: 'TOGGLE_FILE_PICKER' })} title="Copier des notes sélectionnées">
           <Icon name="copy" size={16} /> Copier
         </button>
       </div>
 
-      <button className="sidebar-toggle" onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })} title="Masquer la sidebar">
-        ‹
+      <button
+        className="sidebar-toggle"
+        onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+        title={sidebarOpen ? 'Masquer la sidebar' : 'Afficher la sidebar'}
+      >
+        {sidebarOpen ? '‹' : '›'}
       </button>
     </aside>
   )

@@ -42,9 +42,11 @@ const EDGE_TYPES = [
 ]
 
 export default function GraphEditor() {
-  const { currentFile, openFileId, saveFile, toast } = useApp()
+  const { currentFile, openFileId, saveFile, toast, showContextMenu } = useApp()
   const [graph, setGraph] = useState(() => parseGraph(currentFile?.content, currentFile?.name))
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [marqueeRect, setMarqueeRect] = useState(null)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [linkTarget, setLinkTarget] = useState('')
@@ -52,11 +54,14 @@ export default function GraphEditor() {
   const [zoom, setZoom] = useState(1)
   const saveTimerRef = useRef(null)
   const dragRef = useRef(null)
+  const marqueeRef = useRef(null)
   const stageRef = useRef(null)
+  const viewportRef = useRef(null)
 
   useEffect(() => {
     setGraph(parseGraph(currentFile?.content, currentFile?.name))
     setSelectedId(null)
+    setSelectedIds(new Set())
     setLinkTarget('')
     setDirty(false)
     clearTimeout(saveTimerRef.current)
@@ -120,6 +125,7 @@ export default function GraphEditor() {
       ],
     }))
     setSelectedId(id)
+    setSelectedIds(new Set([id]))
   }, [updateGraph])
 
   const updateNode = useCallback((id, patch) => {
@@ -129,15 +135,44 @@ export default function GraphEditor() {
     }))
   }, [updateGraph])
 
-  const deleteSelected = useCallback(() => {
-    if (!selectedId) return
+  const deleteNodes = useCallback((ids) => {
+    const idSet = new Set(ids)
+    if (idSet.size === 0) return
     updateGraph(prev => ({
       ...prev,
-      nodes: prev.nodes.filter(node => node.id !== selectedId),
-      edges: prev.edges.filter(edge => edge.from !== selectedId && edge.to !== selectedId),
+      nodes: prev.nodes.filter(node => !idSet.has(node.id)),
+      edges: prev.edges.filter(edge => !idSet.has(edge.from) && !idSet.has(edge.to)),
     }))
     setSelectedId(null)
-  }, [selectedId, updateGraph])
+    setSelectedIds(new Set())
+  }, [updateGraph])
+
+  const duplicateNodes = useCallback((ids) => {
+    const idList = Array.from(ids)
+    if (idList.length === 0) return
+    const idMap = new Map(idList.map(id => [id, makeId()]))
+    updateGraph(prev => {
+      const idSet = new Set(idList)
+      const newNodes = prev.nodes
+        .filter(node => idSet.has(node.id))
+        .map(node => ({ ...node, id: idMap.get(node.id), x: node.x + 30, y: node.y + 30 }))
+      const newEdges = prev.edges
+        .filter(edge => idSet.has(edge.from) && idSet.has(edge.to))
+        .map(edge => ({ id: makeId(), from: idMap.get(edge.from), to: idMap.get(edge.to), type: edge.type }))
+      return { ...prev, nodes: [...prev.nodes, ...newNodes], edges: [...prev.edges, ...newEdges] }
+    })
+    const newIds = new Set(idMap.values())
+    setSelectedIds(newIds)
+    setSelectedId(idList.length === 1 ? idMap.get(idList[0]) : Array.from(newIds)[newIds.size - 1])
+  }, [updateGraph])
+
+  const detachEdges = useCallback((ids) => {
+    const idSet = new Set(ids)
+    updateGraph(prev => ({
+      ...prev,
+      edges: prev.edges.filter(edge => !idSet.has(edge.from) && !idSet.has(edge.to)),
+    }))
+  }, [updateGraph])
 
   const addEdge = useCallback(() => {
     if (!selectedId || !linkTarget || selectedId === linkTarget || linkedTargets.has(linkTarget)) return
@@ -171,35 +206,137 @@ export default function GraphEditor() {
 
   const handlePointerDown = useCallback((event, node) => {
     if (event.button !== 0) return
-    const rect = stageRef.current?.getBoundingClientRect()
-    if (!rect) return
+    event.stopPropagation()
+
+    let nextSelected
+    if (event.shiftKey) {
+      nextSelected = new Set(selectedIds)
+      if (nextSelected.has(node.id)) nextSelected.delete(node.id)
+      else nextSelected.add(node.id)
+    } else if (selectedIds.has(node.id) && selectedIds.size > 1) {
+      nextSelected = selectedIds
+    } else {
+      nextSelected = new Set([node.id])
+    }
+    setSelectedIds(nextSelected)
     setSelectedId(node.id)
+
+    if (!nextSelected.has(node.id)) {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      return
+    }
+
+    const dragIds = Array.from(nextSelected)
+    const origin = {}
+    graph.nodes.forEach(n => { if (dragIds.includes(n.id)) origin[n.id] = { x: n.x, y: n.y } })
     dragRef.current = {
-      id: node.id,
       startX: event.clientX,
       startY: event.clientY,
-      nodeX: node.x,
-      nodeY: node.y,
+      origin,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
-  }, [])
+  }, [graph.nodes, selectedIds])
+
+  const handleStagePointerDown = useCallback((event) => {
+    if (event.button !== 0) return
+    if (event.target.closest('.graph-node')) return
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = (event.clientX - rect.left) / zoom
+    const y = (event.clientY - rect.top) / zoom
+    const base = event.shiftKey ? new Set(selectedIds) : new Set()
+    marqueeRef.current = { startX: x, startY: y, base }
+    setMarqueeRect({ x, y, w: 0, h: 0 })
+    // Applique immédiatement la base (vide si pas de shift) : un simple clic
+    // sur le canvas vide désélectionne tout, même sans glisser la souris.
+    setSelectedIds(base)
+    setSelectedId(base.size ? Array.from(base)[base.size - 1] : null)
+  }, [zoom, selectedIds])
 
   const handlePointerMove = useCallback((event) => {
     const drag = dragRef.current
-    if (!drag) return
-    const nextX = Math.max(20, drag.nodeX + (event.clientX - drag.startX) / zoom)
-    const nextY = Math.max(20, drag.nodeY + (event.clientY - drag.startY) / zoom)
-    setGraph(prev => ({
-      ...prev,
-      nodes: prev.nodes.map(node => node.id === drag.id ? { ...node, x: nextX, y: nextY } : node),
-    }))
-  }, [zoom])
+    if (drag) {
+      const dx = (event.clientX - drag.startX) / zoom
+      const dy = (event.clientY - drag.startY) / zoom
+      setGraph(prev => ({
+        ...prev,
+        nodes: prev.nodes.map(node => {
+          const o = drag.origin[node.id]
+          if (!o) return node
+          return { ...node, x: Math.max(20, o.x + dx), y: Math.max(20, o.y + dy) }
+        }),
+      }))
+      return
+    }
+
+    const marquee = marqueeRef.current
+    if (marquee) {
+      const rect = viewportRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const x = (event.clientX - rect.left) / zoom
+      const y = (event.clientY - rect.top) / zoom
+      const rx = Math.min(marquee.startX, x)
+      const ry = Math.min(marquee.startY, y)
+      const rw = Math.abs(x - marquee.startX)
+      const rh = Math.abs(y - marquee.startY)
+      setMarqueeRect({ x: rx, y: ry, w: rw, h: rh })
+      const hit = graph.nodes.filter(node => rectsIntersect(
+        rx, ry, rw, rh, node.x, node.y, getNodeWidth(node), getNodeHeight(node)
+      ))
+      const next = new Set(marquee.base)
+      hit.forEach(node => next.add(node.id))
+      setSelectedIds(next)
+    }
+  }, [graph.nodes, zoom])
 
   const handlePointerUp = useCallback(() => {
-    if (!dragRef.current) return
-    dragRef.current = null
-    persist(graph)
+    if (dragRef.current) {
+      dragRef.current = null
+      persist(graph)
+      return
+    }
+    if (marqueeRef.current) {
+      marqueeRef.current = null
+      setMarqueeRect(null)
+      setSelectedIds(prev => {
+        const arr = Array.from(prev)
+        setSelectedId(arr.length ? arr[arr.length - 1] : null)
+        return prev
+      })
+    }
   }, [graph, persist])
+
+  const handleNodeContextMenu = useCallback((event, node) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const inGroup = selectedIds.has(node.id) && selectedIds.size > 1
+    const targetIds = inGroup ? Array.from(selectedIds) : [node.id]
+    if (!inGroup) {
+      setSelectedIds(new Set([node.id]))
+      setSelectedId(node.id)
+    }
+    const count = targetIds.length
+    showContextMenu(event.clientX, event.clientY, [
+      { icon: '⧉', label: count > 1 ? `Dupliquer (${count})` : 'Dupliquer', action: () => duplicateNodes(targetIds) },
+      { icon: '⛓', label: 'Détacher les liens', action: () => detachEdges(targetIds) },
+      { separator: true },
+      { icon: '🗑', label: count > 1 ? `Supprimer (${count})` : 'Supprimer', danger: true, action: () => deleteNodes(targetIds) },
+    ])
+  }, [selectedIds, showContextMenu, duplicateNodes, detachEdges, deleteNodes])
+
+  // Supprimer la sélection avec la touche Suppr / Retour arrière
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (selectedIds.size === 0) return
+      event.preventDefault()
+      deleteNodes(Array.from(selectedIds))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedIds, deleteNodes])
 
   const nodeMap = useMemo(() => {
     const map = new Map()
@@ -237,10 +374,10 @@ export default function GraphEditor() {
         <div
           className="graph-stage"
           ref={stageRef}
+          onPointerDown={handleStagePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onClick={() => setSelectedId(null)}
           onWheel={handleWheel}
         >
           <div
@@ -248,9 +385,16 @@ export default function GraphEditor() {
             style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}
           >
             <div
+              ref={viewportRef}
               className="graph-viewport"
               style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})` }}
             >
+              {marqueeRect && (
+                <div
+                  className="graph-marquee"
+                  style={{ left: marqueeRect.x, top: marqueeRect.y, width: marqueeRect.w, height: marqueeRect.h }}
+                />
+              )}
               <svg className="graph-lines" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
                 <defs>
                   <marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -288,7 +432,7 @@ export default function GraphEditor() {
                     key={node.id}
                     role="button"
                     tabIndex={0}
-                    className={`graph-node ${selectedId === node.id ? 'selected' : ''}`}
+                    className={`graph-node ${selectedIds.has(node.id) ? 'selected' : ''}`}
                     style={{
                       left: node.x,
                       top: node.y,
@@ -297,10 +441,12 @@ export default function GraphEditor() {
                       '--node-color': borderColor,
                     }}
                     onPointerDown={event => handlePointerDown(event, node)}
-                    onClick={event => { event.stopPropagation(); setSelectedId(node.id) }}
+                    onClick={event => event.stopPropagation()}
+                    onContextMenu={event => handleNodeContextMenu(event, node)}
                     onKeyDown={event => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
+                        setSelectedIds(new Set([node.id]))
                         setSelectedId(node.id)
                       }
                     }}
@@ -323,13 +469,47 @@ export default function GraphEditor() {
         </div>
 
         <aside className="graph-inspector">
-          {selectedNode ? (
+          {selectedIds.size > 1 ? (
+            <>
+              <div className="graph-inspector-head">
+                <strong>{selectedIds.size} cartes sélectionnées</strong>
+              </div>
+              <label className="graph-field">
+                Couleur du contour
+                <div className="graph-color-row">
+                  {BORDER_COLORS.map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      className="graph-color-swatch"
+                      style={{ '--swatch-color': color }}
+                      title={color}
+                      onClick={() => selectedIds.forEach(id => updateNode(id, { color }))}
+                    />
+                  ))}
+                </div>
+              </label>
+              <div className="graph-bulk-actions">
+                <button type="button" className="btn-ghost" onClick={() => duplicateNodes(selectedIds)}>
+                  <Icon name="copy" size={16} /> Dupliquer
+                </button>
+                <button type="button" className="btn-ghost danger" onClick={() => deleteNodes(selectedIds)}>
+                  <Icon name="close" size={16} /> Supprimer
+                </button>
+              </div>
+            </>
+          ) : selectedNode ? (
             <>
               <div className="graph-inspector-head">
                 <strong>Carte</strong>
-                <button type="button" className="icon-btn" title="Supprimer" onClick={deleteSelected}>
-                  <Icon name="close" size={18} />
-                </button>
+                <div className="graph-inspector-actions">
+                  <button type="button" className="icon-btn" title="Dupliquer" onClick={() => duplicateNodes([selectedNode.id])}>
+                    <Icon name="copy" size={16} />
+                  </button>
+                  <button type="button" className="icon-btn" title="Supprimer" onClick={() => deleteNodes([selectedNode.id])}>
+                    <Icon name="close" size={18} />
+                  </button>
+                </div>
               </div>
               <label className="graph-field">
                 Type
@@ -520,6 +700,10 @@ function stringifyFrontmatter(data) {
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10)
+}
+
+function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
 }
 
 function clampZoom(value) {

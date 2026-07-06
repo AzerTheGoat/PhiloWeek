@@ -40,7 +40,6 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   const isFolder = node.type === 'folder' || node.type === 'locked_folder'
   const isLocked = node.type === 'locked_folder'
   const isActive = node.id === openFileId
-  const isJournalRoot = node.name === 'Journal' && !node.parent_id
   const children = node.children || []
   const isDragging = dragState?.id === node.id
   const canReceiveDrop = Boolean(
@@ -66,7 +65,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   }, [isFolder, isLocked, openFile, node.id])
 
   const handleDragStart = useCallback((e) => {
-    if (renaming || unlocking || isJournalRoot) {
+    if (renaming || unlocking) {
       e.preventDefault()
       return
     }
@@ -80,7 +79,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       name: node.name,
       descendantIds: collectDescendantIds(node),
     })
-  }, [isJournalRoot, node, renaming, setDragState, unlocking])
+  }, [node, renaming, setDragState, unlocking])
 
   const handleDragEnd = useCallback(() => {
     setDragState(null)
@@ -130,7 +129,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           !isLocked && { icon: '🔒', label: 'Verrouiller…', action: () => showModal('lock-folder', { id: node.id }) },
           isLocked && { icon: '🔓', label: 'Déverrouiller…', action: () => setUnlocking(true) },
           { separator: true },
-          node.name !== 'Journal' && { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
+          { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
         ].filter(Boolean)
       : [
           { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
@@ -196,7 +195,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
         <div
           className={`file-row ${isFolder ? 'is-folder' : ''} ${isLocked ? 'is-locked' : ''} ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
-          draggable={!isJournalRoot}
+          draggable
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}

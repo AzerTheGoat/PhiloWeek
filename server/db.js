@@ -1,6 +1,5 @@
 const Database = require('better-sqlite3')
 const path = require('path')
-const { v4: uuidv4 } = require('uuid')
 
 const DB_PATH = path.join(__dirname, 'philoweek_v2.db')
 let _db = null
@@ -92,15 +91,6 @@ async function initDb() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `)
-
-  const journalExists = db.prepare(
-    "SELECT id FROM files WHERE name = 'Journal' AND parent_id IS NULL AND type = 'folder'"
-  ).get()
-  if (!journalExists) {
-    db.prepare(
-      "INSERT INTO files (id, parent_id, name, type) VALUES (?, NULL, 'Journal', 'folder')"
-    ).run(uuidv4())
-  }
 }
 
 function updateTags(db, fileId, content) {

@@ -47,10 +47,12 @@ export default function Journal() {
         })
       }
       walk(tree)
-      const journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id)
-      if (!journalFolder) { toast('Dossier Journal introuvable', 'error'); return }
+      let journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id)
 
       try {
+        if (!journalFolder) {
+          journalFolder = await api.createFile({ parent_id: null, name: 'Journal', type: 'folder' })
+        }
         const label = format(date, "EEEE d MMMM yyyy", { locale: fr })
         const header = `---\ntitle: Journal du ${label}\ntags: [journal]\ncreated: ${date.toISOString()}\n---\n\n`
         const newFile = await api.createFile({
