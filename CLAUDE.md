@@ -63,7 +63,17 @@ voice_notes  — id, file_id, filename, duration_seconds, title
 
 ## Règle absolue : toute nouvelle feature doit être ajoutée au tutoriel
 
-Cette app n'a plus de tour interactif intégré. Documente toute nouvelle feature ici dans CLAUDE.md.
+Il existe un didacticiel intégré (`client/src/components/Tutorial.jsx`, vue
+`tutorial`) : une page de cartes groupées par thème (Explorateur, Éditeur,
+Graphe, Questionnaires, IA, Journal/Timer, Inbox/Vie, Export/Import…), chaque
+carte affichant sa description au survol (`:hover`) ou au focus/tap
+(`:focus`, `:focus-within` — fonctionne donc aussi sur mobile sans JS
+supplémentaire). Accessible via le bouton "Découvrir les fonctionnalités"
+sur l'écran d'accueil, ou l'icône dédiée dans le header de la sidebar.
+
+**Quand tu ajoutes une feature visible par l'utilisateur** : ajoute une
+carte correspondante dans le tableau `SECTIONS` de `Tutorial.jsx` (icône +
+titre + description courte), en plus de documenter ici dans CLAUDE.md.
 
 ## Règle absolue : ZÉRO perte de données au déploiement (Railway)
 

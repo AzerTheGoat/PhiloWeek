@@ -8,6 +8,7 @@ import Journal from './components/Journal'
 import Timer from './components/Timer'
 import InboxPage from './components/InboxPage'
 import LifePage from './components/LifePage'
+import Tutorial from './components/Tutorial'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
 import Toast from './components/Toast'
@@ -73,6 +74,8 @@ function AppShell() {
           <InboxPage />
         ) : view === 'life' ? (
           <LifePage />
+        ) : view === 'tutorial' ? (
+          <Tutorial />
         ) : currentFile ? (
           <Editor />
         ) : (
@@ -123,7 +126,7 @@ function MobileNav() {
 }
 
 function Welcome() {
-  const { openJournalToday, showModal } = useApp()
+  const { openJournalToday, showModal, dispatch } = useApp()
   return (
     <div className="welcome">
       <div className="welcome-inner">
@@ -136,6 +139,9 @@ function Welcome() {
           </button>
           <button className="btn-ghost" onClick={openJournalToday}>
             Journal d'aujourd'hui
+          </button>
+          <button className="btn-ghost welcome-tutorial-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'tutorial' })}>
+            <Icon name="thought" size={16} /> Découvrir les fonctionnalités
           </button>
         </div>
         <div className="welcome-shortcuts">

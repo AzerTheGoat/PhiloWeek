@@ -88,6 +88,13 @@ export default function Sidebar() {
           >
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
+          <button
+            title="Découvrir les fonctionnalités"
+            className={`icon-btn ${view === 'tutorial' ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'tutorial' })}
+          >
+            <Icon name="thought" />
+          </button>
         </div>
       </div>
 

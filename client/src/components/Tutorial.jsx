@@ -1,0 +1,212 @@
+import { useApp } from '../context/useApp'
+import Icon from './Icons'
+
+const SECTIONS = [
+  {
+    title: 'Explorateur de fichiers',
+    items: [
+      {
+        icon: 'folder',
+        title: 'Arborescence & recherche',
+        text: "Dossiers et notes s'organisent librement, comme sur un disque. La barre de recherche (en haut de la sidebar) cherche dans les titres ET le contenu des notes.",
+      },
+      {
+        icon: 'edit',
+        title: 'Glisser-déposer, renommer',
+        text: 'Fais glisser un fichier sur un dossier pour le déplacer. Double-clique sur un nom (ou "Renommer" au clic droit) pour le modifier.',
+      },
+      {
+        icon: 'plus',
+        title: 'Clic droit = menu contextuel',
+        text: "Clic droit sur un dossier/fichier : nouveau fichier, graphe ou questionnaire ici, renommer, verrouiller, supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
+      },
+      {
+        icon: 'close',
+        title: 'Dossier verrouillé',
+        text: "Protège un dossier avec un mot de passe. Le contenu est chiffré (AES-256) côté serveur — illisible sans le mot de passe, même dans la base de données.",
+      },
+    ],
+  },
+  {
+    title: "Éditeur de note",
+    items: [
+      {
+        icon: 'edit',
+        title: 'Trois vues : Éditer / Split / Aperçu',
+        text: "Bascule entre écriture pure, vue partagée, ou aperçu Markdown rendu. Le mode par défaut à l'ouverture est l'Aperçu.",
+      },
+      {
+        icon: 'graph',
+        title: 'Liens [[wiki]] et #tags',
+        text: "Tape [[ dans une note pour lier une autre note (autocomplete). Les #tags dans le texte ou le frontmatter YAML sont indexés automatiquement.",
+      },
+      {
+        icon: 'download',
+        title: 'Sauvegarde automatique',
+        text: "Chaque modification est enregistrée ~800ms après la dernière frappe. Ctrl+S force une sauvegarde immédiate.",
+      },
+      {
+        icon: 'upload',
+        title: 'Coller une image',
+        text: 'Colle une image directement dans le texte (Ctrl+V) : elle est compressée en WebP et intégrée en base64 dans la note.',
+      },
+    ],
+  },
+  {
+    title: 'Graphe visuel',
+    items: [
+      {
+        icon: 'graph',
+        title: 'Cartes & liens typés',
+        text: "Crée des cartes (Idée, Objectif, Question, Ressource) et relie-les avec des liens typés (relie, soutient, bloque, mène vers).",
+      },
+      {
+        icon: 'copy',
+        title: 'Sélection multiple',
+        text: 'Shift+clic ajoute une carte à la sélection. Un cliqué-glissé sur le fond dessine un rectangle qui sélectionne toutes les cartes à l\'intérieur.',
+      },
+      {
+        icon: 'close',
+        title: 'Dupliquer / Supprimer / Détacher',
+        text: "Touche Suppr pour effacer la sélection. Clic droit sur une carte : dupliquer, détacher ses liens, ou supprimer — agit sur tout le groupe si plusieurs cartes sont sélectionnées.",
+      },
+    ],
+  },
+  {
+    title: 'Questionnaires & révision',
+    items: [
+      {
+        icon: 'question',
+        title: 'Créer un questionnaire',
+        text: "Un questionnaire est un fichier JSON de questions (ouvertes ou à choix multiples) avec réponses et explications. Génère-le avec l'IA via le bouton Copier (prompt dédié), puis colle le JSON.",
+      },
+      {
+        icon: 'thought',
+        title: 'Lier des notes sources',
+        text: "Dans l'éditeur de questionnaire, le panneau \"Fichiers liés\" associe chaque question à la note dont elle provient — utile pour cibler tes révisions plus tard.",
+      },
+      {
+        icon: 'play',
+        title: 'Réviser',
+        text: "Sélectionne des notes sources, choisis un nombre de questions, et lance une session : les questions liées sont piochées au hasard, tes réponses sont notées et gardées en historique.",
+      },
+    ],
+  },
+  {
+    title: 'Panneau IA "Penseur"',
+    items: [
+      {
+        icon: 'ai',
+        title: '4 modes de dialogue',
+        text: "Socratique (questions qui dérangent), Critique (failles logiques), Explorateur (penseurs et cadres alternatifs), Synthèse (résume et relie) — appliqués à la note ouverte.",
+      },
+      {
+        icon: 'life',
+        title: 'Portrait philosophique',
+        text: "Analyse l'ensemble de tes notes pour dresser un portrait de tes préoccupations et angles morts philosophiques.",
+      },
+      {
+        icon: 'download',
+        title: 'Modèle & coût',
+        text: "Choisis le fournisseur (Claude ou OpenAI) et le modèle ; le coût estimé (puis réel) de chaque génération s'affiche avant de lancer.",
+      },
+      {
+        icon: 'edit',
+        title: 'Insérer dans la note',
+        text: "Une réponse te plaît ? Un clic l'ajoute directement à la fin de la note ouverte, citée comme suggestion IA.",
+      },
+    ],
+  },
+  {
+    title: 'Journal & Timer',
+    items: [
+      {
+        icon: 'journal',
+        title: 'Journal quotidien',
+        text: "Le bouton \"Journal d'aujourd'hui\" crée (à la demande, pas par défaut) le dossier Journal et l'entrée du jour. Le calendrier permet de naviguer et revenir sur d'anciennes entrées.",
+      },
+      {
+        icon: 'timer',
+        title: 'Timer de travail',
+        text: 'Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion) et consulte tes totaux du jour et l\'historique complet.',
+      },
+    ],
+  },
+  {
+    title: 'Nid à idées & Vie intérieure',
+    items: [
+      {
+        icon: 'idea',
+        title: 'Ressources & idées rapides',
+        text: "Capture une URL à lire/voir plus tard (avec statut), ou une idée/question au vol avec des #tags — sans avoir à créer un fichier.",
+      },
+      {
+        icon: 'life',
+        title: 'Citations & rapport',
+        text: "Vie intérieure garde tes citations favorites (auteur, source, pourquoi elle te parle) et peut générer un rapport IA périodique sur ton évolution.",
+      },
+    ],
+  },
+  {
+    title: 'Partage & sauvegarde',
+    items: [
+      {
+        icon: 'copy',
+        title: 'Copier plusieurs notes',
+        text: "Sélectionne des notes et copie leur contenu combiné dans le presse-papiers, avec un prompt prêt à coller ailleurs (ex : générer un questionnaire JSON).",
+      },
+      {
+        icon: 'download',
+        title: 'Export Obsidian (.zip)',
+        text: 'Télécharge toutes tes notes en ZIP, compatible Obsidian, avec frontmatter YAML. C\'est ton filet de sécurité manuel.',
+      },
+      {
+        icon: 'upload',
+        title: 'Import (.zip)',
+        text: 'Réintègre un export précédent (ou un vault Obsidian) : les fichiers, dossiers et liens [[wiki]] sont reconstruits.',
+      },
+    ],
+  },
+]
+
+export default function Tutorial() {
+  const { dispatch } = useApp()
+
+  return (
+    <div className="tutorial-view">
+      <div className="tutorial-header">
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+          <Icon name="back" />
+        </button>
+        <h2>Découvrir PhiloWeek</h2>
+      </div>
+
+      <p className="tutorial-intro">
+        Survole (ou touche) une fonctionnalité pour voir à quoi elle sert.
+      </p>
+
+      {SECTIONS.map(section => (
+        <div key={section.title} className="tutorial-section">
+          <h3>{section.title}</h3>
+          <div className="tutorial-grid">
+            {section.items.map(item => (
+              <TutorialCard key={item.title} {...item} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TutorialCard({ icon, title, text }) {
+  return (
+    <div className="tutorial-card" tabIndex={0}>
+      <div className="tutorial-card-head">
+        <span className="tutorial-card-icon"><Icon name={icon} size={18} /></span>
+        <strong>{title}</strong>
+      </div>
+      <p className="tutorial-card-text">{text}</p>
+    </div>
+  )
+}
