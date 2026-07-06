@@ -3,6 +3,11 @@ import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
 const AUTOSAVE_DELAY = 650
+const CANVAS_WIDTH = 1400
+const CANVAS_HEIGHT = 900
+const MIN_ZOOM = 0.4
+const MAX_ZOOM = 2
+const ZOOM_STEP = 0.1
 
 const NODE_TYPES = [
   { value: 'idea', label: 'Idee', color: '#6ba3e8' },
@@ -26,6 +31,7 @@ export default function GraphEditor() {
   const [dirty, setDirty] = useState(false)
   const [linkTarget, setLinkTarget] = useState('')
   const [edgeKind, setEdgeKind] = useState('relates')
+  const [zoom, setZoom] = useState(1)
   const saveTimerRef = useRef(null)
   const dragRef = useRef(null)
   const stageRef = useRef(null)
@@ -125,6 +131,23 @@ export default function GraphEditor() {
     updateGraph(prev => ({ ...prev, edges: prev.edges.filter(edge => edge.id !== edgeId) }))
   }, [updateGraph])
 
+  const setClampedZoom = useCallback((nextZoom) => {
+    setZoom(prev => {
+      const value = typeof nextZoom === 'function' ? nextZoom(prev) : nextZoom
+      return clampZoom(value)
+    })
+  }, [])
+
+  const zoomIn = useCallback(() => setClampedZoom(value => value + ZOOM_STEP), [setClampedZoom])
+  const zoomOut = useCallback(() => setClampedZoom(value => value - ZOOM_STEP), [setClampedZoom])
+  const resetZoom = useCallback(() => setClampedZoom(1), [setClampedZoom])
+
+  const handleWheel = useCallback((event) => {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    setClampedZoom(value => value + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))
+  }, [setClampedZoom])
+
   const handlePointerDown = useCallback((event, node) => {
     if (event.button !== 0) return
     const rect = stageRef.current?.getBoundingClientRect()
@@ -143,13 +166,13 @@ export default function GraphEditor() {
   const handlePointerMove = useCallback((event) => {
     const drag = dragRef.current
     if (!drag) return
-    const nextX = Math.max(20, drag.nodeX + event.clientX - drag.startX)
-    const nextY = Math.max(20, drag.nodeY + event.clientY - drag.startY)
+    const nextX = Math.max(20, drag.nodeX + (event.clientX - drag.startX) / zoom)
+    const nextY = Math.max(20, drag.nodeY + (event.clientY - drag.startY) / zoom)
     setGraph(prev => ({
       ...prev,
       nodes: prev.nodes.map(node => node.id === drag.id ? { ...node, x: nextX, y: nextY } : node),
     }))
-  }, [])
+  }, [zoom])
 
   const handlePointerUp = useCallback(() => {
     if (!dragRef.current) return
@@ -173,6 +196,13 @@ export default function GraphEditor() {
           </span>
         </div>
         <div className="graph-toolbar">
+          <div className="graph-zoom-controls" aria-label="Zoom du graphe">
+            <button type="button" className="graph-zoom-btn" onClick={zoomOut} title="Dézoomer">-</button>
+            <button type="button" className="graph-zoom-value" onClick={resetZoom} title="Réinitialiser le zoom">
+              {Math.round(zoom * 100)}%
+            </button>
+            <button type="button" className="graph-zoom-btn" onClick={zoomIn} title="Zoomer">+</button>
+          </div>
           {NODE_TYPES.map(type => (
             <button key={type.value} type="button" className="btn-ghost graph-add-btn" onClick={() => addNode(type.value)}>
               <span style={{ background: type.color }} />
@@ -190,50 +220,61 @@ export default function GraphEditor() {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onClick={() => setSelectedId(null)}
+          onWheel={handleWheel}
         >
-          <svg className="graph-lines" width="100%" height="100%">
-            <defs>
-              <marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
-              </marker>
-            </defs>
-            {graph.edges.map(edge => {
-              const from = nodeMap.get(edge.from)
-              const to = nodeMap.get(edge.to)
-              if (!from || !to) return null
-              const x1 = from.x + 130
-              const y1 = from.y + 54
-              const x2 = to.x + 18
-              const y2 = to.y + 54
-              const mid = Math.max(40, Math.abs(x2 - x1) / 2)
-              return (
-                <path
-                  key={edge.id}
-                  d={`M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`}
-                  className={`graph-edge graph-edge-${edge.type || 'relates'}`}
-                  markerEnd="url(#graph-arrow)"
-                />
-              )
-            })}
-          </svg>
+          <div
+            className="graph-canvas"
+            style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}
+          >
+            <div
+              className="graph-viewport"
+              style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})` }}
+            >
+              <svg className="graph-lines" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
+                <defs>
+                  <marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+                  </marker>
+                </defs>
+                {graph.edges.map(edge => {
+                  const from = nodeMap.get(edge.from)
+                  const to = nodeMap.get(edge.to)
+                  if (!from || !to) return null
+                  const x1 = from.x + 130
+                  const y1 = from.y + 54
+                  const x2 = to.x + 18
+                  const y2 = to.y + 54
+                  const mid = Math.max(40, Math.abs(x2 - x1) / 2)
+                  return (
+                    <path
+                      key={edge.id}
+                      d={`M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`}
+                      className={`graph-edge graph-edge-${edge.type || 'relates'}`}
+                      markerEnd="url(#graph-arrow)"
+                    />
+                  )
+                })}
+              </svg>
 
-          {graph.nodes.map(node => {
-            const meta = NODE_TYPES.find(item => item.value === node.type) || NODE_TYPES[0]
-            return (
-              <button
-                key={node.id}
-                type="button"
-                className={`graph-node ${selectedId === node.id ? 'selected' : ''}`}
-                style={{ left: node.x, top: node.y, '--node-color': meta.color }}
-                onPointerDown={event => handlePointerDown(event, node)}
-                onClick={event => { event.stopPropagation(); setSelectedId(node.id) }}
-              >
-                <span className="graph-node-type">{meta.label}</span>
-                <strong>{node.title || 'Sans titre'}</strong>
-                {node.body && <small>{node.body}</small>}
-              </button>
-            )
-          })}
+              {graph.nodes.map(node => {
+                const meta = NODE_TYPES.find(item => item.value === node.type) || NODE_TYPES[0]
+                return (
+                  <button
+                    key={node.id}
+                    type="button"
+                    className={`graph-node ${selectedId === node.id ? 'selected' : ''}`}
+                    style={{ left: node.x, top: node.y, '--node-color': meta.color }}
+                    onPointerDown={event => handlePointerDown(event, node)}
+                    onClick={event => { event.stopPropagation(); setSelectedId(node.id) }}
+                  >
+                    <span className="graph-node-type">{meta.label}</span>
+                    <strong>{node.title || 'Sans titre'}</strong>
+                    {node.body && <small>{node.body}</small>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         <aside className="graph-inspector">
@@ -384,4 +425,10 @@ function stringifyFrontmatter(data) {
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10)
+}
+
+function clampZoom(value) {
+  const next = Number(value)
+  if (!Number.isFinite(next)) return 1
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next * 10) / 10))
 }

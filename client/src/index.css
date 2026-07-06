@@ -666,6 +666,42 @@ kbd {
   justify-content: flex-end;
 }
 
+.graph-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.graph-zoom-btn,
+.graph-zoom-value {
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 13px;
+  border-right: 1px solid var(--border);
+}
+
+.graph-zoom-btn:hover,
+.graph-zoom-value:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.graph-zoom-value {
+  min-width: 58px;
+  font-family: var(--font-mono);
+}
+
+.graph-zoom-controls button:last-child {
+  border-right: none;
+}
+
 .graph-add-btn {
   display: inline-flex;
   align-items: center;
@@ -699,17 +735,21 @@ kbd {
 }
 
 .graph-stage::before {
-  content: '';
-  display: block;
-  width: 1400px;
-  height: 900px;
+  content: none;
+}
+
+.graph-canvas {
+  position: relative;
+}
+
+.graph-viewport {
+  position: relative;
+  transform-origin: 0 0;
 }
 
 .graph-lines {
   position: absolute;
   inset: 0;
-  width: 1400px;
-  height: 900px;
   pointer-events: none;
   color: var(--text-3);
   overflow: visible;
@@ -3550,6 +3590,17 @@ kbd {
     grid-template-columns: 1fr 1fr;
   }
 
+  .graph-zoom-controls {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .graph-zoom-btn,
+  .graph-zoom-value {
+    flex: 1;
+    min-height: 40px;
+  }
+
   .graph-add-btn {
     min-height: 40px;
     justify-content: center;
@@ -3562,12 +3613,6 @@ kbd {
 
   .graph-stage {
     min-height: 0;
-  }
-
-  .graph-stage::before,
-  .graph-lines {
-    width: 1100px;
-    height: 760px;
   }
 
   .graph-node {
