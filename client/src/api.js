@@ -85,6 +85,11 @@ export const updateQuote = (id, data) => req('PUT', `/life/quotes/${id}`, data)
 export const deleteQuote = id => req('DELETE', `/life/quotes/${id}`)
 export const generateLifeReport = data => req('POST', '/life/report', data)
 
+// Questionnaires
+export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
+export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)
+export const getQuestionnaireResults = () => req('GET', '/questionnaires/results')
+
 // Timer
 export const getTimerSessions = file_id =>
   req('GET', `/timer${file_id ? `?file_id=${file_id}` : ''}`)

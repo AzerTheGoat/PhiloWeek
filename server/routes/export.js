@@ -33,23 +33,29 @@ router.get('/obsidian', async (req, res) => {
     if (locked) continue
 
     const rawContent = file.content || ''
-    let parsed
-    try { parsed = matter(rawContent) }
-    catch (_) { parsed = { data: {}, content: rawContent } }
+    const originalPath = pathMap[file.id] || file.name
 
-    const tags = db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').all(file.id).map(r => r.tag)
+    if (/\.md$/i.test(file.name)) {
+      let parsed
+      try { parsed = matter(rawContent) }
+      catch (_) { parsed = { data: {}, content: rawContent } }
 
-    const frontmatter = {
-      ...parsed.data,
-      title: parsed.data.title || file.name.replace(/\.md$/i, ''),
-      tags: tags.length > 0 ? tags : (parsed.data.tags || []),
-      created: file.created_at,
-      modified: file.updated_at
+      const tags = db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').all(file.id).map(r => r.tag)
+
+      const frontmatter = {
+        ...parsed.data,
+        title: parsed.data.title || file.name.replace(/\.md$/i, ''),
+        tags: tags.length > 0 ? tags : (parsed.data.tags || []),
+        created: file.created_at,
+        modified: file.updated_at
+      }
+
+      const finalContent = matter.stringify(parsed.content, frontmatter)
+      const zipPath = originalPath.replace(/\.md$/i, '') + '.md'
+      zip.file(zipPath, finalContent)
+    } else {
+      zip.file(originalPath, rawContent)
     }
-
-    const finalContent = matter.stringify(parsed.content, frontmatter)
-    const zipPath = (pathMap[file.id] || file.name).replace(/\.md$/i, '') + '.md'
-    zip.file(zipPath, finalContent)
   }
 
   const quotes = db.prepare('SELECT * FROM quotes ORDER BY created_at DESC').all()
@@ -69,6 +75,15 @@ router.get('/obsidian', async (req, res) => {
       philoweek_type: 'quotes',
       exported: new Date().toISOString(),
     }))
+  }
+
+  const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results ORDER BY created_at DESC').all()
+  if (questionnaireResults.length > 0) {
+    zip.file('_PhiloWeek/QuestionnaireResults.json', JSON.stringify({
+      philoweek_type: 'questionnaire_results',
+      exported: new Date().toISOString(),
+      results: questionnaireResults,
+    }, null, 2))
   }
 
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })

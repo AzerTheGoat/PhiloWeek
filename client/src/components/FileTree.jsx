@@ -206,7 +206,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           title={node.name}
         >
           <span className="file-icon">{icon}</span>
-          <span className="file-name">{node.name.replace(/\.md$/i, '')}</span>
+          <span className="file-name">{node.name.replace(/\.(md|json)$/i, '')}</span>
         </div>
       )}
 

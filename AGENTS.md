@@ -147,6 +147,18 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La largeur et la hauteur des blocs sont configurables depuis l'inspecteur du graphe.
 - Ces réglages sont stockés dans le JSON du fichier graphe pour rester compatibles avec l'export/import Obsidian.
 
+## Questionnaires JSON
+
+- La sidebar permet de creer un `Quiz`, stocke comme fichier `.json`.
+- Un questionnaire JSON utilise `philoweek_type: questionnaire`, `version`, `id`, `title`, `description`, `tags` et un tableau `questions`.
+- Une question supporte au minimum `id`, `type`, `prompt`, `answer`, `explanation` et `tags`; `type` peut etre `open`, `mcq` ou `true_false`.
+- `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
+- L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random.
+- Les resultats de revision sont stockes dans la table `questionnaire_results` avec date, reponse utilisateur, correction attendue et statut juste/faux.
+- Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
+- L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_PhiloWeek/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
+- Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
+
 ## Experience mobile
 
 - Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers/IA en tiroirs plein ecran.

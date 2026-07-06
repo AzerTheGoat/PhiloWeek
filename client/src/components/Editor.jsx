@@ -3,7 +3,9 @@ import { useApp } from '../context/useApp'
 import EditorToolbar from './EditorToolbar'
 import Preview from './Preview'
 import GraphEditor from './GraphEditor'
+import QuestionnaireEditor from './QuestionnaireEditor'
 import { isGraphFile } from '../utils/graphFile'
+import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
@@ -258,6 +260,7 @@ export default function Editor() {
 
   if (!currentFile) return null
   if (isGraphFile(currentFile)) return <GraphEditor />
+  if (isQuestionnaireFile(currentFile)) return <QuestionnaireEditor />
 
   return (
     <div className="editor-container">

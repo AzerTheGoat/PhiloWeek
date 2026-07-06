@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import { createGraphMarkdown } from '../utils/graphFile'
+import { createQuestionnaireJson } from '../utils/questionnaireFile'
 import * as api from '../api'
 
 function shouldAutoFocus() {
@@ -26,8 +27,67 @@ export default function Modals() {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && hideModal()}>
       {modal.type === 'new-file' && <NewFileModal {...props} />}
       {modal.type === 'new-graph' && <NewGraphModal {...props} />}
+      {modal.type === 'new-questionnaire' && <NewQuestionnaireModal {...props} />}
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
+    </div>
+  )
+}
+
+function NewQuestionnaireModal({ modal, hideModal }) {
+  const { loadTree, openFile, toast } = useApp()
+  const [name, setName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
+    const baseName = name.trim()
+    const fileName = baseName.endsWith('.json') ? baseName : `${baseName}.json`
+    const title = baseName.replace(/\.json$/i, '')
+    try {
+      const f = await api.createFile({
+        parent_id: modal.data?.parent_id || null,
+        name: fileName,
+        type: 'file',
+        content: createQuestionnaireJson(title),
+      })
+      await loadTree()
+      await openFile(f.id)
+      hideModal()
+      toast(`Questionnaire "${fileName}" cree`)
+    } catch (err) {
+      toast(err.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header">
+        <h3>Nouveau questionnaire</h3>
+        <button className="icon-btn" onClick={hideModal}>x</button>
+      </div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <input
+          ref={inputRef}
+          autoFocus={shouldAutoFocus()}
+          type="text"
+          placeholder="Nom du questionnaire"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="modal-input"
+        />
+        <p className="modal-hint">Cree un fichier JSON de questions, compatible revision random.</p>
+        <div className="modal-actions">
+          <button type="submit" className="btn-primary" disabled={!name.trim() || submitting}>
+            {submitting ? 'Creation...' : 'Creer'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
+        </div>
+      </form>
     </div>
   )
 }

@@ -130,6 +130,9 @@ export default function Sidebar() {
         <button className="footer-btn" onClick={() => showModal('new-graph', {})} title="Nouveau graphe">
           <Icon name="graph" size={16} /> Graphe
         </button>
+        <button className="footer-btn" onClick={() => showModal('new-questionnaire', {})} title="Nouveau questionnaire">
+          <Icon name="question" size={16} /> Quiz
+        </button>
         <button className="footer-btn" onClick={() => showModal('new-folder', {})} title="Nouveau dossier">
           <Icon name="folder" size={16} /> Dossier
         </button>

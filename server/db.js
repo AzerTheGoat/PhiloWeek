@@ -110,6 +110,30 @@ const MIGRATIONS = [
   //   (db) => {
   //     addColumnIfMissing(db, 'files', 'archived', "INTEGER NOT NULL DEFAULT 0")
   //   },
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS questionnaire_results (
+        id TEXT PRIMARY KEY,
+        question_key TEXT NOT NULL,
+        questionnaire_file_id TEXT REFERENCES files(id) ON DELETE SET NULL,
+        questionnaire_title TEXT,
+        question_id TEXT,
+        question_text TEXT NOT NULL,
+        answer_text TEXT,
+        expected_answer TEXT,
+        correct INTEGER NOT NULL DEFAULT 0,
+        score REAL,
+        response_ms INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_questionnaire_results_question_key
+        ON questionnaire_results(question_key);
+
+      CREATE INDEX IF NOT EXISTS idx_questionnaire_results_created_at
+        ON questionnaire_results(created_at);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

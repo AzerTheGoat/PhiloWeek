@@ -2,6 +2,55 @@ import { useState, useCallback, useEffect } from 'react'
 import { useApp } from '../context/useApp'
 import * as api from '../api'
 
+const COPY_PROMPTS = {
+  none: {
+    label: 'Sans prompt',
+    text: '',
+  },
+  questionnaire: {
+    label: 'Questionnaire JSON',
+    text: `Tu vas creer un questionnaire PhiloWeek a partir des notes ci-dessous.
+
+Retourne uniquement un JSON valide, sans Markdown autour, au format :
+{
+  "philoweek_type": "questionnaire",
+  "version": 1,
+  "id": "slug-stable",
+  "title": "Titre",
+  "description": "Objectif du questionnaire",
+  "tags": [],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "open",
+      "prompt": "Question claire",
+      "answer": "Reponse attendue",
+      "explanation": "Pourquoi cette reponse est juste",
+      "tags": []
+    }
+  ]
+}
+
+Fais des questions utiles pour reviser, avec des reponses precises et des explications courtes.`,
+  },
+  socratique: {
+    label: 'Analyse socratique',
+    text: 'Analyse les notes ci-dessous avec une methode socratique : clarifie les theses, questionne les presupposes, fais apparaitre les tensions, puis propose des questions qui obligent a preciser la pensee.',
+  },
+  critique: {
+    label: 'Critique',
+    text: 'Analyse les notes ci-dessous de maniere critique : repere les faiblesses, objections possibles, concepts flous, sauts logiques et contre-exemples. Termine par une liste de revisions prioritaires.',
+  },
+  explorateur: {
+    label: 'Explorateur',
+    text: 'Explore les notes ci-dessous : propose des pistes nouvelles, rapprochements, analogies, auteurs ou problemes connexes. Priorise les idees qui peuvent ouvrir un vrai travail.',
+  },
+  synthese: {
+    label: 'Synthese',
+    text: 'Fais une synthese structuree des notes ci-dessous : theses, arguments, exemples, objections, concepts cles, puis une conclusion concise.',
+  },
+}
+
 // ——— Helpers ———
 
 function getAllFileIds(node) {
@@ -38,7 +87,7 @@ function buildFullPath(tree, fileId) {
   return walk(tree, '') || ''
 }
 
-async function buildConcatenation(tree, selectedIds) {
+async function buildConcatenation(tree, selectedIds, promptKey = 'none') {
   const orderedFiles = getFilesInTreeOrder(tree, selectedIds)
   const parts = []
   for (const f of orderedFiles) {
@@ -52,7 +101,9 @@ async function buildConcatenation(tree, selectedIds) {
     })
     parts.push(`# ${title}\n> Chemin : /${path} — Modifié le ${modDate}\n\n${body}`)
   }
-  return { text: parts.join('\n\n---\n\n'), count: orderedFiles.length }
+  const notes = parts.join('\n\n---\n\n')
+  const prompt = COPY_PROMPTS[promptKey]?.text || ''
+  return { text: prompt ? `${prompt}\n\n--- NOTES ---\n\n${notes}` : notes, count: orderedFiles.length }
 }
 
 // ——— SelectableTree ———
@@ -128,6 +179,7 @@ export default function FilePicker() {
   const { tree, dispatch, toast } = useApp()
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [loading, setLoading] = useState(false)
+  const [promptKey, setPromptKey] = useState('none')
 
   // Reset on open
   useEffect(() => { setSelectedIds(new Set()) }, [])
@@ -149,7 +201,7 @@ export default function FilePicker() {
     if (fileCount === 0) { toast('Sélectionne au moins un fichier', 'error'); return }
     setLoading(true)
     try {
-      const { text, count } = await buildConcatenation(tree, selectedIds)
+      const { text, count } = await buildConcatenation(tree, selectedIds, promptKey)
       await navigator.clipboard.writeText(text)
       toast(`${count} note(s) copiée(s) dans le presse-papier`)
       dispatch({ type: 'TOGGLE_FILE_PICKER' })
@@ -164,7 +216,7 @@ export default function FilePicker() {
     if (fileCount === 0) { toast('Sélectionne au moins un fichier', 'error'); return }
     setLoading(true)
     try {
-      const { text, count } = await buildConcatenation(tree, selectedIds)
+      const { text, count } = await buildConcatenation(tree, selectedIds, promptKey)
       const blob = new Blob([text], { type: 'text/markdown; charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -208,6 +260,17 @@ export default function FilePicker() {
         </div>
 
         <div className="picker-tree-container">
+          <div className="picker-prompt-box">
+            <label>
+              Prompt au debut du presse-papier
+              <select value={promptKey} onChange={e => setPromptKey(e.target.value)}>
+                {Object.entries(COPY_PROMPTS).map(([key, prompt]) => (
+                  <option key={key} value={key}>{prompt.label}</option>
+                ))}
+              </select>
+            </label>
+            {promptKey !== 'none' && <p>{COPY_PROMPTS[promptKey].text.split('\n')[0]}</p>}
+          </div>
           <SelectableTree
             nodes={tree}
             selectedIds={selectedIds}

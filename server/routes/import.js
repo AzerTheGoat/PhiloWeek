@@ -18,18 +18,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
   try {
     const zip = await JSZip.loadAsync(req.file.buffer)
 
-    // Phase 1: collect all .md entries (sorted shallowest first)
-    const mdEntries = []
+    // Phase 1: collect supported entries (sorted shallowest first)
+    const importEntries = []
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && relativePath.endsWith('.md') && !relativePath.startsWith('__MACOSX')) {
-        mdEntries.push({ relativePath, entry })
+      if (
+        !entry.dir &&
+        /\.(md|json)$/i.test(relativePath) &&
+        !relativePath.startsWith('__MACOSX')
+      ) {
+        importEntries.push({ relativePath, entry })
       }
     })
-    mdEntries.sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
+    importEntries.sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
 
     // Phase 2: decompress all files asynchronously (before touching the DB)
     const decompressed = []
-    for (const { relativePath, entry } of mdEntries) {
+    for (const { relativePath, entry } of importEntries) {
       try {
         const rawContent = await entry.async('text')
         decompressed.push({ relativePath, rawContent })
@@ -55,10 +59,40 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         `INSERT INTO quotes (id, quote, author, source, notes, tags, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertQuestionnaireResult = db.prepare(
+        `INSERT OR IGNORE INTO questionnaire_results (
+          id, question_key, questionnaire_file_id, questionnaire_title, question_id,
+          question_text, answer_text, expected_answer, correct, score, response_ms, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
-          const parsedSpecial = safeMatter(rawContent)
+          const jsonSpecial = safeJson(rawContent)
+          const parsedSpecial = /\.md$/i.test(relativePath) ? safeMatter(rawContent) : { data: {}, content: rawContent }
+          if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
+            const results = Array.isArray(jsonSpecial.results) ? jsonSpecial.results : []
+            for (const result of results) {
+              if (!result.question_key || !result.question_text) continue
+              insertQuestionnaireResult.run(
+                result.id || uuidv4(),
+                String(result.question_key),
+                result.questionnaire_file_id || null,
+                result.questionnaire_title || null,
+                result.question_id || null,
+                String(result.question_text),
+                result.answer_text || '',
+                result.expected_answer || '',
+                result.correct ? 1 : 0,
+                Number.isFinite(Number(result.score)) ? Number(result.score) : (result.correct ? 1 : 0),
+                Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
+                result.created_at || new Date().toISOString()
+              )
+              report.imported++
+            }
+            continue
+          }
+
           if (parsedSpecial.data.philoweek_type === 'quotes') {
             const quotes = parseQuotesExport(parsedSpecial.content)
             for (const quote of quotes) {
@@ -179,6 +213,11 @@ module.exports = router
 function safeMatter(rawContent) {
   try { return matter(rawContent) }
   catch (_) { return { data: {}, content: rawContent } }
+}
+
+function safeJson(rawContent) {
+  try { return JSON.parse(String(rawContent || '').replace(/^\uFEFF/, '')) }
+  catch (_) { return null }
 }
 
 function parseQuotesExport(content) {
