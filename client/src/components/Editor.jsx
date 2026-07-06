@@ -2,9 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
 import EditorToolbar from './EditorToolbar'
 import Preview from './Preview'
+import GraphEditor, { isGraphFile } from './GraphEditor'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
+
+function initialMode() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'split'
+}
 
 export default function Editor() {
   const { currentFile, openFileId, saveFile, toast, fileNames, insertRef } = useApp()
@@ -12,7 +17,7 @@ export default function Editor() {
   // Content is LOCAL state — never dispatched to global context
   const [content, setContent] = useState(currentFile?.content || '')
   const [isDirty, setIsDirty] = useState(false)
-  const [mode, setMode] = useState('split')
+  const [mode, setMode] = useState(initialMode)
   const [wordCount, setWordCount] = useState(0)
   const [saving, setSaving] = useState(false)
   const [wikiQuery, setWikiQuery] = useState(null)
@@ -251,6 +256,7 @@ export default function Editor() {
     : []
 
   if (!currentFile) return null
+  if (isGraphFile(currentFile)) return <GraphEditor />
 
   return (
     <div className="editor-container">

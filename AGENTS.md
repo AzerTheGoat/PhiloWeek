@@ -87,6 +87,15 @@ modified: 2025-01-15T14:22:00Z
 Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ```
 
+## Graphes d'idees
+
+- La sidebar permet de creer un `Graphe` en plus d'un fichier `.md` classique.
+- Un graphe reste un fichier Markdown standard avec `philoweek_type: graph` dans le frontmatter et un bloc fenced `philoweek-graph` contenant le JSON du graphe.
+- Le composant `GraphEditor.jsx` remplace l'editeur Markdown quand le fichier ouvert est un graphe.
+- Le graphe permet d'ajouter des cartes `Idee`, `Objectif`, `Question` et `Ressource`, de les deplacer, de modifier leurs details et de creer des liens orientes entre elles.
+- L'export Obsidian inclut les graphes comme fichiers `.md`; l'import les recree automatiquement comme fichiers, sans table dediee.
+- Ne pas convertir les graphes en table SQLite sans mettre a jour export/import. Le format Markdown est le format de compatibilite.
+
 ## Dossier Journal
 
 - Créé automatiquement à l'init (`/Journal/`)

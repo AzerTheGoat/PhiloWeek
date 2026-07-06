@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { useApp } from '../context/AppContext'
+import Icon from './Icons'
 import * as api from '../api'
 
 export default function Journal() {
@@ -85,7 +86,9 @@ export default function Journal() {
   return (
     <div className="journal-view">
       <div className="journal-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })}>←</button>
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+          <Icon name="back" />
+        </button>
         <h2>Journal</h2>
         <button className="btn-primary" onClick={() => openDay(new Date())}>
           Aujourd'hui

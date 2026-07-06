@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import { createGraphMarkdown } from './GraphEditor'
 import * as api from '../api'
+
+function shouldAutoFocus() {
+  return typeof window === 'undefined' || !window.matchMedia('(max-width: 768px)').matches
+}
 
 export default function Modals() {
   const { modal, hideModal } = useApp()
@@ -11,8 +16,65 @@ export default function Modals() {
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && hideModal()}>
       {modal.type === 'new-file' && <NewFileModal {...props} />}
+      {modal.type === 'new-graph' && <NewGraphModal {...props} />}
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
+    </div>
+  )
+}
+
+function NewGraphModal({ modal, hideModal }) {
+  const { loadTree, openFile, toast } = useApp()
+  const [name, setName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
+    const baseName = name.trim()
+    const fileName = baseName.endsWith('.md') ? baseName : `${baseName}.md`
+    const title = baseName.replace(/\.md$/i, '')
+    try {
+      const f = await api.createFile({
+        parent_id: modal.data?.parent_id || null,
+        name: fileName,
+        type: 'file',
+        content: createGraphMarkdown(title),
+      })
+      await loadTree()
+      await openFile(f.id)
+      hideModal()
+      toast(`Graphe "${fileName}" cree`)
+    } catch (err) {
+      toast(err.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header">
+        <h3>Nouveau graphe</h3>
+        <button className="icon-btn" onClick={hideModal}>x</button>
+      </div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <input
+          autoFocus={shouldAutoFocus()}
+          type="text"
+          placeholder="Nom du graphe"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="modal-input"
+        />
+        <p className="modal-hint">Cree une carte visuelle pour organiser idees, objectifs, questions et ressources.</p>
+        <div className="modal-actions">
+          <button type="submit" className="btn-primary" disabled={!name.trim() || submitting}>
+            {submitting ? 'Creation...' : 'Creer'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -52,7 +114,7 @@ function NewFileModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
-          autoFocus
+          autoFocus={shouldAutoFocus()}
           type="text"
           placeholder="Nom du fichier"
           value={name}
@@ -105,7 +167,7 @@ function NewFolderModal({ modal, hideModal }) {
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <input
-          autoFocus
+          autoFocus={shouldAutoFocus()}
           type="text"
           placeholder="Nom du dossier"
           value={name}
@@ -157,7 +219,7 @@ function LockFolderModal({ modal, hideModal }) {
           Le contenu sera chiffré AES-256. Sans le mot de passe, les fichiers seront inaccessibles.
         </p>
         <input
-          autoFocus
+          autoFocus={shouldAutoFocus()}
           type="password"
           placeholder="Mot de passe"
           value={password}

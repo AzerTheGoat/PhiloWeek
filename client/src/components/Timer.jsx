@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
+import Icon from './Icons'
 import * as api from '../api'
 
 const ACTIVITIES = [
-  { id: 'reading', label: 'Lecture', icon: '📖' },
-  { id: 'watching', label: 'Visionnage', icon: '🎥' },
-  { id: 'writing', label: 'Écriture', icon: '✍' },
-  { id: 'thinking', label: 'Réflexion', icon: '💭' },
+  { id: 'reading', label: 'Lecture', icon: 'journal' },
+  { id: 'watching', label: 'Visionnage', icon: 'video' },
+  { id: 'writing', label: 'Écriture', icon: 'edit' },
+  { id: 'thinking', label: 'Réflexion', icon: 'thought' },
 ]
 
 export default function Timer() {
@@ -79,9 +80,7 @@ export default function Timer() {
       })
 
       if (addToJournal) {
-        // Open today's journal
         await openJournalToday()
-        // The journal will be open in editor; the content insert happens via insertRef
         toast('Session sauvegardée. Ajoute des notes dans ton journal.')
       } else {
         toast('Session sauvegardée')
@@ -98,12 +97,14 @@ export default function Timer() {
     await api.deleteTimerSession(id)
     await loadData()
     toast('Session supprimée')
-  }, [loadData, toast])
+  }, [toast])
 
   return (
     <div className="timer-view">
       <div className="timer-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })}>←</button>
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+          <Icon name="back" />
+        </button>
         <h2>Timer de travail</h2>
       </div>
 
@@ -113,21 +114,19 @@ export default function Timer() {
         </div>
       )}
 
-      {/* Clock */}
       <div className={`timer-display ${running ? 'running' : ''}`}>
         {fmt(seconds)}
       </div>
 
-      {/* Controls */}
       {!pendingSave ? (
         <div className="timer-controls">
           {!running ? (
             <button className="btn-primary timer-start" onClick={() => setRunning(true)}>
-              ▶ Démarrer
+              <Icon name="play" size={18} /> Démarrer
             </button>
           ) : (
             <button className="btn-danger timer-stop" onClick={stop}>
-              ⏹ Arrêter
+              Arrêter
             </button>
           )}
           {seconds > 0 && !running && (
@@ -139,20 +138,10 @@ export default function Timer() {
           <div className="timer-save-info">
             Session de <strong>{fmtMin(seconds)}</strong>
           </div>
-          <div className="activity-picker">
-            {ACTIVITIES.map(a => (
-              <button
-                key={a.id}
-                className={`activity-btn ${activity === a.id ? 'active' : ''}`}
-                onClick={() => setActivity(a.id)}
-              >
-                {a.icon} {a.label}
-              </button>
-            ))}
-          </div>
+          <ActivityPicker activity={activity} setActivity={setActivity} />
           <textarea
             className="session-notes"
-            placeholder="Notes optionnelles sur cette session…"
+            placeholder="Notes optionnelles sur cette session..."
             value={sessionNotes}
             onChange={e => setSessionNotes(e.target.value)}
             rows={3}
@@ -162,7 +151,7 @@ export default function Timer() {
               Sauvegarder
             </button>
             <button className="btn-ghost" onClick={() => saveSession(true)}>
-              + Ajouter au journal
+              Ajouter au journal
             </button>
             <button className="btn-ghost danger" onClick={reset}>
               Ignorer
@@ -171,22 +160,8 @@ export default function Timer() {
         </div>
       )}
 
-      {/* Activity type selector (when not in save mode) */}
-      {!pendingSave && (
-        <div className="activity-picker">
-          {ACTIVITIES.map(a => (
-            <button
-              key={a.id}
-              className={`activity-btn ${activity === a.id ? 'active' : ''}`}
-              onClick={() => setActivity(a.id)}
-            >
-              {a.icon} {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {!pendingSave && <ActivityPicker activity={activity} setActivity={setActivity} />}
 
-      {/* Stats */}
       <div className="timer-stats">
         <div className="timer-stat">
           <span className="stat-label">Aujourd'hui</span>
@@ -198,7 +173,6 @@ export default function Timer() {
         </div>
       </div>
 
-      {/* Session history */}
       <div className="timer-history">
         <h3>Historique récent</h3>
         {sessions.length === 0 && <div className="history-empty">Aucune session</div>}
@@ -206,19 +180,31 @@ export default function Timer() {
           const act = ACTIVITIES.find(a => a.id === s.activity_type) || ACTIVITIES[3]
           return (
             <div key={s.id} className="session-row">
-              <span className="session-icon">{act.icon}</span>
+              <span className="session-icon"><Icon name={act.icon} size={16} /></span>
               <span className="session-duration">{fmtMin(s.duration_seconds)}</span>
               <span className="session-date">{new Date(s.created_at).toLocaleDateString('fr-FR')}</span>
               {s.notes && <span className="session-notes-text">{s.notes}</span>}
-              <button
-                className="session-delete"
-                onClick={() => deleteSession(s.id)}
-                title="Supprimer"
-              >✕</button>
+              <button className="session-delete" onClick={() => deleteSession(s.id)} title="Supprimer">×</button>
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function ActivityPicker({ activity, setActivity }) {
+  return (
+    <div className="activity-picker">
+      {ACTIVITIES.map(a => (
+        <button
+          key={a.id}
+          className={`activity-btn ${activity === a.id ? 'active' : ''}`}
+          onClick={() => setActivity(a.id)}
+        >
+          <Icon name={a.icon} size={17} /> {a.label}
+        </button>
+      ))}
     </div>
   )
 }

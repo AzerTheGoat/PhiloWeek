@@ -32,6 +32,7 @@ function reducer(state, action) {
       openFileId: action.payload?.id || null,
       view: 'editor',
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+      showAI: isMobileViewport() ? false : state.showAI,
     }
     case 'SET_VIEW': return {
       ...state,
@@ -48,6 +49,7 @@ function reducer(state, action) {
       return {
         ...state,
         showAI,
+        view: isMobileViewport() && showAI ? 'editor' : state.view,
         sidebarOpen: isMobileViewport() && showAI ? false : state.sidebarOpen,
       }
     }

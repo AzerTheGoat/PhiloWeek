@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../context/AppContext'
+import Icon from './Icons'
 import * as api from '../api'
 
 const PERIODS = [
@@ -19,6 +20,8 @@ export default function LifePage() {
   const [model, setModel] = useState(localStorage.getItem('pw-ai-model') || 'claude-sonnet-4-6')
   const [loadingReport, setLoadingReport] = useState(false)
   const [report, setReport] = useState(null)
+  const [mobileTab, setMobileTab] = useState('quotes')
+  const [showQuoteForm, setShowQuoteForm] = useState(false)
 
   const providerConfig = modelsConfig?.providers?.[provider]
   const models = providerConfig?.models || []
@@ -59,6 +62,7 @@ export default function LifePage() {
       const created = await api.createQuote({ ...form, tags: quoteTags })
       setQuotes(prev => [created, ...prev])
       setForm({ quote: '', author: '', source: '', notes: '', tags: '' })
+      setShowQuoteForm(false)
       toast('Citation ajoutée')
     } catch (err) {
       toast(err.message, 'error')
@@ -92,18 +96,42 @@ export default function LifePage() {
   return (
     <div className="life-page">
       <div className="life-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })}>←</button>
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+          <Icon name="back" />
+        </button>
         <h2>Vie intérieure</h2>
       </div>
 
-      <div className="life-layout">
+      <div className="life-mobile-tabs">
+        <button
+          className={`inbox-tab-btn ${mobileTab === 'quotes' ? 'active' : ''}`}
+          onClick={() => setMobileTab('quotes')}
+        >
+          Citations
+        </button>
+        <button
+          className={`inbox-tab-btn ${mobileTab === 'report' ? 'active' : ''}`}
+          onClick={() => setMobileTab('report')}
+        >
+          Rapport IA
+        </button>
+      </div>
+
+      <div className={`life-layout mobile-tab-${mobileTab}`}>
         <section className="life-section quotes-section">
           <div className="life-section-header">
             <h3>Citations</h3>
-            <span>{quotes.length}</span>
+            <button
+              type="button"
+              className="life-add-btn"
+              onClick={() => setShowQuoteForm(open => !open)}
+            >
+              <Icon name={showQuoteForm ? 'close' : 'plus'} size={15} />
+              {showQuoteForm ? 'Fermer' : 'Ajouter'}
+            </button>
           </div>
 
-          <form className="quote-form" onSubmit={addQuote}>
+          <form className={`quote-form ${showQuoteForm ? 'is-open' : ''}`} onSubmit={addQuote}>
             <textarea
               className="life-input"
               placeholder="Citation..."

@@ -123,6 +123,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     const items = isFolder
       ? [
           { icon: '📄', label: 'Nouveau fichier ici', action: () => showModal('new-file', { parent_id: node.id }) },
+          { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
           { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
           { separator: true },
           { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },

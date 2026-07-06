@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
+import Icon from './Icons'
 import * as api from '../api'
 
 const RESOURCE_TYPES = [
@@ -288,7 +289,7 @@ function IdeasSection() {
         <textarea
           ref={textareaRef}
           className="idea-textarea"
-          placeholder="Une question, une idée, une intuition… (#tags supportés — Ctrl+Entrée pour capturer)"
+          placeholder="Une question, une idée, une intuition… (#tags supportés)"
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -400,8 +401,10 @@ export default function InboxPage() {
   return (
     <div className="inbox-page">
       <div className="inbox-page-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })}>←</button>
-        <h2>💡 Nid à idées</h2>
+        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+          <Icon name="back" />
+        </button>
+        <h2><Icon name="idea" size={18} /> Nid à idées</h2>
       </div>
 
       {/* Mobile tabs */}

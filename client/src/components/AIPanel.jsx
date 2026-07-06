@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/AppContext'
+import Icon from './Icons'
 import * as api from '../api'
 
 const MODES = [
-  { id: 'socratic', label: 'Socratique', icon: '?', desc: 'Pose des questions qui dérangent' },
-  { id: 'critique', label: 'Critique', icon: '!', desc: 'Détecte les failles logiques' },
-  { id: 'explorer', label: 'Explorateur', icon: '↗', desc: 'Penseurs, textes, cadres alternatifs' },
-  { id: 'synthesis', label: 'Synthèse', icon: '◉', desc: 'Résume et relie' },
+  { id: 'socratic', label: 'Socratique', icon: 'question', desc: 'Pose des questions qui dérangent' },
+  { id: 'critique', label: 'Critique', icon: 'alert', desc: 'Détecte les failles logiques' },
+  { id: 'explorer', label: 'Explorateur', icon: 'compass', desc: 'Penseurs, textes, cadres alternatifs' },
+  { id: 'synthesis', label: 'Synthèse', icon: 'synthesis', desc: 'Résume et relie' },
 ]
 
 const DEFAULT_OUTPUT_TOKENS = 1200
@@ -161,8 +162,10 @@ export default function AIPanel() {
   return (
     <aside className="ai-panel">
       <div className="ai-header">
-        <span className="ai-title">✦ Penseur</span>
-        <button className="icon-btn" onClick={() => dispatch({ type: 'TOGGLE_AI' })} title="Fermer">×</button>
+        <span className="ai-title"><Icon name="ai" size={17} /> Penseur</span>
+        <button className="icon-btn" onClick={() => dispatch({ type: 'TOGGLE_AI' })} title="Fermer">
+          <Icon name="close" />
+        </button>
       </div>
 
       {currentFile && (
@@ -247,7 +250,7 @@ export default function AIPanel() {
             }}
             title={m.desc}
           >
-            <span>{m.icon}</span>
+            <Icon name={m.icon} size={16} />
             <span>{m.label}</span>
           </button>
         ))}
@@ -280,7 +283,7 @@ export default function AIPanel() {
           onClick={generateProfile}
           disabled={profileLoading || !selectedModel}
         >
-          {profileLoading ? '...' : '◎ Portrait philosophique'}
+          {profileLoading ? '...' : <><Icon name="life" size={16} /> Portrait philosophique</>}
         </button>
         <div className="ai-profile-hint">Analyse toutes tes notes</div>
       </div>
