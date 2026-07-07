@@ -99,11 +99,7 @@
   min-width: 0;
   overflow: hidden;
   isolation: isolate;
-  background:
-    radial-gradient(circle at center, rgba(124, 100, 240, 0.08), transparent 34%),
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: auto, 42px 42px, 42px 42px;
+  background: var(--bg);
 }
 
 .kg-canvas {
@@ -117,8 +113,8 @@
 .kg-canvas:active { cursor: grabbing }
 
 .kg-edge {
-  stroke: rgba(170, 180, 210, 0.24);
-  stroke-width: 1.5;
+  stroke: rgba(170, 180, 210, 0.22);
+  stroke-width: 1.2;
   transition: opacity 0.15s, stroke 0.15s;
 }
 
@@ -129,7 +125,7 @@
 
 .kg-edge.active {
   stroke: var(--accent-hover);
-  stroke-width: 2.4;
+  stroke-width: 2;
 }
 
 .kg-edge.dim,
@@ -147,10 +143,10 @@
 }
 
 .kg-node circle {
-  fill: #1f2430;
+  fill: #171a20;
   stroke: #6ba3e8;
-  stroke-width: 2;
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.34));
+  stroke-width: 1.5;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.32));
 }
 
 .kg-node-questionnaire circle { stroke: var(--success) }
@@ -158,20 +154,13 @@
 .kg-node-journal circle { stroke: #d65f78 }
 
 .kg-node.connected circle {
-  stroke-width: 2.8;
+  stroke-width: 2.2;
 }
 
 .kg-node.active circle {
   fill: #29233e;
   stroke: var(--accent-hover);
-  stroke-width: 3.4;
-}
-
-.kg-node text {
-  fill: var(--text);
-  font-size: 10px;
-  font-weight: 800;
-  pointer-events: none;
+  stroke-width: 2.8;
 }
 
 .kg-node-label {
@@ -331,6 +320,27 @@
   color: var(--text-2);
   padding: 24px;
   text-align: center;
+}
+
+.kg-side-empty {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.kg-side-empty h3 {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.kg-side-empty p {
+  font-size: 13px;
 }
 
 @media (max-width: 768px) {

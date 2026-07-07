@@ -19,13 +19,6 @@ const KIND_LABELS = {
   journal: 'Journal',
 }
 
-const KIND_MARKS = {
-  note: 'N',
-  questionnaire: 'Q',
-  idea_graph: 'G',
-  journal: 'J',
-}
-
 export default function KnowledgeGraph() {
   const { dispatch, openFile, toast } = useApp()
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
@@ -55,7 +48,7 @@ export default function KnowledgeGraph() {
         const data = await api.getKnowledgeGraph()
         if (ignore) return
         setGraph(data)
-        setSelectedId(data.nodes[0]?.id || null)
+        setSelectedId(null)
       } catch (err) {
         toast(err.message, 'error')
       } finally {
@@ -88,7 +81,7 @@ export default function KnowledgeGraph() {
         ...node,
         x: Math.cos(angle) * spread + Math.cos(index * 2.1) * 35,
         y: Math.sin(angle) * spread + Math.sin(index * 1.7) * 35,
-        radius: clamp(9 + (degree.get(node.id) || 0) * 1.8, 10, 22),
+        radius: clamp(5.5 + (degree.get(node.id) || 0) * 1.1, 6, 13),
       }
     })
     velocitiesRef.current = new Map(next.map(node => [node.id, { vx: 0, vy: 0 }]))
@@ -118,7 +111,7 @@ export default function KnowledgeGraph() {
       .map(node => node.id))
   }, [simNodes, query])
 
-  const selected = byId.get(selectedId) || simNodes[0]
+  const selected = selectedId ? byId.get(selectedId) : null
   const connectedIds = useMemo(() => {
     if (!selected) return new Set()
     const ids = new Set([selected.id])
@@ -129,7 +122,7 @@ export default function KnowledgeGraph() {
     return ids
   }, [graph.edges, selected])
 
-  const labeledNode = byId.get(hoveredId) || selected
+  const labeledNode = hoveredId ? byId.get(hoveredId) : null
 
   const handleCopy = async () => {
     if (!selected) return
@@ -169,6 +162,7 @@ export default function KnowledgeGraph() {
 
   const startPan = (event) => {
     if (event.target.closest?.('[data-node-id]')) return
+    setSelectedId(null)
     dragRef.current = { type: 'pan', x: event.clientX, y: event.clientY, viewBox }
   }
 
@@ -229,7 +223,7 @@ export default function KnowledgeGraph() {
         ...node,
         x: Math.cos(angle) * spread,
         y: Math.sin(angle) * spread,
-        radius: clamp(9 + (degree.get(node.id) || 0) * 1.8, 10, 22),
+        radius: clamp(5.5 + (degree.get(node.id) || 0) * 1.1, 6, 13),
       }
     })
     pinnedRef.current = new Map()
@@ -405,7 +399,6 @@ export default function KnowledgeGraph() {
                       onDoubleClick={() => openFile(node.id)}
                     >
                       <circle r={node.radius} />
-                      <text y="4" textAnchor="middle">{KIND_MARKS[node.kind] || 'N'}</text>
                     </g>
                   )
                 })}
@@ -476,7 +469,10 @@ export default function KnowledgeGraph() {
               </div>
             </>
           ) : (
-            <div className="kg-empty">Selectionne un noeud.</div>
+            <div className="kg-side-empty">
+              <h3>Aucun noeud selectionne</h3>
+              <p>{graph.nodes.length} noeud(s), {graph.edges.length} lien(s)</p>
+            </div>
           )}
         </aside>
       </div>
