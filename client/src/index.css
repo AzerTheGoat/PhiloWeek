@@ -1174,6 +1174,10 @@ kbd {
   outline-offset: 2px;
 }
 
+.graph-node.title-only {
+  justify-content: center;
+}
+
 .graph-node-type {
   font-size: 11px;
   line-height: 1;
@@ -1250,11 +1254,6 @@ kbd {
 
 .graph-node-markdown a {
   color: var(--link);
-}
-
-.graph-node-placeholder {
-  color: var(--text-3);
-  font-size: 12px;
 }
 
 .graph-inspector {
@@ -1357,6 +1356,62 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-elevated);
+}
+
+.graph-link-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.graph-link-results span,
+.graph-link-selected span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.graph-link-results button {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.graph-link-results button:hover,
+.graph-link-results button.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.graph-link-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.graph-link-selected span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.graph-link-selected button {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent-hover);
+  font-size: 12px;
 }
 
 .graph-color-row {

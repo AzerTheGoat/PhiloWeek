@@ -4,8 +4,9 @@ import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
 const AUTOSAVE_DELAY = 650
-const CANVAS_WIDTH = 1400
-const CANVAS_HEIGHT = 900
+const CANVAS_PADDING = 800
+const CANVAS_WIDTH = 3000
+const CANVAS_HEIGHT = 2200
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
@@ -59,6 +60,7 @@ export default function GraphEditor() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [linkTarget, setLinkTarget] = useState('')
+  const [linkSearch, setLinkSearch] = useState('')
   const [edgeKind, setEdgeKind] = useState('relates')
   const [edgeArrowStyle, setEdgeArrowStyle] = useState('end')
   const [edgeLabel, setEdgeLabel] = useState('')
@@ -74,10 +76,24 @@ export default function GraphEditor() {
     setSelectedId(null)
     setSelectedIds(new Set())
     setLinkTarget('')
+    setLinkSearch('')
     setEdgeLabel('')
     setEdgeArrowStyle('end')
     setDirty(false)
     clearTimeout(saveTimerRef.current)
+  }, [currentFile?.id])
+
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return undefined
+    const nextGraph = parseGraph(currentFile?.content, currentFile?.name)
+    const minX = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.x)) : 0
+    const minY = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.y)) : 0
+    const frame = requestAnimationFrame(() => {
+      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 120) * zoom)
+      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 120) * zoom)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [currentFile?.id])
 
   const selectedNode = useMemo(
@@ -89,6 +105,32 @@ export default function GraphEditor() {
     if (!selectedId) return new Set()
     return new Set(graph.edges.filter(edge => edge.from === selectedId).map(edge => edge.to))
   }, [graph.edges, selectedId])
+
+  const availableLinkTargets = useMemo(() => {
+    if (!selectedId) return []
+    return graph.nodes.filter(node => node.id !== selectedId && !linkedTargets.has(node.id))
+  }, [graph.nodes, linkedTargets, selectedId])
+
+  const filteredLinkTargets = useMemo(() => {
+    const query = normalizeSearch(linkSearch)
+    if (!query) return []
+    return availableLinkTargets
+      .filter(node => {
+        const haystack = normalizeSearch(`${node.title || ''} ${node.body || ''}`)
+        return haystack.includes(query)
+      })
+      .slice(0, 8)
+  }, [availableLinkTargets, linkSearch])
+
+  const selectedLinkTarget = useMemo(
+    () => availableLinkTargets.find(node => node.id === linkTarget) || null,
+    [availableLinkTargets, linkTarget]
+  )
+
+  useEffect(() => {
+    setLinkTarget('')
+    setLinkSearch('')
+  }, [selectedId])
 
   const persist = useCallback((nextGraph) => {
     clearTimeout(saveTimerRef.current)
@@ -194,6 +236,7 @@ export default function GraphEditor() {
       edges: [...prev.edges, { id: makeId(), from: selectedId, to: linkTarget, type: edgeKind, arrow: edgeArrowStyle, label: edgeLabel.trim() }],
     }))
     setLinkTarget('')
+    setLinkSearch('')
     setEdgeLabel('')
   }, [edgeArrowStyle, edgeKind, edgeLabel, linkTarget, linkedTargets, selectedId, updateGraph])
 
@@ -263,8 +306,8 @@ export default function GraphEditor() {
     if (event.target.closest('.graph-node')) return
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    const x = (event.clientX - rect.left) / zoom
-    const y = (event.clientY - rect.top) / zoom
+    const x = (event.clientX - rect.left) / zoom - CANVAS_PADDING
+    const y = (event.clientY - rect.top) / zoom - CANVAS_PADDING
     const base = event.shiftKey ? new Set(selectedIds) : new Set()
     marqueeRef.current = { startX: x, startY: y, base }
     setMarqueeRect({ x, y, w: 0, h: 0 })
@@ -284,7 +327,7 @@ export default function GraphEditor() {
         nodes: prev.nodes.map(node => {
           const o = drag.origin[node.id]
           if (!o) return node
-          return { ...node, x: Math.max(20, o.x + dx), y: Math.max(20, o.y + dy) }
+          return { ...node, x: o.x + dx, y: o.y + dy }
         }),
       }))
       return
@@ -294,8 +337,8 @@ export default function GraphEditor() {
     if (marquee) {
       const rect = viewportRef.current?.getBoundingClientRect()
       if (!rect) return
-      const x = (event.clientX - rect.left) / zoom
-      const y = (event.clientY - rect.top) / zoom
+      const x = (event.clientX - rect.left) / zoom - CANVAS_PADDING
+      const y = (event.clientY - rect.top) / zoom - CANVAS_PADDING
       const rx = Math.min(marquee.startX, x)
       const ry = Math.min(marquee.startY, y)
       const rw = Math.abs(x - marquee.startX)
@@ -413,7 +456,12 @@ export default function GraphEditor() {
               {marqueeRect && (
                 <div
                   className="graph-marquee"
-                  style={{ left: marqueeRect.x, top: marqueeRect.y, width: marqueeRect.w, height: marqueeRect.h }}
+                  style={{
+                    left: marqueeRect.x + CANVAS_PADDING,
+                    top: marqueeRect.y + CANVAS_PADDING,
+                    width: marqueeRect.w,
+                    height: marqueeRect.h,
+                  }}
                 />
               )}
               <svg className="graph-lines" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
@@ -430,10 +478,12 @@ export default function GraphEditor() {
                   const fromH = getNodeHeight(from)
                   const toW = getNodeWidth(to)
                   const toH = getNodeHeight(to)
-                  const fromCenter = { x: from.x + fromW / 2, y: from.y + fromH / 2 }
-                  const toCenter = { x: to.x + toW / 2, y: to.y + toH / 2 }
-                  const p1 = getBorderPoint(from, fromW, fromH, toCenter.x, toCenter.y)
-                  const p2 = getBorderPoint(to, toW, toH, fromCenter.x, fromCenter.y)
+                  const fromDraw = toCanvasNode(from)
+                  const toDraw = toCanvasNode(to)
+                  const fromCenter = { x: fromDraw.x + fromW / 2, y: fromDraw.y + fromH / 2 }
+                  const toCenter = { x: toDraw.x + toW / 2, y: toDraw.y + toH / 2 }
+                  const p1 = getBorderPoint(fromDraw, fromW, fromH, toCenter.x, toCenter.y)
+                  const p2 = getBorderPoint(toDraw, toW, toH, fromCenter.x, fromCenter.y)
                   const arrow = edge.arrow || 'end'
                   const label = edge.label || ''
                   const labelPos = label ? edgeLabelTransform(p1.x, p1.y, p2.x, p2.y) : null
@@ -469,16 +519,17 @@ export default function GraphEditor() {
                 const borderColor = normalizeColor(node.color, meta.color)
                 const width = getNodeWidth(node)
                 const height = getNodeHeight(node)
-                const markdown = renderNodeMarkdown(node.body)
+                const hasBody = Boolean(String(node.body || '').trim())
+                const markdown = hasBody ? renderNodeMarkdown(node.body) : ''
                 return (
                   <div
                     key={node.id}
                     role="button"
                     tabIndex={0}
-                    className={`graph-node ${selectedIds.has(node.id) ? 'selected' : ''}`}
+                    className={`graph-node ${selectedIds.has(node.id) ? 'selected' : ''} ${hasBody ? '' : 'title-only'}`}
                     style={{
-                      left: node.x,
-                      top: node.y,
+                      left: node.x + CANVAS_PADDING,
+                      top: node.y + CANVAS_PADDING,
                       width,
                       height,
                       '--node-color': borderColor,
@@ -496,13 +547,11 @@ export default function GraphEditor() {
                   >
                     {!meta.blank && <span className="graph-node-type">{meta.label}</span>}
                     <strong>{node.title || 'Sans titre'}</strong>
-                    {node.body ? (
+                    {hasBody && (
                       <div
                         className="graph-node-markdown"
                         dangerouslySetInnerHTML={{ __html: markdown }}
                       />
-                    ) : (
-                      <span className="graph-node-placeholder">Markdown...</span>
                     )}
                   </div>
                 )
@@ -630,12 +679,50 @@ export default function GraphEditor() {
                   value={edgeLabel}
                   onChange={event => setEdgeLabel(event.target.value)}
                 />
-                <select value={linkTarget} onChange={event => setLinkTarget(event.target.value)}>
-                  <option value="">Choisir une carte</option>
-                  {graph.nodes
-                    .filter(node => node.id !== selectedNode.id && !linkedTargets.has(node.id))
-                    .map(node => <option key={node.id} value={node.id}>{node.title || 'Sans titre'}</option>)}
-                </select>
+                <input
+                  type="search"
+                  placeholder="Rechercher une carte a relier"
+                  value={linkSearch}
+                  onChange={event => {
+                    setLinkSearch(event.target.value)
+                    setLinkTarget('')
+                  }}
+                />
+                <div className="graph-link-results">
+                  {!linkSearch.trim() ? (
+                    <span>Tape quelques lettres pour chercher une carte.</span>
+                  ) : filteredLinkTargets.length ? (
+                    filteredLinkTargets.map(node => (
+                      <button
+                        key={node.id}
+                        type="button"
+                        className={linkTarget === node.id ? 'active' : ''}
+                        onClick={() => {
+                          setLinkTarget(node.id)
+                          setLinkSearch(node.title || 'Sans titre')
+                        }}
+                      >
+                        {node.title || 'Sans titre'}
+                      </button>
+                    ))
+                  ) : (
+                    <span>Aucune carte trouvee.</span>
+                  )}
+                </div>
+                {selectedLinkTarget && (
+                  <div className="graph-link-selected">
+                    <span>Cible : {selectedLinkTarget.title || 'Sans titre'}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkTarget('')
+                        setLinkSearch('')
+                      }}
+                    >
+                      Changer
+                    </button>
+                  </div>
+                )}
                 <button type="button" className="btn-primary" disabled={!linkTarget} onClick={addEdge}>Relier</button>
               </div>
 
@@ -773,6 +860,14 @@ function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
 }
 
+function toCanvasNode(node) {
+  return {
+    ...node,
+    x: node.x + CANVAS_PADDING,
+    y: node.y + CANVAS_PADDING,
+  }
+}
+
 // Point d'intersection entre le rectangle du noeud et le segment reliant
 // son centre a un point cible : donne le point du bord le plus proche de
 // l'autre extremite du lien, quelle que soit la position relative des noeuds.
@@ -821,6 +916,14 @@ function clampNumber(value, min, max, fallback) {
 function normalizeColor(value, fallback = NODE_TYPES[0].color) {
   const color = String(value || '').trim()
   return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 function renderNodeMarkdown(markdown) {

@@ -151,8 +151,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - Les fichiers graphes sont des fichiers `.md` avec `philoweek_type: graph` et un bloc JSON `philoweek-graph`.
 - Chaque bloc du graphe peut contenir du Markdown visible directement dans la carte.
+- Un bloc du graphe peut aussi rester sans contenu Markdown : dans ce cas la carte affiche seulement son titre, sans placeholder.
+- Le canvas du graphe ajoute une grande marge visuelle autour des cartes pour permettre de naviguer et de deplacer les blocs au-dela de leur groupe initial.
 - La couleur configurable d'un bloc concerne uniquement son contour, pas son fond.
 - La largeur et la hauteur des blocs sont configurables depuis l'inspecteur du graphe.
+- La creation d'un lien sortant se fait via une recherche textuelle de la carte cible, pas via une liste complete de tous les titres.
 - Ces réglages sont stockés dans le JSON du fichier graphe pour rester compatibles avec l'export/import Obsidian.
 
 ## Graphe de la base
