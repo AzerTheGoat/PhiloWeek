@@ -68,7 +68,12 @@ const SECTIONS = [
       {
         icon: 'graph',
         title: 'Cartes & liens typés',
-        text: "Crée des cartes (Idée, Objectif, Question, Ressource) et relie-les avec des liens typés (relie, soutient, bloque, mène vers).",
+        text: "Crée des cartes (Idée, Objectif, Question, Ressource) et relie-les avec des liens typés (relie, soutient, bloque, mène vers). Chaque lien part automatiquement des bords les plus proches entre les deux cartes, quelle que soit leur position.",
+      },
+      {
+        icon: 'graph',
+        title: 'Flèches & texte sur les liens',
+        text: "Choisis le style de chaque lien (flèche simple, flèche double, ou sans flèche) et ajoute un texte optionnel qui s'affiche directement le long du trait. Modifiable à tout moment depuis la liste des liens de la carte.",
       },
       {
         icon: 'copy',

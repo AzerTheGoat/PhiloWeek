@@ -1123,6 +1123,17 @@ kbd {
 .graph-edge-blocks { color: var(--danger) }
 .graph-edge-leads_to { color: var(--accent-hover) }
 
+.graph-edge-label-bg {
+  fill: var(--bg-elevated);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.graph-edge-label-text {
+  fill: var(--text-2);
+  font-size: 11px;
+}
+
 .graph-node {
   position: absolute;
   display: flex;
@@ -1286,7 +1297,8 @@ kbd {
 .graph-field input,
 .graph-field select,
 .graph-field textarea,
-.graph-link-box select {
+.graph-link-box select,
+.graph-link-box input {
   width: 100%;
   min-width: 0;
   background: var(--bg-input);
@@ -1318,7 +1330,8 @@ kbd {
 .graph-field input:focus,
 .graph-field select:focus,
 .graph-field textarea:focus,
-.graph-link-box select:focus {
+.graph-link-box select:focus,
+.graph-link-box input:focus {
   border-color: var(--border-focus);
 }
 
@@ -1372,14 +1385,20 @@ kbd {
 }
 
 .graph-edge-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 7px 0;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--text-2);
+}
+
+.graph-edge-row-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .graph-edge-row span {
@@ -1391,6 +1410,29 @@ kbd {
 .graph-edge-row button {
   color: var(--danger);
   font-size: 12px;
+}
+
+.graph-edge-row-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.graph-edge-row-controls select,
+.graph-edge-row-controls input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 5px 7px;
+  font-size: 11px;
+  outline: none;
+}
+
+.graph-edge-row-controls select:focus,
+.graph-edge-row-controls input:focus {
+  border-color: var(--border-focus);
 }
 
 .graph-empty-panel {

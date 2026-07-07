@@ -41,6 +41,12 @@ const EDGE_TYPES = [
   { value: 'leads_to', label: 'mene vers' },
 ]
 
+const ARROW_STYLES = [
+  { value: 'end', label: 'Fleche simple' },
+  { value: 'both', label: 'Fleche double' },
+  { value: 'none', label: 'Sans fleche' },
+]
+
 export default function GraphEditor() {
   const { currentFile, openFileId, saveFile, toast, showContextMenu } = useApp()
   const [graph, setGraph] = useState(() => parseGraph(currentFile?.content, currentFile?.name))
@@ -51,6 +57,8 @@ export default function GraphEditor() {
   const [dirty, setDirty] = useState(false)
   const [linkTarget, setLinkTarget] = useState('')
   const [edgeKind, setEdgeKind] = useState('relates')
+  const [edgeArrowStyle, setEdgeArrowStyle] = useState('end')
+  const [edgeLabel, setEdgeLabel] = useState('')
   const [zoom, setZoom] = useState(1)
   const saveTimerRef = useRef(null)
   const dragRef = useRef(null)
@@ -63,6 +71,8 @@ export default function GraphEditor() {
     setSelectedId(null)
     setSelectedIds(new Set())
     setLinkTarget('')
+    setEdgeLabel('')
+    setEdgeArrowStyle('end')
     setDirty(false)
     clearTimeout(saveTimerRef.current)
   }, [currentFile?.id])
@@ -158,7 +168,7 @@ export default function GraphEditor() {
         .map(node => ({ ...node, id: idMap.get(node.id), x: node.x + 30, y: node.y + 30 }))
       const newEdges = prev.edges
         .filter(edge => idSet.has(edge.from) && idSet.has(edge.to))
-        .map(edge => ({ id: makeId(), from: idMap.get(edge.from), to: idMap.get(edge.to), type: edge.type }))
+        .map(edge => ({ id: makeId(), from: idMap.get(edge.from), to: idMap.get(edge.to), type: edge.type, arrow: edge.arrow, label: edge.label }))
       return { ...prev, nodes: [...prev.nodes, ...newNodes], edges: [...prev.edges, ...newEdges] }
     })
     const newIds = new Set(idMap.values())
@@ -178,13 +188,21 @@ export default function GraphEditor() {
     if (!selectedId || !linkTarget || selectedId === linkTarget || linkedTargets.has(linkTarget)) return
     updateGraph(prev => ({
       ...prev,
-      edges: [...prev.edges, { id: makeId(), from: selectedId, to: linkTarget, type: edgeKind }],
+      edges: [...prev.edges, { id: makeId(), from: selectedId, to: linkTarget, type: edgeKind, arrow: edgeArrowStyle, label: edgeLabel.trim() }],
     }))
     setLinkTarget('')
-  }, [edgeKind, linkTarget, linkedTargets, selectedId, updateGraph])
+    setEdgeLabel('')
+  }, [edgeArrowStyle, edgeKind, edgeLabel, linkTarget, linkedTargets, selectedId, updateGraph])
 
   const deleteEdge = useCallback((edgeId) => {
     updateGraph(prev => ({ ...prev, edges: prev.edges.filter(edge => edge.id !== edgeId) }))
+  }, [updateGraph])
+
+  const updateEdge = useCallback((edgeId, patch) => {
+    updateGraph(prev => ({
+      ...prev,
+      edges: prev.edges.map(edge => edge.id === edgeId ? { ...edge, ...patch } : edge),
+    }))
   }, [updateGraph])
 
   const setClampedZoom = useCallback((nextZoom) => {
@@ -397,7 +415,7 @@ export default function GraphEditor() {
               )}
               <svg className="graph-lines" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
                 <defs>
-                  <marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                  <marker id="graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse">
                     <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
                   </marker>
                 </defs>
@@ -405,18 +423,40 @@ export default function GraphEditor() {
                   const from = nodeMap.get(edge.from)
                   const to = nodeMap.get(edge.to)
                   if (!from || !to) return null
-                  const x1 = from.x + getNodeWidth(from)
-                  const y1 = from.y + getNodeHeight(from) / 2
-                  const x2 = to.x
-                  const y2 = to.y + getNodeHeight(to) / 2
-                  const mid = Math.max(40, Math.abs(x2 - x1) / 2)
+                  const fromW = getNodeWidth(from)
+                  const fromH = getNodeHeight(from)
+                  const toW = getNodeWidth(to)
+                  const toH = getNodeHeight(to)
+                  const fromCenter = { x: from.x + fromW / 2, y: from.y + fromH / 2 }
+                  const toCenter = { x: to.x + toW / 2, y: to.y + toH / 2 }
+                  const p1 = getBorderPoint(from, fromW, fromH, toCenter.x, toCenter.y)
+                  const p2 = getBorderPoint(to, toW, toH, fromCenter.x, fromCenter.y)
+                  const arrow = edge.arrow || 'end'
+                  const label = edge.label || ''
+                  const labelPos = label ? edgeLabelTransform(p1.x, p1.y, p2.x, p2.y) : null
+                  const labelWidth = label ? Math.max(28, label.length * 6.2 + 12) : 0
                   return (
-                    <path
-                      key={edge.id}
-                      d={`M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`}
-                      className={`graph-edge graph-edge-${edge.type || 'relates'}`}
-                      markerEnd="url(#graph-arrow)"
-                    />
+                    <g key={edge.id}>
+                      <path
+                        d={`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`}
+                        className={`graph-edge graph-edge-${edge.type || 'relates'}`}
+                        markerEnd={arrow !== 'none' ? 'url(#graph-arrow)' : undefined}
+                        markerStart={arrow === 'both' ? 'url(#graph-arrow)' : undefined}
+                      />
+                      {label && labelPos && (
+                        <g transform={`translate(${labelPos.mx}, ${labelPos.my}) rotate(${labelPos.angle})`}>
+                          <rect
+                            x={-labelWidth / 2}
+                            y={-9}
+                            width={labelWidth}
+                            height={18}
+                            rx={4}
+                            className="graph-edge-label-bg"
+                          />
+                          <text textAnchor="middle" dy="4" className="graph-edge-label-text">{label}</text>
+                        </g>
+                      )}
+                    </g>
                   )
                 })}
               </svg>
@@ -578,6 +618,15 @@ export default function GraphEditor() {
                 <select value={edgeKind} onChange={event => setEdgeKind(event.target.value)}>
                   {EDGE_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                 </select>
+                <select value={edgeArrowStyle} onChange={event => setEdgeArrowStyle(event.target.value)}>
+                  {ARROW_STYLES.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Texte affiche sur le lien (optionnel)"
+                  value={edgeLabel}
+                  onChange={event => setEdgeLabel(event.target.value)}
+                />
                 <select value={linkTarget} onChange={event => setLinkTarget(event.target.value)}>
                   <option value="">Choisir une carte</option>
                   {graph.nodes
@@ -593,8 +642,21 @@ export default function GraphEditor() {
                   const label = EDGE_TYPES.find(type => type.value === edge.type)?.label || 'relie'
                   return (
                     <div key={edge.id} className="graph-edge-row">
-                      <span>{edge.from === selectedNode.id ? label : 'vient de'} {other?.title || 'Carte'}</span>
-                      <button type="button" onClick={() => deleteEdge(edge.id)}>Retirer</button>
+                      <div className="graph-edge-row-top">
+                        <span>{edge.from === selectedNode.id ? label : 'vient de'} {other?.title || 'Carte'}</span>
+                        <button type="button" onClick={() => deleteEdge(edge.id)}>Retirer</button>
+                      </div>
+                      <div className="graph-edge-row-controls">
+                        <select value={edge.arrow || 'end'} onChange={event => updateEdge(edge.id, { arrow: event.target.value })}>
+                          {ARROW_STYLES.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Texte du lien"
+                          value={edge.label || ''}
+                          onChange={event => updateEdge(edge.id, { label: event.target.value })}
+                        />
+                      </div>
                     </div>
                   )
                 })}
@@ -668,6 +730,8 @@ function normalizeGraph(graph) {
         from: String(edge.from),
         to: String(edge.to),
         type: EDGE_TYPES.some(type => type.value === edge.type) ? edge.type : 'relates',
+        arrow: ARROW_STYLES.some(style => style.value === edge.arrow) ? edge.arrow : 'end',
+        label: String(edge.label || ''),
       })),
   }
 }
@@ -704,6 +768,31 @@ function makeId() {
 
 function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+// Point d'intersection entre le rectangle du noeud et le segment reliant
+// son centre a un point cible : donne le point du bord le plus proche de
+// l'autre extremite du lien, quelle que soit la position relative des noeuds.
+function getBorderPoint(node, width, height, targetX, targetY) {
+  const cx = node.x + width / 2
+  const cy = node.y + height / 2
+  const dx = targetX - cx
+  const dy = targetY - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const halfW = width / 2
+  const halfH = height / 2
+  const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity
+  const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity
+  const scale = Math.min(scaleX, scaleY)
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
+function edgeLabelTransform(x1, y1, x2, y2) {
+  const mx = (x1 + x2) / 2
+  const my = (y1 + y2) / 2
+  let angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI)
+  if (angle > 90 || angle < -90) angle += 180
+  return { mx, my, angle }
 }
 
 function clampZoom(value) {
