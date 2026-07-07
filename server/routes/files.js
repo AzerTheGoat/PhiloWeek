@@ -191,21 +191,49 @@ router.post('/:id/unlock', async (req, res) => {
   const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
-  const decrypted = children.map(child => {
-    if (!child.encrypted_content) return child
-    try {
-      const iv = Buffer.from(child.encrypted_content.slice(0, 32), 'hex')
-      const ciphertext = child.encrypted_content.slice(32)
-      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
-      let plain = decipher.update(ciphertext, 'hex', 'utf8')
-      plain += decipher.final('utf8')
-      return { ...child, content: plain, encrypted_content: undefined }
-    } catch {
-      return { ...child, content: '[Decryption error]' }
+  let decrypted
+  try {
+    decrypted = children.map(child => {
+      if (!child.encrypted_content) return child
+      try {
+        const iv = Buffer.from(child.encrypted_content.slice(0, 32), 'hex')
+        const ciphertext = child.encrypted_content.slice(32)
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+        let plain = decipher.update(ciphertext, 'hex', 'utf8')
+        plain += decipher.final('utf8')
+        return { ...child, content: plain, encrypted_content: null }
+      } catch {
+        throw new Error(`Could not decrypt "${child.name}"`)
+      }
+    })
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unlock failed' })
+  }
+
+  const unlockTx = db.transaction(() => {
+    db.prepare(
+      "UPDATE files SET type = 'folder', password_hash = NULL, updated_at = ? WHERE id = ?"
+    ).run(new Date().toISOString(), req.params.id)
+
+    const updateChild = db.prepare(
+      'UPDATE files SET content = ?, encrypted_content = NULL, updated_at = ? WHERE id = ?'
+    )
+    for (const child of decrypted) {
+      if (child.content === undefined || child.content === null) continue
+      updateChild.run(child.content, new Date().toISOString(), child.id)
+      updateTags(db, child.id, child.content)
+      updateLinks(db, child.id, child.content)
     }
+    updateAllLinks(db)
   })
 
-  res.json(decrypted)
+  try {
+    unlockTx()
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unlock failed' })
+  }
+
+  res.json({ ok: true, children: decrypted })
 })
 
 // POST /api/files/:id/lock

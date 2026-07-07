@@ -164,6 +164,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     e.preventDefault()
     try {
       await api.unlockFolder(node.id, password)
+      await loadTree()
       setExpanded(true)
       setUnlocking(false)
       toast('Dossier déverrouillé')
@@ -171,7 +172,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       toast('Mot de passe incorrect', 'error')
     }
     setPassword('')
-  }, [node.id, password, toast])
+  }, [node.id, password, loadTree, toast])
 
   const icon = isLocked ? '🔒' : isFolder ? (expanded ? '▾' : '▸') : '📄'
 
