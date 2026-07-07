@@ -113,6 +113,19 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
+  const practices = db.prepare('SELECT * FROM agenda_practices WHERE user_id = ? ORDER BY created_at ASC').all(req.user.id)
+  const agendaChecks = db.prepare('SELECT * FROM agenda_checks WHERE user_id = ? ORDER BY entry_date ASC').all(req.user.id)
+  const lifeProfile = db.prepare('SELECT * FROM life_profiles WHERE user_id = ?').get(req.user.id)
+  if (practices.length > 0 || agendaChecks.length > 0 || lifeProfile) {
+    zip.file('_Opuscule/Dashboard.json', JSON.stringify({
+      philoweek_type: 'dashboard',
+      exported: new Date().toISOString(),
+      practices,
+      checks: agendaChecks,
+      life_profile: lifeProfile || null,
+    }, null, 2))
+  }
+
   const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   if (questionnaireResults.length > 0) {
     zip.file('_Opuscule/QuestionnaireResults.json', JSON.stringify({

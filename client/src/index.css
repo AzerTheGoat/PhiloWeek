@@ -4337,6 +4337,32 @@ kbd {
   background: var(--accent-dim);
 }
 
+.todos-dashboard-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+
+.todos-dashboard-tabs button,
+.life-unit-toggle button {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.todos-dashboard-tabs button.active,
+.life-unit-toggle button.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-hover);
+}
+
 .todo-form {
   display: none;
   flex-direction: column;
@@ -4580,6 +4606,257 @@ kbd {
   gap: 8px;
 }
 
+.agenda-dashboard,
+.life-dashboard {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.25fr);
+  gap: 0;
+}
+
+.agenda-today,
+.agenda-chart-panel,
+.agenda-practices-panel,
+.life-config-panel,
+.life-grid-panel {
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.agenda-practices-panel,
+.life-grid-panel {
+  border-right: none;
+}
+
+.agenda-practices-panel {
+  grid-column: 1 / -1;
+}
+
+.agenda-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.agenda-section-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.agenda-section-head span,
+.agenda-section-head strong {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.practice-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.practice-color-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.practice-color-row button {
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--practice-color);
+}
+
+.practice-color-row button.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--practice-color) 34%, transparent);
+}
+
+.practice-check-list,
+.practice-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.practice-check {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  text-align: left;
+}
+
+.practice-check span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 2px solid var(--practice-color);
+  border-radius: 999px;
+  color: var(--practice-color);
+  font-weight: 800;
+}
+
+.practice-check.done {
+  background: color-mix(in srgb, var(--practice-color) 11%, var(--bg-elevated));
+  border-color: var(--practice-color);
+}
+
+.agenda-bars {
+  height: 210px;
+  display: grid;
+  grid-template-columns: repeat(28, minmax(4px, 1fr));
+  align-items: end;
+  gap: 4px;
+  padding: 8px 0 0;
+}
+
+.agenda-bar-wrap {
+  height: 100%;
+  display: flex;
+  align-items: end;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.agenda-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 999px 999px 0 0;
+  background: var(--accent);
+}
+
+.practice-manage-card {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.practice-manage-card.archived {
+  opacity: 0.65;
+}
+
+.practice-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--practice-color);
+}
+
+.practice-manage-card strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.practice-manage-card span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.practice-manage-card button {
+  color: var(--accent-hover);
+  font-size: 12px;
+}
+
+.life-dashboard {
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+}
+
+.life-config-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.life-config-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.life-unit-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.life-grid-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.life-grid-summary strong {
+  font-size: 16px;
+}
+
+.life-grid-summary span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.life-dot-grid {
+  display: grid;
+  gap: 3px;
+}
+
+.life-dot-grid.week {
+  grid-template-columns: repeat(auto-fill, minmax(7px, 1fr));
+}
+
+.life-dot-grid.month {
+  grid-template-columns: repeat(auto-fill, minmax(10px, 1fr));
+}
+
+.life-dot-grid span {
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: var(--bg-hover);
+}
+
+.life-dot-grid span.lived {
+  background: #050505;
+}
+
+[data-theme="light"] .life-dot-grid span.lived {
+  background: #111;
+}
+
+.life-dot-grid span.current {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
 @media (max-width: 900px) {
   .life-layout {
     grid-template-columns: 1fr;
@@ -4598,6 +4875,19 @@ kbd {
   .todo-deadline {
     grid-column: 2;
     align-items: flex-start;
+  }
+
+  .agenda-dashboard,
+  .life-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-today,
+  .agenda-chart-panel,
+  .agenda-practices-panel,
+  .life-config-panel,
+  .life-grid-panel {
+    border-right: none;
   }
 }
 
@@ -4621,6 +4911,32 @@ kbd {
 
   .todo-card {
     padding: 12px;
+  }
+
+  .todos-dashboard-tabs {
+    overflow-x: auto;
+  }
+
+  .agenda-today,
+  .agenda-chart-panel,
+  .agenda-practices-panel,
+  .life-config-panel,
+  .life-grid-panel {
+    padding: 12px;
+  }
+
+  .agenda-bars {
+    height: 150px;
+    gap: 3px;
+  }
+
+  .practice-manage-card {
+    grid-template-columns: 16px minmax(0, 1fr);
+  }
+
+  .practice-manage-card button {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .todo-reminder-backdrop {

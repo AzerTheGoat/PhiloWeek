@@ -224,6 +224,42 @@ const MIGRATIONS = [
         ON todos(user_id, status, due_at);
     `)
   },
+  // v5 -> v6 : dashboard quotidien, pratiques evolutives et grille de vie
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agenda_practices (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#6ba3e8',
+        active INTEGER NOT NULL DEFAULT 1,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        archived_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS agenda_checks (
+        practice_id TEXT NOT NULL REFERENCES agenda_practices(id) ON DELETE CASCADE,
+        entry_date TEXT NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (user_id, practice_id, entry_date)
+      );
+
+      CREATE TABLE IF NOT EXISTS life_profiles (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        birth_date TEXT,
+        life_expectancy_years INTEGER NOT NULL DEFAULT 85,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agenda_practices_user_active
+        ON agenda_practices(user_id, active, created_at);
+      CREATE INDEX IF NOT EXISTS idx_agenda_checks_user_date
+        ON agenda_checks(user_id, entry_date);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

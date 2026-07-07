@@ -57,6 +57,9 @@ voice_notes  — id, file_id, filename, duration_seconds, title, user_id
 quotes       — id, quote, author, source, notes, tags, user_id, created_at, updated_at
 fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
 todos        — id, title, notes, status (open/done), due_at, user_id, created_at, updated_at, completed_at
+agenda_practices — id, title, color, active, user_id, created_at, updated_at, archived_at
+agenda_checks — practice_id, entry_date, done, user_id, updated_at
+life_profiles — user_id, birth_date, life_expectancy_years, updated_at
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
@@ -150,10 +153,13 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Todo
 
-- La vue `Todo` est accessible depuis la sidebar et la navigation mobile.
+- La vue `Todo` est accessible depuis la sidebar et la navigation mobile; elle fonctionne comme un petit dashboard avec les onglets `Taches`, `Agenda` et `Vie`.
 - Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
+- L'onglet `Agenda` permet de créer des pratiques quotidiennes, de les cocher par jour, de les archiver/reprendre, et d'afficher une évolution sur les derniers jours.
+- L'onglet `Vie` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points déjà vécus.
 - À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
 - L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.
+- L'export Obsidian ajoute aussi `_Opuscule/Dashboard.json` avec `philoweek_type: dashboard` pour les pratiques, coches d'agenda et le profil de vie; l'import recrée ces données.
 
 ## Graphes d'idées
 

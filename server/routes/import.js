@@ -68,6 +68,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           id, title, notes, status, due_at, user_id, created_at, updated_at, completed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertPractice = db.prepare(
+        `INSERT OR IGNORE INTO agenda_practices (
+          id, title, color, active, user_id, created_at, updated_at, archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      const insertAgendaCheck = db.prepare(
+        `INSERT OR REPLACE INTO agenda_checks (
+          practice_id, entry_date, done, user_id, updated_at
+        ) VALUES (?, ?, ?, ?, ?)`
+      )
+      const upsertLifeProfile = db.prepare(
+        `INSERT INTO life_profiles (user_id, birth_date, life_expectancy_years, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id)
+         DO UPDATE SET birth_date = excluded.birth_date, life_expectancy_years = excluded.life_expectancy_years, updated_at = excluded.updated_at`
+      )
       const insertQuestionnaireResult = db.prepare(
         `INSERT OR IGNORE INTO questionnaire_results (
           id, question_key, questionnaire_file_id, questionnaire_title, question_id,
@@ -121,6 +137,52 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 todo.created_at || now,
                 todo.updated_at || now,
                 status === 'done' ? (todo.completed_at || now) : null
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'dashboard') {
+            const now = new Date().toISOString()
+            const practices = Array.isArray(jsonSpecial.practices) ? jsonSpecial.practices : []
+            const knownPracticeIds = new Set()
+            for (const practice of practices) {
+              const title = String(practice.title || '').trim()
+              if (!title) continue
+              const id = practice.id || uuidv4()
+              knownPracticeIds.add(id)
+              insertPractice.run(
+                id,
+                title,
+                normalizeColor(practice.color),
+                practice.active ? 1 : 0,
+                req.user.id,
+                practice.created_at || now,
+                practice.updated_at || now,
+                practice.active ? null : (practice.archived_at || now)
+              )
+              report.imported++
+            }
+            const checks = Array.isArray(jsonSpecial.checks) ? jsonSpecial.checks : []
+            for (const check of checks) {
+              const entryDate = normalizeDueDate(check.entry_date)
+              if (!check.practice_id || !entryDate || !knownPracticeIds.has(check.practice_id)) continue
+              insertAgendaCheck.run(
+                check.practice_id,
+                entryDate,
+                check.done ? 1 : 0,
+                req.user.id,
+                check.updated_at || now
+              )
+              report.imported++
+            }
+            if (jsonSpecial.life_profile) {
+              upsertLifeProfile.run(
+                req.user.id,
+                normalizeDueDate(jsonSpecial.life_profile.birth_date),
+                clampInt(jsonSpecial.life_profile.life_expectancy_years, 1, 130, 85),
+                jsonSpecial.life_profile.updated_at || now
               )
               report.imported++
             }
@@ -354,4 +416,15 @@ function matchLine(text, label) {
 function normalizeDueDate(value) {
   const text = String(value || '').trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
+}
+
+function normalizeColor(value) {
+  const color = String(value || '').trim()
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : '#6ba3e8'
+}
+
+function clampInt(value, min, max, fallback) {
+  const next = Number(value)
+  if (!Number.isFinite(next)) return fallback
+  return Math.min(max, Math.max(min, Math.round(next)))
 }

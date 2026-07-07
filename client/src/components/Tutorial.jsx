@@ -122,8 +122,8 @@ const SECTIONS = [
       },
       {
         icon: 'synthesis',
-        title: 'Todo & dates limites',
-        text: "Ajoute des tâches avec une date limite max. À l'ouverture de l'app, une fois par jour, un rappel affiche les tâches ouvertes et leurs échéances.",
+        title: 'Dashboard Todo',
+        text: "Ajoute des tâches avec une date limite, coche tes pratiques du jour, suis l'évolution avec des barres, et affiche ta grille de vie en semaines ou en mois.",
       },
     ],
   },
