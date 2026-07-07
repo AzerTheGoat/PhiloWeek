@@ -8,6 +8,7 @@ import Journal from './components/Journal'
 import Timer from './components/Timer'
 import InboxPage from './components/InboxPage'
 import LifePage from './components/LifePage'
+import KnowledgeGraph from './components/KnowledgeGraph'
 import Tutorial from './components/Tutorial'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
@@ -74,6 +75,8 @@ function AppShell() {
           <InboxPage />
         ) : view === 'life' ? (
           <LifePage />
+        ) : view === 'knowledge-graph' ? (
+          <KnowledgeGraph />
         ) : view === 'tutorial' ? (
           <Tutorial />
         ) : currentFile ? (
@@ -83,7 +86,7 @@ function AppShell() {
         )}
       </main>
 
-      {showAI && view !== 'inbox' && view !== 'life' && <AIPanel />}
+      {showAI && view !== 'inbox' && view !== 'life' && view !== 'knowledge-graph' && <AIPanel />}
 
       {showFilePicker && <FilePicker />}
       {showQuizLauncher && <GlobalQuizLauncher />}
@@ -103,6 +106,7 @@ function MobileNav() {
     { key: 'editor', label: 'Éditer', icon: 'edit', active: view === 'editor' && !showAI && !sidebarOpen, action: () => dispatch({ type: 'SET_VIEW', payload: 'editor' }) },
     { key: 'journal', label: 'Journal', icon: 'journal', active: view === 'journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'journal' }) },
     { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
+    { key: 'graph', label: 'Graphe', icon: 'graph', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { key: 'timer', label: 'Timer', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { key: 'ai', label: 'IA', icon: 'ai', active: showAI, action: () => dispatch({ type: 'TOGGLE_AI' }) },
     { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },

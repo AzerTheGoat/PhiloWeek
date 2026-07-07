@@ -23,6 +23,7 @@ app.use('/api/timer', require('./routes/timer'))
 app.use('/api/inbox', require('./routes/inbox'))
 app.use('/api/life', require('./routes/life'))
 app.use('/api/questionnaires', require('./routes/questionnaires'))
+app.use('/api/knowledge-graph', require('./routes/knowledgeGraph'))
 
 // Serve built React app
 const clientBuild = path.join(__dirname, 'public')

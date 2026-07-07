@@ -13,7 +13,7 @@ const init = {
   tree: [],
   openFileId: null,
   openFile: null,
-  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life'
+  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'knowledge-graph'
   theme: localStorage.getItem('pw-theme') || 'dark',
   showAI: AI_PANEL_OPEN_BY_DEFAULT && !isMobileViewport(),
   sidebarOpen: !isMobileViewport(),

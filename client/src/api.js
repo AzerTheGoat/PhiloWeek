@@ -91,6 +91,11 @@ export const saveQuestionnaireResult = data => req('POST', '/questionnaires/resu
 export const getQuestionnaireResults = () => req('GET', '/questionnaires/results')
 export const getLinkedQuestionnaires = fileId => req('GET', `/questionnaires/linked/${fileId}`)
 
+// Knowledge graph
+export const getKnowledgeGraph = () => req('GET', '/knowledge-graph')
+export const getKnowledgeGraphReferences = fileId => req('GET', `/knowledge-graph/${fileId}/references`)
+export const copyKnowledgeGraphBundle = data => req('POST', '/knowledge-graph/copy', data)
+
 // Timer
 export const getTimerSessions = file_id =>
   req('GET', `/timer${file_id ? `?file_id=${file_id}` : ''}`)

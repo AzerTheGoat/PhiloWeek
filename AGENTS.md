@@ -147,6 +147,15 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La largeur et la hauteur des blocs sont configurables depuis l'inspecteur du graphe.
 - Ces réglages sont stockés dans le JSON du fichier graphe pour rester compatibles avec l'export/import Obsidian.
 
+## Graphe de la base
+
+- La vue `Graphe de la base` est accessible depuis la sidebar avec le bouton `Base` et affiche tous les fichiers lisibles comme noeuds.
+- Les liens affiches viennent des `[[wiki-links]]` stockes dans `file_links` et des questionnaires JSON via `source_paths`.
+- Cette vue ne cree pas de table dediee : elle reconstruit le reseau depuis les fichiers existants pour rester compatible avec l'export/import Obsidian.
+- Cliquer sur un noeud ouvre un inspecteur avec les appels entrants : fichiers qui contiennent le lien wiki vers ce noeud, plus questionnaires qui l'utilisent comme source.
+- Les appels wiki affichent le paragraphe de contexte ou le lien apparait; les appels questionnaire affichent le questionnaire source.
+- L'inspecteur permet d'ouvrir le fichier selectionne et de copier tout ce qui est lie au noeud jusqu'a une profondeur choisie, avec les memes familles de preprompts que le panneau `Copier`.
+
 ## Questionnaires JSON
 
 - La sidebar permet de creer un `Quiz`, stocke comme fichier `.json`.

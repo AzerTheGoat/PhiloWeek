@@ -71,6 +71,13 @@ export default function Sidebar() {
           >
             <Icon name="life" />
           </button>
+          <button
+            title="Graphe de la base"
+            className={`icon-btn ${view === 'knowledge-graph' ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })}
+          >
+            <Icon name="graph" />
+          </button>
           <button title="Timer" className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timer' })}>
             <Icon name="timer" />
           </button>
@@ -145,6 +152,9 @@ export default function Sidebar() {
         </button>
         <button className="footer-btn" onClick={() => showModal('new-folder', {})} title="Nouveau dossier">
           <Icon name="folder" size={16} /> Dossier
+        </button>
+        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })} title="Voir le graphe de la base">
+          <Icon name="graph" size={16} /> Base
         </button>
         <button className="footer-btn" onClick={api.exportObsidian} title="Exporter vault Obsidian">
           <Icon name="download" size={16} /> Export

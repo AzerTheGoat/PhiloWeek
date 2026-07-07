@@ -57,6 +57,16 @@ const SECTIONS = [
     items: [
       {
         icon: 'graph',
+        title: 'Graphe de la base',
+        text: "Le bouton Base affiche tous les fichiers, questionnaires et graphes comme un reseau navigable. Clique un noeud pour voir les fichiers qui l'appellent, avec le paragraphe de contexte.",
+      },
+      {
+        icon: 'copy',
+        title: "Copier autour d'un noeud",
+        text: "Depuis le graphe de la base, choisis une profondeur et un preprompt pour copier le fichier selectionne avec tout ce qui lui est lie.",
+      },
+      {
+        icon: 'graph',
         title: 'Cartes & liens typés',
         text: "Crée des cartes (Idée, Objectif, Question, Ressource) et relie-les avec des liens typés (relie, soutient, bloque, mène vers).",
       },
