@@ -56,6 +56,7 @@ timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
 voice_notes  — id, file_id, filename, duration_seconds, title, user_id
 quotes       — id, quote, author, source, notes, tags, user_id, created_at, updated_at
 fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
+todos        — id, title, notes, status (open/done), due_at, user_id, created_at, updated_at, completed_at
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
@@ -147,6 +148,13 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Stockées dans la table `fact_checks` avec un `status` : `to_check` (par défaut), `true`, `false`, `partial`. Le statut se change directement depuis la carte (select inline), pas besoin de rouvrir un formulaire.
 - L'export Obsidian ajoute les entrées dans `_Opuscule/FactChecks.md` avec `philoweek_type: fact_checks` (même format bloc-quote que les citations, plus une ligne `Statut:`); l'import recrée les entrées et remappe le libellé du statut vers sa valeur (`A verifier` → `to_check`, etc.).
 
+## Todo
+
+- La vue `Todo` est accessible depuis la sidebar et la navigation mobile.
+- Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
+- À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
+- L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.
+
 ## Graphes d'idées
 
 - Les fichiers graphes sont des fichiers `.md` avec `philoweek_type: graph` et un bloc JSON `philoweek-graph`.
@@ -191,5 +199,5 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers en tiroirs plein ecran.
 - Sur mobile, la sidebar n'est pas ouverte par defaut. Ouvrir une note referme automatiquement la sidebar.
 - Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
-- Les vues Editeur, Journal, Timer, Inbox et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
+- Les vues Editeur, Journal, Timer, Inbox, Todo et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
 - Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.

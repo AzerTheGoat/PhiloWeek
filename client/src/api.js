@@ -91,6 +91,13 @@ export const getFactChecks = () => req('GET', '/life/fact-checks')
 export const createFactCheck = data => req('POST', '/life/fact-checks', data)
 export const updateFactCheck = (id, data) => req('PUT', `/life/fact-checks/${id}`, data)
 export const deleteFactCheck = id => req('DELETE', `/life/fact-checks/${id}`)
+
+// Todos
+export const getTodos = (status = 'open') => req('GET', `/todos?status=${encodeURIComponent(status)}`)
+export const getTodoReminder = () => req('GET', '/todos/reminder')
+export const createTodo = data => req('POST', '/todos', data)
+export const updateTodo = (id, data) => req('PUT', `/todos/${id}`, data)
+export const deleteTodo = id => req('DELETE', `/todos/${id}`)
 // Questionnaires
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)

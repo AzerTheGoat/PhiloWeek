@@ -10,7 +10,7 @@ const init = {
   tree: [],
   openFileId: null,
   openFile: null,
-  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'knowledge-graph'
+  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'knowledge-graph'
   theme: localStorage.getItem('pw-theme') || 'dark',
   sidebarOpen: !isMobileViewport(),
   toasts: [],

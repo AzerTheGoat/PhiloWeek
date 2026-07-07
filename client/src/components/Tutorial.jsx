@@ -120,6 +120,11 @@ const SECTIONS = [
         title: 'Timer de travail',
         text: 'Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion) et consulte tes totaux du jour et l\'historique complet.',
       },
+      {
+        icon: 'synthesis',
+        title: 'Todo & dates limites',
+        text: "Ajoute des tâches avec une date limite max. À l'ouverture de l'app, une fois par jour, un rappel affiche les tâches ouvertes et leurs échéances.",
+      },
     ],
   },
   {

@@ -142,6 +142,9 @@ export default function Sidebar() {
         <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })} title="Voir le graphe de la base">
           <Icon name="graph" size={16} /> Base
         </button>
+        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'todos' })} title="Todos et dates limites">
+          <Icon name="synthesis" size={16} /> Todo
+        </button>
         <button className="footer-btn" onClick={api.exportObsidian} title="Exporter vault Obsidian">
           <Icon name="download" size={16} /> Export
         </button>

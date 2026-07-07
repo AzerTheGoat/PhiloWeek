@@ -205,6 +205,25 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_fact_checks_status ON fact_checks(status);
     `)
   },
+  // v4 -> v5 : section Todo avec date limite et rappel quotidien côté app
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS todos (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'done')),
+        due_at TEXT NOT NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        completed_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_todos_user_status_due
+        ON todos(user_id, status, due_at);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

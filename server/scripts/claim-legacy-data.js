@@ -12,7 +12,7 @@
 
 const { getDb, backupDb } = require('../db')
 
-const TABLES = ['files', 'timer_sessions', 'voice_notes', 'inbox_resources', 'inbox_ideas', 'quotes', 'questionnaire_results']
+const TABLES = ['files', 'timer_sessions', 'voice_notes', 'inbox_resources', 'inbox_ideas', 'quotes', 'questionnaire_results', 'fact_checks', 'todos']
 
 async function main() {
   const username = process.argv[2]

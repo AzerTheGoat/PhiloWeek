@@ -5,9 +5,10 @@ const matter = require('gray-matter')
 const { getDb } = require('../db')
 
 router.get('/obsidian', async (req, res) => {
-  const db = getDb()
-  const zip = new JSZip()
-  const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? ORDER BY type DESC, sort_order, name').all(req.user.id)
+  try {
+    const db = getDb()
+    const zip = new JSZip()
+    const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? ORDER BY type DESC, sort_order, name').all(req.user.id)
 
   const pathMap = {}
   function getPath(id) {
@@ -37,8 +38,12 @@ router.get('/obsidian', async (req, res) => {
 
     if (/\.md$/i.test(file.name)) {
       let parsed
+      let parsedMatter = true
       try { parsed = matter(rawContent) }
-      catch (_) { parsed = { data: {}, content: rawContent } }
+      catch (_) {
+        parsedMatter = false
+        parsed = { data: {}, content: rawContent }
+      }
 
       const tags = db.prepare('SELECT tag FROM file_tags WHERE file_id = ?').all(file.id).map(r => r.tag)
 
@@ -50,7 +55,9 @@ router.get('/obsidian', async (req, res) => {
         modified: file.updated_at
       }
 
-      const finalContent = matter.stringify(parsed.content, frontmatter)
+      const finalContent = parsedMatter
+        ? safeMatterStringify(parsed.content, frontmatter)
+        : rawContent
       const zipPath = originalPath.replace(/\.md$/i, '') + '.md'
       zip.file(zipPath, finalContent)
     } else {
@@ -70,7 +77,7 @@ router.get('/obsidian', async (req, res) => {
       return `> ${q.quote.replace(/\n/g, '\n> ')}\n\n${meta}${q.notes ? `\n\nNotes:\n${q.notes}` : ''}`
     }).join('\n\n---\n\n')
 
-    zip.file('_Opuscule/Citations.md', matter.stringify(body, {
+    zip.file('_Opuscule/Citations.md', safeMatterStringify(body, {
       title: 'Citations',
       philoweek_type: 'quotes',
       exported: new Date().toISOString(),
@@ -90,11 +97,20 @@ router.get('/obsidian', async (req, res) => {
       return `> ${f.claim.replace(/\n/g, '\n> ')}\n\n${meta}${f.notes ? `\n\nNotes:\n${f.notes}` : ''}`
     }).join('\n\n---\n\n')
 
-    zip.file('_Opuscule/FactChecks.md', matter.stringify(body, {
+    zip.file('_Opuscule/FactChecks.md', safeMatterStringify(body, {
       title: 'Fact Check',
       philoweek_type: 'fact_checks',
       exported: new Date().toISOString(),
     }))
+  }
+
+  const todos = db.prepare('SELECT * FROM todos WHERE user_id = ? ORDER BY status ASC, due_at ASC, created_at DESC').all(req.user.id)
+  if (todos.length > 0) {
+    zip.file('_Opuscule/Todos.json', JSON.stringify({
+      philoweek_type: 'todos',
+      exported: new Date().toISOString(),
+      todos,
+    }, null, 2))
   }
 
   const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
@@ -110,7 +126,34 @@ router.get('/obsidian', async (req, res) => {
   const date = new Date().toISOString().slice(0, 10)
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="opuscule-vault-${date}.zip"`)
-  res.send(buffer)
+    res.send(buffer)
+  } catch (err) {
+    console.error('Export Obsidian error:', err)
+    if (res.headersSent) return res.end()
+    res.status(500).json({ error: "Export impossible. Un fichier n'a pas pu etre prepare." })
+  }
 })
+
+function safeMatterStringify(content, frontmatter) {
+  try {
+    return matter.stringify(content, frontmatter)
+  } catch (_) {
+    return `${manualFrontmatter(frontmatter)}\n\n${String(content || '')}`
+  }
+}
+
+function manualFrontmatter(data) {
+  const lines = Object.entries(data).map(([key, value]) => {
+    if (Array.isArray(value)) return `${key}: [${value.map(yamlScalar).join(', ')}]`
+    return `${key}: ${yamlScalar(value)}`
+  })
+  return `---\n${lines.join('\n')}\n---`
+}
+
+function yamlScalar(value) {
+  if (value === null || value === undefined) return '""'
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(String(value))
+}
 
 module.exports = router

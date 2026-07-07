@@ -63,6 +63,11 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         `INSERT INTO fact_checks (id, claim, status, notes, source, tags, user_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertTodo = db.prepare(
+        `INSERT OR IGNORE INTO todos (
+          id, title, notes, status, due_at, user_id, created_at, updated_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
       const insertQuestionnaireResult = db.prepare(
         `INSERT OR IGNORE INTO questionnaire_results (
           id, question_key, questionnaire_file_id, questionnaire_title, question_id,
@@ -92,6 +97,30 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
                 req.user.id,
                 result.created_at || new Date().toISOString()
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'todos') {
+            const todos = Array.isArray(jsonSpecial.todos) ? jsonSpecial.todos : []
+            for (const todo of todos) {
+              const title = String(todo.title || '').trim()
+              const dueAt = normalizeDueDate(todo.due_at)
+              if (!title || !dueAt) continue
+              const status = todo.status === 'done' ? 'done' : 'open'
+              const now = new Date().toISOString()
+              insertTodo.run(
+                todo.id || uuidv4(),
+                title,
+                todo.notes || null,
+                status,
+                dueAt,
+                req.user.id,
+                todo.created_at || now,
+                todo.updated_at || now,
+                status === 'done' ? (todo.completed_at || now) : null
               )
               report.imported++
             }
@@ -320,4 +349,9 @@ function matchLine(text, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = String(text || '').match(new RegExp(`^${escaped}:\\s*(.+)$`, 'm'))
   return match ? match[1].trim() : null
+}
+
+function normalizeDueDate(value) {
+  const text = String(value || '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
 }
