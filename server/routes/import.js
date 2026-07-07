@@ -47,23 +47,23 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     const importTx = db.transaction(() => {
       const insertFolder = db.prepare(
-        "INSERT INTO files (id, parent_id, name, type, created_at, updated_at) VALUES (?, ?, ?, 'folder', datetime('now'), datetime('now'))"
+        "INSERT INTO files (id, parent_id, name, type, user_id, created_at, updated_at) VALUES (?, ?, ?, 'folder', ?, datetime('now'), datetime('now'))"
       )
       const insertFile = db.prepare(
-        "INSERT INTO files (id, parent_id, name, type, content, created_at, updated_at) VALUES (?, ?, ?, 'file', ?, datetime('now'), datetime('now'))"
+        "INSERT INTO files (id, parent_id, name, type, content, user_id, created_at, updated_at) VALUES (?, ?, ?, 'file', ?, ?, datetime('now'), datetime('now'))"
       )
       const updateFile = db.prepare(
         "UPDATE files SET content = ?, updated_at = datetime('now') WHERE id = ?"
       )
       const insertQuote = db.prepare(
-        `INSERT INTO quotes (id, quote, author, source, notes, tags, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO quotes (id, quote, author, source, notes, tags, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       const insertQuestionnaireResult = db.prepare(
         `INSERT OR IGNORE INTO questionnaire_results (
           id, question_key, questionnaire_file_id, questionnaire_title, question_id,
-          question_text, answer_text, expected_answer, correct, score, response_ms, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          question_text, answer_text, expected_answer, correct, score, response_ms, user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
 
       for (const { relativePath, rawContent } of decompressed) {
@@ -86,6 +86,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 result.correct ? 1 : 0,
                 Number.isFinite(Number(result.score)) ? Number(result.score) : (result.correct ? 1 : 0),
                 Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
+                req.user.id,
                 result.created_at || new Date().toISOString()
               )
               report.imported++
@@ -105,6 +106,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 quote.source,
                 quote.notes,
                 quote.tags,
+                req.user.id,
                 quote.created_at || now,
                 now
               )
@@ -123,13 +125,13 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             pathAccum = pathAccum ? pathAccum + '/' + dirName : dirName
             if (!pathToId[pathAccum]) {
               const existing = db.prepare(
-                "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder'"
-              ).get(dirName, parentId)
+                "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ?"
+              ).get(dirName, parentId, req.user.id)
               if (existing) {
                 pathToId[pathAccum] = existing.id
               } else {
                 const id = uuidv4()
-                insertFolder.run(id, parentId, dirName)
+                insertFolder.run(id, parentId, dirName, req.user.id)
                 pathToId[pathAccum] = id
               }
             }
@@ -137,8 +139,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
 
           const existing = db.prepare(
-            'SELECT id FROM files WHERE name = ? AND parent_id IS ?'
-          ).get(fileName, parentId)
+            'SELECT id FROM files WHERE name = ? AND parent_id IS ? AND user_id = ?'
+          ).get(fileName, parentId, req.user.id)
 
           let fileId
           if (existing) {
@@ -149,11 +151,11 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             } else {
               const newName = fileName.replace(/\.md$/i, '') + `-import-${Date.now()}.md`
               fileId = uuidv4()
-              insertFile.run(fileId, parentId, newName, rawContent)
+              insertFile.run(fileId, parentId, newName, rawContent, req.user.id)
             }
           } else {
             fileId = uuidv4()
-            insertFile.run(fileId, parentId, fileName, rawContent)
+            insertFile.run(fileId, parentId, fileName, rawContent, req.user.id)
           }
 
           pathToId[relativePath] = fileId
@@ -168,7 +170,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     importTx()
 
     // Phase 4: resolve [[links]] — one query to get all files with content
-    const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file'").all()
+    const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file' AND user_id = ?").all(req.user.id)
     const nameToId = {}
     allFiles.forEach(f => {
       nameToId[f.name] = f.id

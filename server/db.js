@@ -134,6 +134,58 @@ const MIGRATIONS = [
         ON questionnaire_results(created_at);
     `)
   },
+  // v2 → v3 : authentification (users, sessions) + isolation multi-utilisateur
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Unicité insensible à la casse au niveau SQLite (ferme la race
+      -- condition TOCTOU entre le check applicatif et l'INSERT).
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase
+        ON users(username COLLATE NOCASE);
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL,
+        user_agent TEXT,
+        last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+    `)
+
+    // user_id nullable partout : les données créées avant l'auth restent
+    // orphelines (NULL) jusqu'au rattachement manuel via
+    // server/scripts/claim-legacy-data.js — jamais d'attribution automatique
+    // au premier compte inscrit (risque réel puisque l'inscription est ouverte).
+    addColumnIfMissing(db, 'files', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'timer_sessions', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'voice_notes', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'inbox_resources', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'inbox_ideas', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'quotes', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+    addColumnIfMissing(db, 'questionnaire_results', 'user_id', "TEXT REFERENCES users(id) ON DELETE CASCADE")
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
+      CREATE INDEX IF NOT EXISTS idx_timer_sessions_user_id ON timer_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_voice_notes_user_id ON voice_notes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_inbox_resources_user_id ON inbox_resources(user_id);
+      CREATE INDEX IF NOT EXISTS idx_inbox_ideas_user_id ON inbox_ideas(user_id);
+      CREATE INDEX IF NOT EXISTS idx_quotes_user_id ON quotes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_questionnaire_results_user_id ON questionnaire_results(user_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne
@@ -227,7 +279,7 @@ function updateTags(db, fileId, content) {
   for (const tag of tags) insertTag.run(fileId, tag)
 }
 
-function updateLinks(db, fileId, content) {
+function updateLinks(db, fileId, content, userId) {
   const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
   const linkTexts = new Set()
   let m
@@ -240,17 +292,19 @@ function updateLinks(db, fileId, content) {
 
   for (const linkText of linkTexts) {
     const nameWithExt = linkText.endsWith('.md') ? linkText : linkText + '.md'
+    // Filtré par user_id : un lien [[Nom]] ne doit jamais se résoudre vers
+    // le fichier d'un autre compte, même en cas d'homonymie.
     const target = db.prepare(
-      'SELECT id FROM files WHERE name = ? OR name = ? LIMIT 1'
-    ).get(nameWithExt, linkText)
+      'SELECT id FROM files WHERE (name = ? OR name = ?) AND user_id IS ? LIMIT 1'
+    ).get(nameWithExt, linkText, userId ?? null)
     if (target) insertLink.run(fileId, target.id, linkText)
   }
 }
 
-function updateAllLinks(db) {
-  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file'").all()
+function updateAllLinks(db, userId) {
+  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file' AND user_id IS ?").all(userId ?? null)
   const tx = db.transaction(() => {
-    for (const file of files) updateLinks(db, file.id, file.content || '')
+    for (const file of files) updateLinks(db, file.id, file.content || '', userId)
   })
   tx()
 }

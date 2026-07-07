@@ -1,4 +1,4 @@
-# PhiloWeek v2 — Instructions pour Codex
+# Opuscule v2 (PhiloWeek) — Instructions pour Codex
 
 ## Stack technique
 
@@ -131,7 +131,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - La vue `Vie` contient une bibliothèque de citations.
 - Les citations sont stockées dans la table `quotes` avec auteur, source, notes et tags.
-- L'export Obsidian ajoute les citations dans `_PhiloWeek/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
+- L'export Obsidian ajoute les citations dans `_Opuscule/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
 
 ## Graphes d'idées
 
@@ -165,7 +165,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Pendant une revision globale, le footer affiche seulement `Stop`; l'arret ou la fin de session affiche un score, un mini-rapport et les questions ratees a revoir.
 - Les resultats de revision sont stockes dans la table `questionnaire_results` avec date, reponse utilisateur, correction attendue et statut juste/faux.
 - Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
-- L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_PhiloWeek/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
+- L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_Opuscule/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
 - Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
 - Le panneau `Copier` contient aussi un bloc `Recap de periode` avec `Copier la derniere semaine` et une periode personnalisable; il copie les notes modifiees dans la periode avec un preprompt de synthese prudent.
 

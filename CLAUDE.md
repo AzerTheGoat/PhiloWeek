@@ -1,4 +1,4 @@
-# PhiloWeek v2 — Instructions pour Claude
+# Opuscule v2 (PhiloWeek) — Instructions pour Claude
 
 ## Stack technique
 

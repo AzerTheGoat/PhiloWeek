@@ -8,8 +8,8 @@ const { v4: uuidv4 } = require('uuid')
 router.get('/resources', (req, res) => {
   const db = getDb()
   const { status, type } = req.query
-  let sql = 'SELECT * FROM inbox_resources WHERE 1=1'
-  const params = []
+  let sql = 'SELECT * FROM inbox_resources WHERE user_id = ?'
+  const params = [req.user.id]
   if (status) { sql += ' AND status = ?'; params.push(status) }
   if (type) { sql += ' AND type = ?'; params.push(type) }
   sql += ' ORDER BY created_at DESC'
@@ -23,13 +23,15 @@ router.post('/resources', (req, res) => {
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(
-    "INSERT INTO inbox_resources (id, url, title, type, notes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'todo', ?, ?)"
-  ).run(id, url, title || null, type || 'article', notes || null, now, now)
-  res.status(201).json(db.prepare('SELECT * FROM inbox_resources WHERE id = ?').get(id))
+    "INSERT INTO inbox_resources (id, url, title, type, notes, status, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'todo', ?, ?, ?)"
+  ).run(id, url, title || null, type || 'article', notes || null, req.user.id, now, now)
+  res.status(201).json(db.prepare('SELECT * FROM inbox_resources WHERE id = ? AND user_id = ?').get(id, req.user.id))
 })
 
 router.put('/resources/:id', (req, res) => {
   const db = getDb()
+  const existing = db.prepare('SELECT id FROM inbox_resources WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!existing) return res.status(404).json({ error: 'Not found' })
   const { title, status, notes, type } = req.body
   const now = new Date().toISOString()
   const sets = ['updated_at = ?']
@@ -45,7 +47,7 @@ router.put('/resources/:id', (req, res) => {
 
 router.delete('/resources/:id', (req, res) => {
   const db = getDb()
-  db.prepare('DELETE FROM inbox_resources WHERE id = ?').run(req.params.id)
+  db.prepare('DELETE FROM inbox_resources WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
   res.json({ ok: true })
 })
 
@@ -53,7 +55,7 @@ router.delete('/resources/:id', (req, res) => {
 
 router.get('/ideas', (req, res) => {
   const db = getDb()
-  res.json(db.prepare('SELECT * FROM inbox_ideas ORDER BY created_at DESC').all())
+  res.json(db.prepare('SELECT * FROM inbox_ideas WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id))
 })
 
 router.post('/ideas', (req, res) => {
@@ -63,13 +65,15 @@ router.post('/ideas', (req, res) => {
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(
-    'INSERT INTO inbox_ideas (id, content, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, content.trim(), JSON.stringify(tags || []), now, now)
-  res.status(201).json(db.prepare('SELECT * FROM inbox_ideas WHERE id = ?').get(id))
+    'INSERT INTO inbox_ideas (id, content, tags, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, content.trim(), JSON.stringify(tags || []), req.user.id, now, now)
+  res.status(201).json(db.prepare('SELECT * FROM inbox_ideas WHERE id = ? AND user_id = ?').get(id, req.user.id))
 })
 
 router.put('/ideas/:id', (req, res) => {
   const db = getDb()
+  const existing = db.prepare('SELECT id FROM inbox_ideas WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!existing) return res.status(404).json({ error: 'Not found' })
   const { content, tags } = req.body
   const now = new Date().toISOString()
   const sets = ['updated_at = ?']
@@ -83,7 +87,7 @@ router.put('/ideas/:id', (req, res) => {
 
 router.delete('/ideas/:id', (req, res) => {
   const db = getDb()
-  db.prepare('DELETE FROM inbox_ideas WHERE id = ?').run(req.params.id)
+  db.prepare('DELETE FROM inbox_ideas WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
   res.json({ ok: true })
 })
 
@@ -92,10 +96,10 @@ router.post('/ideas/:id/send-to-file', (req, res) => {
   const { fileId } = req.body
   if (!fileId) return res.status(400).json({ error: 'fileId required' })
 
-  const idea = db.prepare('SELECT * FROM inbox_ideas WHERE id = ?').get(req.params.id)
+  const idea = db.prepare('SELECT * FROM inbox_ideas WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!idea) return res.status(404).json({ error: 'Idea not found' })
 
-  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(fileId)
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(fileId, req.user.id)
   if (!file) return res.status(404).json({ error: 'File not found' })
 
   const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })

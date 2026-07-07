@@ -7,7 +7,7 @@ const { getDb } = require('../db')
 router.get('/obsidian', async (req, res) => {
   const db = getDb()
   const zip = new JSZip()
-  const allFiles = db.prepare('SELECT * FROM files ORDER BY type DESC, sort_order, name').all()
+  const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? ORDER BY type DESC, sort_order, name').all(req.user.id)
 
   const pathMap = {}
   function getPath(id) {
@@ -58,7 +58,7 @@ router.get('/obsidian', async (req, res) => {
     }
   }
 
-  const quotes = db.prepare('SELECT * FROM quotes ORDER BY created_at DESC').all()
+  const quotes = db.prepare('SELECT * FROM quotes WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   if (quotes.length > 0) {
     const body = quotes.map(q => {
       const meta = [
@@ -70,16 +70,16 @@ router.get('/obsidian', async (req, res) => {
       return `> ${q.quote.replace(/\n/g, '\n> ')}\n\n${meta}${q.notes ? `\n\nNotes:\n${q.notes}` : ''}`
     }).join('\n\n---\n\n')
 
-    zip.file('_PhiloWeek/Citations.md', matter.stringify(body, {
+    zip.file('_Opuscule/Citations.md', matter.stringify(body, {
       title: 'Citations',
       philoweek_type: 'quotes',
       exported: new Date().toISOString(),
     }))
   }
 
-  const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results ORDER BY created_at DESC').all()
+  const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   if (questionnaireResults.length > 0) {
-    zip.file('_PhiloWeek/QuestionnaireResults.json', JSON.stringify({
+    zip.file('_Opuscule/QuestionnaireResults.json', JSON.stringify({
       philoweek_type: 'questionnaire_results',
       exported: new Date().toISOString(),
       results: questionnaireResults,
@@ -89,7 +89,7 @@ router.get('/obsidian', async (req, res) => {
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   const date = new Date().toISOString().slice(0, 10)
   res.setHeader('Content-Type', 'application/zip')
-  res.setHeader('Content-Disposition', `attachment; filename="philoweek-vault-${date}.zip"`)
+  res.setHeader('Content-Disposition', `attachment; filename="opuscule-vault-${date}.zip"`)
   res.send(buffer)
 })
 

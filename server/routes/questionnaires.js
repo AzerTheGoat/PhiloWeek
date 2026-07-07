@@ -8,8 +8,8 @@ const router = express.Router()
 router.post('/session', (req, res) => {
   const db = getDb()
   const { scope = 'all', folder_ids = [], file_id = null, file_ids = [], limit = 12 } = req.body || {}
-  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids })
-  const stats = getStats(db)
+  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids }, req.user.id)
+  const stats = getStats(db, req.user.id)
   const questions = []
 
   for (const file of files) {
@@ -29,15 +29,15 @@ router.post('/session', (req, res) => {
 
 router.get('/linked/:fileId', (req, res) => {
   const db = getDb()
-  const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(req.params.fileId)
+  const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(req.params.fileId, req.user.id)
   if (!target || target.type !== 'file') return res.json([])
 
-  const targetPath = getFilePath(db, target.id)
+  const targetPath = getFilePath(db, target.id, req.user.id)
   const rows = db.prepare(`
     SELECT id, parent_id, name, content, created_at, updated_at
     FROM files
-    WHERE type = 'file' AND content IS NOT NULL
-  `).all()
+    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
+  `).all(req.user.id)
 
   const linked = rows
     .filter(file => isQuestionnaireContent(file.name, file.content))
@@ -65,8 +65,8 @@ router.post('/results', (req, res) => {
   db.prepare(`
     INSERT INTO questionnaire_results (
       id, question_key, questionnaire_file_id, questionnaire_title, question_id,
-      question_text, answer_text, expected_answer, correct, score, response_ms, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      question_text, answer_text, expected_answer, correct, score, response_ms, user_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     String(body.question_key),
@@ -79,6 +79,7 @@ router.post('/results', (req, res) => {
     body.correct ? 1 : 0,
     Number.isFinite(Number(body.score)) ? Number(body.score) : (body.correct ? 1 : 0),
     Number.isFinite(Number(body.response_ms)) ? Math.max(0, Math.round(Number(body.response_ms))) : null,
+    req.user.id,
     new Date().toISOString()
   )
 
@@ -89,27 +90,28 @@ router.get('/results', (req, res) => {
   const db = getDb()
   const rows = db.prepare(`
     SELECT * FROM questionnaire_results
+    WHERE user_id = ?
     ORDER BY created_at DESC
     LIMIT 500
-  `).all()
+  `).all(req.user.id)
   res.json(rows)
 })
 
 module.exports = router
 
-function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }) {
+function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId) {
   let rows = db.prepare(`
     SELECT id, parent_id, name, content, created_at, updated_at
     FROM files
-    WHERE type = 'file' AND content IS NOT NULL
-  `).all()
+    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
+  `).all(userId)
 
   if (scope === 'file' && fileId) {
     rows = rows.filter(file => file.id === fileId)
   } else if (scope === 'linked_file' && fileId) {
-    const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(fileId)
+    const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(fileId, userId)
     if (!target || target.type !== 'file') return []
-    const targetPath = getFilePath(db, target.id)
+    const targetPath = getFilePath(db, target.id, userId)
     rows = rows.filter(file => {
       if (!isQuestionnaireContent(file.name, file.content)) return false
       return questionnaireMatchesFile(parseQuestionnaire(file.content), target, targetPath)
@@ -117,9 +119,9 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }) {
   } else if (scope === 'source_files') {
     const targets = Array.isArray(fileIds)
       ? fileIds
-        .map(id => db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ?').get(String(id)))
+        .map(id => db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(String(id), userId))
         .filter(file => file && file.type === 'file')
-        .map(file => ({ file, path: getFilePath(db, file.id) }))
+        .map(file => ({ file, path: getFilePath(db, file.id, userId) }))
       : []
     if (targets.length === 0) return []
     rows = rows.filter(file => {
@@ -129,20 +131,20 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }) {
     })
   } else if (scope === 'folders') {
     if (!Array.isArray(folderIds) || folderIds.length === 0) return []
-    const allowed = collectFolderScope(db, folderIds)
+    const allowed = collectFolderScope(db, folderIds, userId)
     rows = rows.filter(file => allowed.has(file.parent_id))
   }
 
   return rows.filter(file => isQuestionnaireContent(file.name, file.content))
 }
 
-function collectFolderScope(db, folderIds) {
+function collectFolderScope(db, folderIds, userId) {
   const allowed = new Set()
-  const childrenStmt = db.prepare('SELECT id, type FROM files WHERE parent_id = ?')
+  const childrenStmt = db.prepare('SELECT id, type FROM files WHERE parent_id = ? AND user_id = ?')
   function walk(id) {
     if (!id || allowed.has(id)) return
     allowed.add(id)
-    childrenStmt.all(id).forEach(child => {
+    childrenStmt.all(id, userId).forEach(child => {
       if (child.type === 'folder') walk(child.id)
     })
   }
@@ -157,7 +159,7 @@ function isQuestionnaireContent(name, content) {
 
 function parseQuestionnaire(content) {
   try {
-    const parsed = JSON.parse(String(content || '').replace(/^\uFEFF/, ''))
+    const parsed = JSON.parse(String(content || '').replace(/^﻿/, ''))
     if (!parsed || typeof parsed !== 'object') return null
     const questions = Array.isArray(parsed.questions) ? parsed.questions : []
     if (parsed.philoweek_type !== 'questionnaire' && questions.length === 0) return null
@@ -203,7 +205,7 @@ function normalizeType(type) {
   return ['open', 'mcq', 'true_false'].includes(type) ? type : 'open'
 }
 
-function getStats(db) {
+function getStats(db, userId) {
   const rows = db.prepare(`
     SELECT
       question_key,
@@ -212,8 +214,9 @@ function getStats(db) {
       AVG(COALESCE(score, CASE WHEN correct = 1 THEN 1 ELSE 0 END)) AS average_score,
       MAX(created_at) AS last_seen
     FROM questionnaire_results
+    WHERE user_id = ?
     GROUP BY question_key
-  `).all()
+  `).all(userId)
 
   const latestRows = db.prepare(`
     SELECT r.question_key, r.correct, r.score
@@ -221,9 +224,11 @@ function getStats(db) {
     JOIN (
       SELECT question_key, MAX(created_at) AS last_seen
       FROM questionnaire_results
+      WHERE user_id = ?
       GROUP BY question_key
     ) latest ON latest.question_key = r.question_key AND latest.last_seen = r.created_at
-  `).all()
+    WHERE r.user_id = ?
+  `).all(userId, userId)
 
   const latest = new Map(latestRows.map(row => [row.question_key, {
     correct: Boolean(row.correct),
@@ -294,13 +299,13 @@ function questionnaireMatchesFile(questionnaire, file, filePath) {
     sourcePaths.has(normalizePath(file.name.replace(/\.md$/i, '')))
 }
 
-function getFilePath(db, fileId) {
+function getFilePath(db, fileId, userId) {
   const parts = []
-  let cursor = db.prepare('SELECT id, parent_id, name FROM files WHERE id = ?').get(fileId)
+  let cursor = db.prepare('SELECT id, parent_id, name FROM files WHERE id = ? AND user_id = ?').get(fileId, userId)
   while (cursor) {
     parts.unshift(cursor.name)
     cursor = cursor.parent_id
-      ? db.prepare('SELECT id, parent_id, name FROM files WHERE id = ?').get(cursor.parent_id)
+      ? db.prepare('SELECT id, parent_id, name FROM files WHERE id = ? AND user_id = ?').get(cursor.parent_id, userId)
       : null
   }
   return parts.join('/')

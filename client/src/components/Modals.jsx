@@ -30,6 +30,7 @@ export default function Modals() {
       {modal.type === 'new-questionnaire' && <NewQuestionnaireModal {...props} />}
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
+      {modal.type === 'account' && <AccountModal {...props} />}
     </div>
   )
 }
@@ -317,6 +318,87 @@ function LockFolderModal({ modal, hideModal }) {
           <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
         </div>
       </form>
+    </div>
+  )
+}
+
+function AccountModal({ hideModal }) {
+  const { currentUser, logout, toast } = useApp()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (submitting) return
+    if (newPassword !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return }
+    if (newPassword.length < 10) { toast('Minimum 10 caractères', 'error'); return }
+    setSubmitting(true)
+    try {
+      await api.authChangePassword(currentPassword, newPassword)
+      toast('Mot de passe modifié')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirm('')
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    hideModal()
+    await logout()
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header">
+        <h3>Compte</h3>
+        <button className="icon-btn" onClick={hideModal}>✕</button>
+      </div>
+      <div className="modal-body">
+        <p className="modal-hint">Connecté en tant que <strong>{currentUser?.username}</strong></p>
+        <form onSubmit={handleChangePassword} className="modal-body" style={{ padding: 0 }}>
+          <input
+            ref={inputRef}
+            autoFocus={shouldAutoFocus()}
+            type="password"
+            placeholder="Mot de passe actuel"
+            value={currentPassword}
+            onChange={e => setCurrentPassword(e.target.value)}
+            className="modal-input"
+            autoComplete="current-password"
+          />
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe (min. 10 caractères)"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            className="modal-input"
+            autoComplete="new-password"
+          />
+          <input
+            type="password"
+            placeholder="Confirmer le nouveau mot de passe"
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            className="modal-input"
+            autoComplete="new-password"
+          />
+          <div className="modal-actions">
+            <button type="submit" className="btn-primary" disabled={!currentPassword || !newPassword || !confirm || submitting}>
+              {submitting ? 'Modification…' : 'Changer le mot de passe'}
+            </button>
+          </div>
+        </form>
+        <div className="modal-actions">
+          <button type="button" className="btn-danger" onClick={handleLogout}>Se déconnecter</button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-Write-Host "`n  PhiloWeek v2 - Demarrage..." -ForegroundColor Cyan
+Write-Host "`n  Opuscule v2 - Demarrage..." -ForegroundColor Cyan
 
 function Install-IfNeeded {
   param(

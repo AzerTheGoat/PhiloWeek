@@ -1,7 +1,7 @@
 const BASE = '/api'
 
 async function req(method, path, body, isFormData = false) {
-  const opts = { method, headers: {} }
+  const opts = { method, headers: {}, credentials: 'include' }
   if (body && !isFormData) {
     opts.headers['Content-Type'] = 'application/json'
     opts.body = JSON.stringify(body)
@@ -11,10 +11,19 @@ async function req(method, path, body, isFormData = false) {
   const res = await fetch(BASE + path, opts)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || res.statusText)
+    const e = new Error(err.error || res.statusText)
+    e.status = res.status
+    throw e
   }
   return res.json()
 }
+
+// Auth
+export const authRegister = (username, password) => req('POST', '/auth/register', { username, password })
+export const authLogin = (username, password) => req('POST', '/auth/login', { username, password })
+export const authLogout = () => req('POST', '/auth/logout')
+export const authMe = () => req('GET', '/auth/me')
+export const authChangePassword = (currentPassword, newPassword) => req('PATCH', '/auth/password', { currentPassword, newPassword })
 
 // Files
 export const getFileTree = () => req('GET', '/files')

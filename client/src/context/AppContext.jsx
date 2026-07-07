@@ -19,6 +19,8 @@ const init = {
   fileNames: [],
   showFilePicker: false,
   showQuizLauncher: false,
+  currentUser: null,
+  authChecked: false,
 }
 
 function reducer(state, action) {
@@ -104,6 +106,14 @@ function reducer(state, action) {
         contextMenu: showQuizLauncher ? null : state.contextMenu,
         sidebarOpen: showQuizLauncher && isMobileViewport() ? false : state.sidebarOpen,
       }
+    }
+    case 'SET_CURRENT_USER': return { ...state, currentUser: action.payload, authChecked: true }
+    case 'LOGOUT': return {
+      ...init,
+      theme: state.theme,
+      sidebarOpen: state.sidebarOpen,
+      authChecked: true,
+      currentUser: null,
     }
     default: return state
   }
@@ -219,6 +229,30 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_VIEW', payload: 'editor' })
   }, [state.tree, openFile, loadTree, toast])
 
+  const checkSession = useCallback(async () => {
+    try {
+      const user = await api.authMe()
+      dispatch({ type: 'SET_CURRENT_USER', payload: user })
+    } catch {
+      dispatch({ type: 'SET_CURRENT_USER', payload: null })
+    }
+  }, [])
+
+  const login = useCallback(async (username, password) => {
+    const user = await api.authLogin(username, password)
+    dispatch({ type: 'SET_CURRENT_USER', payload: user })
+  }, [])
+
+  const register = useCallback(async (username, password) => {
+    const user = await api.authRegister(username, password)
+    dispatch({ type: 'SET_CURRENT_USER', payload: user })
+  }, [])
+
+  const logout = useCallback(async () => {
+    await api.authLogout().catch(() => {})
+    dispatch({ type: 'LOGOUT' })
+  }, [])
+
   const value = {
     ...state,
     currentFile: state.openFile,
@@ -234,6 +268,10 @@ export function AppProvider({ children }) {
     hideModal,
     openJournalToday,
     insertRef,
+    checkSession,
+    login,
+    register,
+    logout,
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

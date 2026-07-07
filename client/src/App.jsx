@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
+import AuthScreen from './components/AuthScreen'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import Journal from './components/Journal'
@@ -19,9 +20,24 @@ import Icon from './components/Icons'
 export default function App() {
   return (
     <AppProvider>
-      <AppShell />
+      <AuthGate />
     </AppProvider>
   )
+}
+
+// Garde de confort UX uniquement : elle évite d'afficher l'arbre de
+// fichiers avant d'avoir confirmé la session. La vraie protection est
+// entièrement côté serveur (middleware requireAuth + filtrage user_id sur
+// chaque requête SQL) — contourner ce garde côté client (devtools) ne
+// donne accès à rien, puisque le serveur ne fait jamais confiance à ce que
+// le client prétend sur son identité, seulement au cookie de session.
+function AuthGate() {
+  const { currentUser, authChecked, checkSession } = useApp()
+
+  useEffect(() => { checkSession() }, [])
+
+  if (!authChecked) return null
+  return currentUser ? <AppShell /> : <AuthScreen />
 }
 
 function AppShell() {
@@ -131,7 +147,7 @@ function Welcome() {
     <div className="welcome">
       <div className="welcome-inner">
         <div className="welcome-logo"><Icon name="ai" size={42} /></div>
-        <h1>PhiloWeek</h1>
+        <h1>Opuscule</h1>
         <p>Ton espace de pensée philosophique</p>
         <div className="welcome-actions">
           <button className="btn-primary" onClick={() => showModal('new-file', {})}>

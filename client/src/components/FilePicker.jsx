@@ -9,7 +9,7 @@ const COPY_PROMPTS = {
   },
   questionnaire: {
     label: 'Questionnaire JSON',
-    text: `Tu vas creer un questionnaire PhiloWeek a partir des notes ci-dessous.
+    text: `Tu vas creer un questionnaire Opuscule a partir des notes ci-dessous.
 
 Retourne uniquement un JSON valide, sans Markdown autour, au format :
 {
@@ -68,7 +68,7 @@ Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec 
   },
 }
 
-const PERIOD_RECAP_PROMPT = `Tu vas faire un recapitulatif de periode a partir des notes PhiloWeek ci-dessous.
+const PERIOD_RECAP_PROMPT = `Tu vas faire un recapitulatif de periode a partir des notes Opuscule ci-dessous.
 
 Objectif :
 - synthetiser les idees importantes de la periode ;

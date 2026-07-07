@@ -5,9 +5,9 @@ const { getDb } = require('../db')
 
 const COPY_PROMPTS = {
   none: '',
-  questionnaire: `Tu vas creer un questionnaire PhiloWeek a partir des notes ci-dessous.
+  questionnaire: `Tu vas creer un questionnaire Opuscule a partir des notes ci-dessous.
 
-Retourne uniquement un JSON valide, sans Markdown autour, au format PhiloWeek avec philoweek_type, version, id, title, description, tags et questions.`,
+Retourne uniquement un JSON valide, sans Markdown autour, au format Opuscule avec philoweek_type, version, id, title, description, tags et questions.`,
   socratique: 'Analyse les notes ci-dessous avec une methode socratique : clarifie les theses, questionne les presupposes, fais apparaitre les tensions, puis propose des questions qui obligent a preciser la pensee.',
   critique: 'Analyse les notes ci-dessous de maniere critique : repere les faiblesses, objections possibles, concepts flous, sauts logiques et contre-exemples. Termine par une liste de revisions prioritaires.',
   explorateur: 'Explore les notes ci-dessous : propose des pistes nouvelles, rapprochements, analogies, auteurs ou problemes connexes. Priorise les idees qui peuvent ouvrir un vrai travail.',
@@ -16,8 +16,8 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format PhiloWeek av
 
 router.get('/', (req, res) => {
   const db = getDb()
-  const files = getReadableFiles(db)
-  const paths = buildPaths(db)
+  const files = getReadableFiles(db, req.user.id)
+  const paths = buildPaths(db, req.user.id)
   const nodes = files.map(file => {
     const parsed = parseFile(file)
     return {
@@ -31,18 +31,18 @@ router.get('/', (req, res) => {
     }
   })
 
-  res.json({ nodes, edges: buildEdges(db, files, paths) })
+  res.json({ nodes, edges: buildEdges(db, files, paths, req.user.id) })
 })
 
 router.get('/:id/references', (req, res) => {
   const db = getDb()
-  const target = db.prepare("SELECT * FROM files WHERE id = ? AND type = 'file'").get(req.params.id)
+  const target = db.prepare("SELECT * FROM files WHERE id = ? AND type = 'file' AND user_id = ?").get(req.params.id, req.user.id)
   if (!target) return res.status(404).json({ error: 'Not found' })
 
-  const paths = buildPaths(db)
+  const paths = buildPaths(db, req.user.id)
   const references = [
-    ...getWikiReferences(db, target, paths),
-    ...getQuestionnaireReferences(db, target, paths),
+    ...getWikiReferences(db, target, paths, req.user.id),
+    ...getQuestionnaireReferences(db, target, paths, req.user.id),
   ].sort((a, b) => String(a.source_name).localeCompare(String(b.source_name)))
 
   res.json({
@@ -61,12 +61,12 @@ router.post('/copy', (req, res) => {
   const { file_id: fileId, depth = 1, prompt = 'none' } = req.body || {}
   if (!fileId) return res.status(400).json({ error: 'file_id required' })
 
-  const files = getReadableFiles(db)
+  const files = getReadableFiles(db, req.user.id)
   const fileById = new Map(files.map(file => [file.id, file]))
   if (!fileById.has(fileId)) return res.status(404).json({ error: 'Not found' })
 
-  const paths = buildPaths(db)
-  const ids = collectNeighborhood(fileId, Number(depth) || 0, buildEdges(db, files, paths))
+  const paths = buildPaths(db, req.user.id)
+  const ids = collectNeighborhood(fileId, Number(depth) || 0, buildEdges(db, files, paths, req.user.id))
   const ordered = files
     .filter(file => ids.has(file.id))
     .sort((a, b) => (paths[a.id] || a.name).localeCompare(paths[b.id] || b.name))
@@ -95,16 +95,16 @@ router.post('/copy', (req, res) => {
 
 module.exports = router
 
-function getReadableFiles(db) {
+function getReadableFiles(db, userId) {
   return db.prepare(`
     SELECT id, parent_id, name, type, content, created_at, updated_at
     FROM files
-    WHERE type = 'file' AND content IS NOT NULL
+    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
     ORDER BY name ASC
-  `).all()
+  `).all(userId)
 }
 
-function buildEdges(db, files, paths) {
+function buildEdges(db, files, paths, userId) {
   const fileByPath = new Map()
   const fileById = new Map(files.map(file => [file.id, file]))
   for (const file of files) {
@@ -120,8 +120,8 @@ function buildEdges(db, files, paths) {
     FROM file_links fl
     JOIN files s ON s.id = fl.source_id
     JOIN files t ON t.id = fl.target_id
-    WHERE s.type = 'file' AND t.type = 'file'
-  `).all()
+    WHERE s.type = 'file' AND t.type = 'file' AND s.user_id = ? AND t.user_id = ?
+  `).all(userId, userId)
 
   for (const link of wikiLinks) {
     addEdge(edges, seen, {
@@ -158,13 +158,13 @@ function addEdge(edges, seen, edge) {
   edges.push(edge)
 }
 
-function getWikiReferences(db, target, paths) {
+function getWikiReferences(db, target, paths, userId) {
   const rows = db.prepare(`
     SELECT f.id, f.name, f.content, fl.link_text
     FROM file_links fl
     JOIN files f ON f.id = fl.source_id
-    WHERE fl.target_id = ? AND f.type = 'file' AND f.content IS NOT NULL
-  `).all(target.id)
+    WHERE fl.target_id = ? AND f.type = 'file' AND f.content IS NOT NULL AND f.user_id = ?
+  `).all(target.id, userId)
 
   return rows.flatMap(row => {
     const snippets = findWikiSnippets(row.content || '', row.link_text || target.name)
@@ -178,8 +178,8 @@ function getWikiReferences(db, target, paths) {
   })
 }
 
-function getQuestionnaireReferences(db, target, paths) {
-  const files = getReadableFiles(db)
+function getQuestionnaireReferences(db, target, paths, userId) {
+  const files = getReadableFiles(db, userId)
   const targetPath = normalizePath(paths[target.id] || target.name)
   const refs = []
 
@@ -244,8 +244,8 @@ function collectNeighborhood(startId, depth, edges) {
   return selected
 }
 
-function buildPaths(db) {
-  const rows = db.prepare('SELECT id, parent_id, name FROM files').all()
+function buildPaths(db, userId) {
+  const rows = db.prepare('SELECT id, parent_id, name FROM files WHERE user_id = ?').all(userId)
   const byId = new Map(rows.map(row => [row.id, row]))
   const cache = {}
   function pathFor(id) {

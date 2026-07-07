@@ -152,6 +152,9 @@ export default function Sidebar() {
         <button className="footer-btn" onClick={() => dispatch({ type: 'TOGGLE_FILE_PICKER' })} title="Copier des notes sélectionnées">
           <Icon name="copy" size={16} /> Copier
         </button>
+        <button className="footer-btn" onClick={() => showModal('account', {})} title="Compte">
+          <Icon name="compass" size={16} /> Compte
+        </button>
       </div>
 
       <div className="sidebar-version" title="Version déployée">v2.0.2</div>

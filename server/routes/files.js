@@ -8,8 +8,8 @@ const { v4: uuidv4 } = require('uuid')
 router.get('/', (req, res) => {
   const db = getDb()
   const rows = db.prepare(
-    'SELECT id, parent_id, name, type, sort_order, created_at, updated_at FROM files ORDER BY type DESC, sort_order ASC, name ASC'
-  ).all()
+    'SELECT id, parent_id, name, type, sort_order, created_at, updated_at FROM files WHERE user_id = ? ORDER BY type DESC, sort_order ASC, name ASC'
+  ).all(req.user.id)
   const map = {}
   rows.forEach(r => (map[r.id] = { ...r, children: [] }))
   const roots = []
@@ -28,22 +28,22 @@ router.get('/search', (req, res) => {
   const results = db.prepare(
     `SELECT id, name, type, parent_id,
       substr(content, max(1, instr(lower(content), lower(?)) - 60), 160) as excerpt
-     FROM files WHERE type = 'file' AND (lower(name) LIKE lower(?) OR lower(content) LIKE lower(?))
+     FROM files WHERE type = 'file' AND user_id = ? AND (lower(name) LIKE lower(?) OR lower(content) LIKE lower(?))
      LIMIT 20`
-  ).all(q, `%${q}%`, `%${q}%`)
+  ).all(q, req.user.id, `%${q}%`, `%${q}%`)
   res.json(results)
 })
 
 // GET /api/files/names — for [[link]] autocomplete
 router.get('/names', (req, res) => {
   const db = getDb()
-  res.json(db.prepare("SELECT id, name, parent_id FROM files WHERE type = 'file' ORDER BY name").all())
+  res.json(db.prepare("SELECT id, name, parent_id FROM files WHERE type = 'file' AND user_id = ? ORDER BY name").all(req.user.id))
 })
 
 // GET /api/files/:id
 router.get('/:id', (req, res) => {
   const db = getDb()
-  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   if (file.type === 'locked_folder') {
@@ -66,22 +66,22 @@ router.post('/', (req, res) => {
   const { parent_id, name, type, content } = req.body
   if (!name || !type) return res.status(400).json({ error: 'name and type required' })
   const parentId = parent_id || null
-  const parentCheck = validateParent(db, parentId)
+  const parentCheck = validateParent(db, parentId, req.user.id)
   if (parentCheck) return res.status(parentCheck.status).json({ error: parentCheck.error })
-  const duplicate = findSiblingByName(db, parentId, name)
+  const duplicate = findSiblingByName(db, parentId, name, null, req.user.id)
   if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
 
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(
-    'INSERT INTO files (id, parent_id, name, type, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, parentId, name, type, content || null, now, now)
+    'INSERT INTO files (id, parent_id, name, type, content, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, parentId, name, type, content || null, req.user.id, now, now)
 
   if (content) {
     updateTags(db, id, content)
-    updateLinks(db, id, content)
+    updateLinks(db, id, content, req.user.id)
   }
-  if (type === 'file') updateAllLinks(db)
+  if (type === 'file') updateAllLinks(db, req.user.id)
 
   res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(id))
 })
@@ -89,16 +89,16 @@ router.post('/', (req, res) => {
 // PUT /api/files/:id
 router.put('/:id', (req, res) => {
   const db = getDb()
-  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   const { name, content, parent_id, sort_order } = req.body
   const nextParentId = parent_id !== undefined ? (parent_id || null) : file.parent_id
   const nextName = name !== undefined ? name : file.name
   if (name !== undefined || parent_id !== undefined) {
-    const parentCheck = validateParent(db, nextParentId)
+    const parentCheck = validateParent(db, nextParentId, req.user.id)
     if (parentCheck) return res.status(parentCheck.status).json({ error: parentCheck.error })
-    const duplicate = findSiblingByName(db, nextParentId, nextName, req.params.id)
+    const duplicate = findSiblingByName(db, nextParentId, nextName, req.params.id, req.user.id)
     if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
   }
   const now = new Date().toISOString()
@@ -118,9 +118,9 @@ router.put('/:id', (req, res) => {
 
   if (content !== undefined) {
     updateTags(db, req.params.id, content)
-    updateLinks(db, req.params.id, content)
+    updateLinks(db, req.params.id, content, req.user.id)
   }
-  if (name !== undefined) updateAllLinks(db)
+  if (name !== undefined) updateAllLinks(db, req.user.id)
 
   res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id))
 })
@@ -128,7 +128,7 @@ router.put('/:id', (req, res) => {
 // DELETE /api/files/:id
 router.delete('/:id', (req, res) => {
   const db = getDb()
-  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
   db.prepare('DELETE FROM files WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
@@ -138,18 +138,18 @@ router.delete('/:id', (req, res) => {
 router.put('/:id/move', (req, res) => {
   const db = getDb()
   const { parent_id, sort_order } = req.body
-  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id)
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
 
   const nextParentId = parent_id || null
-  const duplicate = findSiblingByName(db, nextParentId, file.name, req.params.id)
+  const duplicate = findSiblingByName(db, nextParentId, file.name, req.params.id, req.user.id)
   if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
   if (nextParentId) {
     if (nextParentId === req.params.id) {
       return res.status(400).json({ error: 'Cannot move a folder into itself' })
     }
 
-    const parent = db.prepare('SELECT id, parent_id, type FROM files WHERE id = ?').get(nextParentId)
+    const parent = db.prepare('SELECT id, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(nextParentId, req.user.id)
     if (!parent) return res.status(404).json({ error: 'Target folder not found' })
     if (parent.type === 'locked_folder') {
       return res.status(403).json({ error: 'Unlock the folder before moving files into it' })
@@ -164,7 +164,7 @@ router.put('/:id/move', (req, res) => {
         return res.status(400).json({ error: 'Cannot move a folder into one of its children' })
       }
       cursor = cursor.parent_id
-        ? db.prepare('SELECT id, parent_id FROM files WHERE id = ?').get(cursor.parent_id)
+        ? db.prepare('SELECT id, parent_id FROM files WHERE id = ? AND user_id = ?').get(cursor.parent_id, req.user.id)
         : null
     }
   }
@@ -181,14 +181,14 @@ router.post('/:id/unlock', async (req, res) => {
   const { password } = req.body
 
   const folder = db.prepare(
-    "SELECT * FROM files WHERE id = ? AND type = 'locked_folder'"
-  ).get(req.params.id)
+    "SELECT * FROM files WHERE id = ? AND type = 'locked_folder' AND user_id = ?"
+  ).get(req.params.id, req.user.id)
   if (!folder) return res.status(404).json({ error: 'Not found' })
 
   const valid = verifyPassword(password, folder.password_hash)
   if (!valid) return res.status(401).json({ error: 'Wrong password' })
 
-  const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
+  const children = db.prepare('SELECT * FROM files WHERE parent_id = ? AND user_id = ?').all(req.params.id, req.user.id)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
   let decrypted
@@ -222,9 +222,9 @@ router.post('/:id/unlock', async (req, res) => {
       if (child.content === undefined || child.content === null) continue
       updateChild.run(child.content, new Date().toISOString(), child.id)
       updateTags(db, child.id, child.content)
-      updateLinks(db, child.id, child.content)
+      updateLinks(db, child.id, child.content, req.user.id)
     }
-    updateAllLinks(db)
+    updateAllLinks(db, req.user.id)
   })
 
   try {
@@ -244,12 +244,15 @@ router.post('/:id/lock', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters' })
   }
 
+  const folder = db.prepare('SELECT id FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!folder) return res.status(404).json({ error: 'Not found' })
+
   const hash = hashPassword(password)
   const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
   db.prepare("UPDATE files SET type = 'locked_folder', password_hash = ? WHERE id = ?").run(hash, req.params.id)
 
-  const children = db.prepare('SELECT * FROM files WHERE parent_id = ?').all(req.params.id)
+  const children = db.prepare('SELECT * FROM files WHERE parent_id = ? AND user_id = ?').all(req.params.id, req.user.id)
   const updateEnc = db.prepare('UPDATE files SET encrypted_content = ?, content = NULL WHERE id = ?')
   for (const child of children) {
     if (!child.content) continue
@@ -265,17 +268,17 @@ router.post('/:id/lock', async (req, res) => {
 
 module.exports = router
 
-function findSiblingByName(db, parentId, name, excludeId = null) {
+function findSiblingByName(db, parentId, name, excludeId = null, userId) {
   return db.prepare(
     `SELECT id FROM files
-     WHERE parent_id IS ? AND lower(name) = lower(?) AND (? IS NULL OR id != ?)
+     WHERE parent_id IS ? AND user_id = ? AND lower(name) = lower(?) AND (? IS NULL OR id != ?)
      LIMIT 1`
-  ).get(parentId || null, name, excludeId, excludeId)
+  ).get(parentId || null, userId, name, excludeId, excludeId)
 }
 
-function validateParent(db, parentId) {
+function validateParent(db, parentId, userId) {
   if (!parentId) return null
-  const parent = db.prepare('SELECT id, type FROM files WHERE id = ?').get(parentId)
+  const parent = db.prepare('SELECT id, type FROM files WHERE id = ? AND user_id = ?').get(parentId, userId)
   if (!parent) return { status: 404, error: 'Parent folder not found' }
   if (parent.type === 'locked_folder') return { status: 403, error: 'Unlock the folder before adding files into it' }
   if (parent.type !== 'folder') return { status: 400, error: 'Parent must be a folder' }

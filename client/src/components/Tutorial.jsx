@@ -162,6 +162,21 @@ const SECTIONS = [
       },
     ],
   },
+  {
+    title: 'Compte',
+    items: [
+      {
+        icon: 'close',
+        title: 'Ton espace est privé',
+        text: "Chaque compte a son propre coffre : notes, journal, timer, notes vocales, idées et citations ne sont visibles que par toi.",
+      },
+      {
+        icon: 'edit',
+        title: 'Changer de mot de passe',
+        text: "Depuis le bouton Compte de la barre latérale, renseigne ton mot de passe actuel puis le nouveau. Il n'y a pas de récupération par e-mail : garde-le en lieu sûr.",
+      },
+    ],
+  },
 ]
 
 export default function Tutorial() {
@@ -173,7 +188,7 @@ export default function Tutorial() {
         <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
           <Icon name="back" />
         </button>
-        <h2>Découvrir PhiloWeek</h2>
+        <h2>Découvrir Opuscule</h2>
       </div>
 
       <p className="tutorial-intro">

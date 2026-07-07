@@ -1,5 +1,5 @@
 {
-  "name": "philoweek",
+  "name": "opuscule",
   "version": "2.0.2",
   "engines": { "node": ">=20" },
   "scripts": {

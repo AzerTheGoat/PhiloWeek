@@ -5,7 +5,7 @@ const { getDb } = require('../db')
 
 router.get('/quotes', (req, res) => {
   const db = getDb()
-  const rows = db.prepare('SELECT * FROM quotes ORDER BY created_at DESC').all()
+  const rows = db.prepare('SELECT * FROM quotes WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   res.json(rows)
 })
 
@@ -18,8 +18,8 @@ router.post('/quotes', (req, res) => {
     : JSON.stringify([])
 
   db.prepare(`
-    INSERT INTO quotes (id, quote, author, source, notes, tags, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO quotes (id, quote, author, source, notes, tags, user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     String(req.body.quote || '').trim(),
@@ -27,16 +27,17 @@ router.post('/quotes', (req, res) => {
     emptyToNull(req.body.source),
     emptyToNull(req.body.notes),
     tags,
+    req.user.id,
     now,
     now,
   )
 
-  res.status(201).json(db.prepare('SELECT * FROM quotes WHERE id = ?').get(id))
+  res.status(201).json(db.prepare('SELECT * FROM quotes WHERE id = ? AND user_id = ?').get(id, req.user.id))
 })
 
 router.put('/quotes/:id', (req, res) => {
   const db = getDb()
-  const existing = db.prepare('SELECT * FROM quotes WHERE id = ?').get(req.params.id)
+  const existing = db.prepare('SELECT * FROM quotes WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!existing) return res.status(404).json({ error: 'Not found' })
 
   const tags = Array.isArray(req.body.tags)
@@ -62,7 +63,7 @@ router.put('/quotes/:id', (req, res) => {
 
 router.delete('/quotes/:id', (req, res) => {
   const db = getDb()
-  db.prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id)
+  db.prepare('DELETE FROM quotes WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
   res.json({ ok: true })
 })
 
