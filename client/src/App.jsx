@@ -3,7 +3,6 @@ import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
-import AIPanel from './components/AIPanel'
 import Journal from './components/Journal'
 import Timer from './components/Timer'
 import InboxPage from './components/InboxPage'
@@ -26,7 +25,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { theme, showAI, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
+  const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
 
   useEffect(() => { loadTree() }, [])
 
@@ -63,7 +62,7 @@ function AppShell() {
   }, [contextMenu, hideContextMenu])
 
   return (
-    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${showAI ? 'ai-open' : ''}`}>
+    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
       <Sidebar />
 
       <main className="main-pane">
@@ -86,8 +85,6 @@ function AppShell() {
         )}
       </main>
 
-      {showAI && view !== 'inbox' && view !== 'life' && view !== 'knowledge-graph' && <AIPanel />}
-
       {showFilePicker && <FilePicker />}
       {showQuizLauncher && <GlobalQuizLauncher />}
 
@@ -100,15 +97,14 @@ function AppShell() {
 }
 
 function MobileNav() {
-  const { dispatch, view, showAI, sidebarOpen } = useApp()
+  const { dispatch, view, sidebarOpen } = useApp()
   const items = [
     { key: 'files', label: 'Fichiers', icon: 'folder', active: sidebarOpen, action: () => dispatch({ type: 'TOGGLE_SIDEBAR' }) },
-    { key: 'editor', label: 'Éditer', icon: 'edit', active: view === 'editor' && !showAI && !sidebarOpen, action: () => dispatch({ type: 'SET_VIEW', payload: 'editor' }) },
+    { key: 'editor', label: 'Éditer', icon: 'edit', active: view === 'editor' && !sidebarOpen, action: () => dispatch({ type: 'SET_VIEW', payload: 'editor' }) },
     { key: 'journal', label: 'Journal', icon: 'journal', active: view === 'journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'journal' }) },
     { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
     { key: 'graph', label: 'Graphe', icon: 'graph', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { key: 'timer', label: 'Timer', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
-    { key: 'ai', label: 'IA', icon: 'ai', active: showAI, action: () => dispatch({ type: 'TOGGLE_AI' }) },
     { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
   ]
 

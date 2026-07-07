@@ -88,7 +88,7 @@ const SECTIONS = [
       {
         icon: 'question',
         title: 'Créer un questionnaire',
-        text: "Un questionnaire est un fichier JSON de questions (ouvertes ou à choix multiples) avec réponses et explications. Génère-le avec l'IA via le bouton Copier (prompt dédié), puis colle le JSON.",
+        text: "Un questionnaire est un fichier JSON de questions (ouvertes ou à choix multiples) avec réponses et explications. Il s'ouvre directement en Aperçu pour réviser sans bruit.",
       },
       {
         icon: 'thought',
@@ -99,31 +99,6 @@ const SECTIONS = [
         icon: 'play',
         title: 'Réviser',
         text: "Sélectionne des notes sources, choisis un nombre de questions, et lance une session : les questions liées sont piochées au hasard, tes réponses sont notées et gardées en historique.",
-      },
-    ],
-  },
-  {
-    title: 'Panneau IA "Penseur"',
-    items: [
-      {
-        icon: 'ai',
-        title: '4 modes de dialogue',
-        text: "Socratique (questions qui dérangent), Critique (failles logiques), Explorateur (penseurs et cadres alternatifs), Synthèse (résume et relie) — appliqués à la note ouverte.",
-      },
-      {
-        icon: 'life',
-        title: 'Portrait philosophique',
-        text: "Analyse l'ensemble de tes notes pour dresser un portrait de tes préoccupations et angles morts philosophiques.",
-      },
-      {
-        icon: 'download',
-        title: 'Modèle & coût',
-        text: "Choisis le fournisseur (Claude ou OpenAI) et le modèle ; le coût estimé (puis réel) de chaque génération s'affiche avant de lancer.",
-      },
-      {
-        icon: 'edit',
-        title: 'Insérer dans la note',
-        text: "Une réponse te plaît ? Un clic l'ajoute directement à la fin de la note ouverte, citée comme suggestion IA.",
       },
     ],
   },
@@ -152,8 +127,8 @@ const SECTIONS = [
       },
       {
         icon: 'life',
-        title: 'Citations & rapport',
-        text: "Vie intérieure garde tes citations favorites (auteur, source, pourquoi elle te parle) et peut générer un rapport IA périodique sur ton évolution.",
+        title: 'Citations',
+        text: "Vie intérieure garde tes citations favorites avec auteur, source, notes personnelles et tags.",
       },
     ],
   },
@@ -164,6 +139,11 @@ const SECTIONS = [
         icon: 'copy',
         title: 'Copier plusieurs notes',
         text: "Sélectionne des notes et copie leur contenu combiné dans le presse-papiers, avec un prompt prêt à coller ailleurs (ex : générer un questionnaire JSON).",
+      },
+      {
+        icon: 'copy',
+        title: 'Récap de période',
+        text: "Dans Copier, utilise Dernière semaine ou une période personnalisée pour copier les notes modifiées avec un preprompt de récapitulatif.",
       },
       {
         icon: 'download',

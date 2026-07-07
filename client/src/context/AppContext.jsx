@@ -6,16 +6,12 @@ function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
 }
 
-// Mets à true si tu veux que le panneau "Penseur" (IA) s'ouvre automatiquement au démarrage
-const AI_PANEL_OPEN_BY_DEFAULT = false
-
 const init = {
   tree: [],
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'knowledge-graph'
   theme: localStorage.getItem('pw-theme') || 'dark',
-  showAI: AI_PANEL_OPEN_BY_DEFAULT && !isMobileViewport(),
   sidebarOpen: !isMobileViewport(),
   toasts: [],
   contextMenu: null,
@@ -46,7 +42,6 @@ function reducer(state, action) {
       showFilePicker: false,
       showQuizLauncher: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
-      showAI: isMobileViewport() ? false : state.showAI,
     }
     case 'SET_VIEW': return {
       ...state,
@@ -56,24 +51,10 @@ function reducer(state, action) {
       showFilePicker: false,
       showQuizLauncher: false,
       sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
-      showAI: isMobileViewport() && action.payload !== 'editor' ? false : state.showAI,
     }
     case 'SET_THEME': {
       localStorage.setItem('pw-theme', action.payload)
       return { ...state, theme: action.payload }
-    }
-    case 'TOGGLE_AI': {
-      const showAI = !state.showAI
-      return {
-        ...state,
-        showAI,
-        view: isMobileViewport() && showAI ? 'editor' : state.view,
-        modal: null,
-        contextMenu: null,
-        showFilePicker: false,
-        showQuizLauncher: false,
-        sidebarOpen: isMobileViewport() && showAI ? false : state.sidebarOpen,
-      }
     }
     case 'TOGGLE_SIDEBAR': {
       const sidebarOpen = !state.sidebarOpen
@@ -84,7 +65,6 @@ function reducer(state, action) {
         contextMenu: null,
         showFilePicker: false,
         showQuizLauncher: false,
-        showAI: isMobileViewport() && sidebarOpen ? false : state.showAI,
       }
     }
     case 'CLEAR_OPEN_FILE': return {
@@ -102,7 +82,6 @@ function reducer(state, action) {
       showFilePicker: action.payload ? false : state.showFilePicker,
       showQuizLauncher: action.payload ? false : state.showQuizLauncher,
       sidebarOpen: action.payload && isMobileViewport() ? false : state.sidebarOpen,
-      showAI: action.payload && isMobileViewport() ? false : state.showAI,
     }
     case 'TOGGLE_FILE_PICKER': {
       const showFilePicker = !state.showFilePicker
@@ -113,7 +92,6 @@ function reducer(state, action) {
         modal: showFilePicker ? null : state.modal,
         contextMenu: showFilePicker ? null : state.contextMenu,
         sidebarOpen: showFilePicker && isMobileViewport() ? false : state.sidebarOpen,
-        showAI: showFilePicker && isMobileViewport() ? false : state.showAI,
       }
     }
     case 'TOGGLE_QUIZ_LAUNCHER': {
@@ -125,7 +103,6 @@ function reducer(state, action) {
         modal: showQuizLauncher ? null : state.modal,
         contextMenu: showQuizLauncher ? null : state.contextMenu,
         sidebarOpen: showQuizLauncher && isMobileViewport() ? false : state.sidebarOpen,
-        showAI: showQuizLauncher && isMobileViewport() ? false : state.showAI,
       }
     }
     default: return state

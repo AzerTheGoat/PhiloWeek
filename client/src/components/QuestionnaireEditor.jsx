@@ -9,7 +9,7 @@ const AUTOSAVE_DELAY = 800
 export default function QuestionnaireEditor() {
   const { currentFile, openFileId, saveFile, tree, toast } = useApp()
   const [content, setContent] = useState(currentFile?.content || '')
-  const [mode, setMode] = useState('split')
+  const [mode, setMode] = useState('preview')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scope, setScope] = useState('file')

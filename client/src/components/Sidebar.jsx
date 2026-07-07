@@ -6,7 +6,7 @@ import * as api from '../api'
 
 export default function Sidebar() {
   const {
-    tree, theme, showAI, sidebarOpen, loadTree, toast,
+    tree, theme, sidebarOpen, loadTree, toast,
     dispatch, showModal, showContextMenu, openJournalToday, openFile, view
   } = useApp()
   const [searchQ, setSearchQ] = useState('')
@@ -71,22 +71,8 @@ export default function Sidebar() {
           >
             <Icon name="life" />
           </button>
-          <button
-            title="Graphe de la base"
-            className={`icon-btn ${view === 'knowledge-graph' ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })}
-          >
-            <Icon name="graph" />
-          </button>
           <button title="Timer" className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timer' })}>
             <Icon name="timer" />
-          </button>
-          <button
-            title={showAI ? "Masquer l'IA" : "Afficher l'IA"}
-            className={`icon-btn ${showAI ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'TOGGLE_AI' })}
-          >
-            <Icon name="ai" />
           </button>
           <button
             title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}

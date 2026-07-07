@@ -4,8 +4,8 @@
 
 - **Backend** : Node.js/Express + SQLite (via `sqlite` + `sqlite3`)
 - **Frontend** : React 18 + Vite (vanilla CSS, pas de framework UI)
-- **IA** : Anthropic API, modèle `Codex-sonnet-4-6`
-- **Config** : clé API dans `.env` → `ANTHROPIC_API_KEY`
+- **IA** : aucune fonctionnalite IA active dans l'interface
+- **Config** : pas de cle IA requise pour les fonctionnalites actuelles
 - **Lancement dev** : `.\run-v2.ps1` (lance le serveur Node sur :3001 + Vite dev sur :5173)
 - **Lancement prod** : `cd client && npm run build` puis `cd server && node index.js`
 
@@ -18,7 +18,6 @@ PhiloWeek/
 │   ├── db.js           ← SQLite async (getDb, initDb, updateTags, updateLinks)
 │   ├── routes/
 │   │   ├── files.js    ← CRUD fichiers + lock/unlock
-│   │   ├── ai.js       ← Codex AI (generate + active mode)
 │   │   ├── export.js   ← Export ZIP Obsidian
 │   │   ├── import.js   ← Import ZIP Obsidian
 │   │   ├── voice.js    ← Notes vocales
@@ -37,7 +36,6 @@ PhiloWeek/
 │   │   │   ├── Editor.jsx      ← Split-pane Markdown, autosave, [[links]]
 │   │   │   ├── EditorToolbar.jsx
 │   │   │   ├── Preview.jsx     ← Rendu marked.js + [[wiki-links]] cliquables
-│   │   │   ├── AIPanel.jsx     ← 4 modes + "Insérer dans la note"
 │   │   │   ├── Journal.jsx     ← Calendrier + navigation jours
 │   │   │   ├── Timer.jsx       ← Chronomètre + sessions
 │   │   │   ├── ContextMenu.jsx
@@ -116,13 +114,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les dossiers verrouillés (`locked_folder`) : contenu chiffré AES-256 côté serveur
 - `insertRef` dans AppContext : ref vers la fonction "insérer dans la note" de l'éditeur
 
-## Fonctionnalité IA multi-fournisseur
+## Fonctionnalites IA
 
-- Le panneau IA permet de choisir le fournisseur (`Claude` ou `OpenAI`), le modèle et le nombre de tokens de sortie prédits.
-- Les clés attendues dans `.env` sont `ANTHROPIC_API_KEY` pour Claude et `OPENAI_API_KEY` pour OpenAI.
-- Le backend expose `GET /api/ai/models` pour la liste des modèles/prix, `POST /api/ai/estimate` pour l'estimation, et `POST /api/ai/generate` pour l'appel réel.
-- L'estimation de coût est calculée avec les tokens d'entrée estimés côté serveur et les tokens de sortie prédits par l'utilisateur. Après génération, le coût affiché utilise les tokens réels si le fournisseur les renvoie.
-- Les prix sont stockés dans `server/routes/ai.js` en USD par million de tokens input/output. Les mettre à jour quand OpenAI ou Anthropic changent leurs tarifs.
+- Les fonctionnalites IA ont ete retirees de l'interface.
+- Ne pas ajouter de nouveau panneau IA, appel fournisseur, estimation de cout ou generation automatique sans demande explicite.
+- Le recap de semaine/periode passe par le panneau `Copier`, qui met un preprompt dans le presse-papier sans appeler de fournisseur IA.
 
 ## Déplacement des fichiers et dossiers
 
@@ -131,12 +127,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
 - Les dossiers verrouillés ne peuvent pas recevoir de nouveaux fichiers tant qu'ils ne sont pas déverrouillés.
 
-## Vie intérieure : citations et rapport IA
+## Vie intérieure : citations
 
-- La vue `Vie` contient une bibliothèque de citations et un générateur de rapport IA par période.
+- La vue `Vie` contient une bibliothèque de citations.
 - Les citations sont stockées dans la table `quotes` avec auteur, source, notes et tags.
-- Le rapport IA (`POST /api/life/report`) agrège les notes modifiées, citations, idées, ressources, sessions timer et notes vocales sur la durée choisie.
-- Le rapport doit rester prudent : hypothèses sur l'état mental, pas de diagnostic médical.
 - L'export Obsidian ajoute les citations dans `_PhiloWeek/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
 
 ## Graphes d'idées
@@ -165,7 +159,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Un questionnaire peut etre lie a des notes Markdown avec `source_paths`; ces chemins sont preferes aux IDs pour rester compatibles avec export/import.
 - La liaison des fichiers d'un questionnaire se fait via une modal de selection avec recherche, arbre de dossiers, recapitulatif et validation explicite.
 - `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
-- L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random.
+- L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random; il s'ouvre par defaut en `Apercu`.
 - Une note Markdown affiche un bouton `Quiz` quand au moins un questionnaire est lie a cette note.
 - La sidebar contient un bouton global `Reviser` qui ouvre un panneau de selection de notes Markdown et lance les questions des questionnaires lies a ces notes, independamment du fichier ouvert.
 - Pendant une revision globale, le footer affiche seulement `Stop`; l'arret ou la fin de session affiche un score, un mini-rapport et les questions ratees a revoir.
@@ -173,11 +167,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_PhiloWeek/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
 - Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
+- Le panneau `Copier` contient aussi un bloc `Recap de periode` avec `Copier la derniere semaine` et une periode personnalisable; il copie les notes modifiees dans la periode avec un preprompt de synthese prudent.
 
 ## Experience mobile
 
-- Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers/IA en tiroirs plein ecran.
-- Sur mobile, la sidebar et le panneau IA ne sont pas ouverts par defaut. Ouvrir une note referme automatiquement la sidebar.
+- Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers en tiroirs plein ecran.
+- Sur mobile, la sidebar n'est pas ouverte par defaut. Ouvrir une note referme automatiquement la sidebar.
 - Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
 - Les vues Editeur, Journal, Timer, Inbox et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
 - Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.

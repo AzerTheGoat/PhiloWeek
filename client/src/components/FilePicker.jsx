@@ -68,6 +68,22 @@ Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec 
   },
 }
 
+const PERIOD_RECAP_PROMPT = `Tu vas faire un recapitulatif de periode a partir des notes PhiloWeek ci-dessous.
+
+Objectif :
+- synthetiser les idees importantes de la periode ;
+- reperer les fils conducteurs, questions recurrentes, tensions et evolutions ;
+- distinguer les faits observes dans les notes des hypotheses ;
+- proposer une section "A revoir / a approfondir" ;
+- rester prudent : pas de diagnostic, pas de conclusion psychologique certaine.
+
+Format attendu :
+## Resume de la periode
+## Idees fortes
+## Questions ouvertes
+## Liens entre les notes
+## A revoir la semaine prochaine`
+
 // ——— Helpers ———
 
 function getAllFileIds(node) {
@@ -121,6 +137,75 @@ async function buildConcatenation(tree, selectedIds, promptKey = 'none') {
   const notes = parts.join('\n\n---\n\n')
   const prompt = COPY_PROMPTS[promptKey]?.text || ''
   return { text: prompt ? `${prompt}\n\n--- NOTES ---\n\n${notes}` : notes, count: orderedFiles.length }
+}
+
+async function buildPeriodConcatenation(tree, startValue, endValue) {
+  const start = startOfDay(parseDateInput(startValue))
+  const end = endOfDay(parseDateInput(endValue))
+  if (!start || !end || start > end) throw new Error('Periode invalide')
+
+  const allIds = new Set()
+  function collect(nodes) {
+    nodes.forEach(node => {
+      if (node.type === 'file') {
+        const date = parseFileDate(node)
+        if (date && date >= start && date <= end) allIds.add(node.id)
+      }
+      if (node.children) collect(node.children)
+    })
+  }
+  collect(tree)
+
+  const { text, count } = await buildConcatenation(tree, allIds, 'none')
+  const periodLabel = `${formatDateFr(start)} -> ${formatDateFr(end)}`
+  return {
+    count,
+    text: `${PERIOD_RECAP_PROMPT}\n\nPeriode : ${periodLabel}\nNombre de notes : ${count}\n\n--- NOTES DE LA PERIODE ---\n\n${text}`,
+  }
+}
+
+function getLastWeekRange() {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(end.getDate() - 6)
+  return { start: toDateInput(start), end: toDateInput(end) }
+}
+
+function parseFileDate(file) {
+  const raw = file.updated_at || file.created_at
+  if (!raw) return null
+  const date = new Date(raw)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function parseDateInput(value) {
+  if (!value) return null
+  const date = new Date(`${value}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function startOfDay(date) {
+  if (!date) return null
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function endOfDay(date) {
+  if (!date) return null
+  const next = new Date(date)
+  next.setHours(23, 59, 59, 999)
+  return next
+}
+
+function toDateInput(date) {
+  const local = new Date(date)
+  local.setMinutes(local.getMinutes() - local.getTimezoneOffset())
+  return local.toISOString().slice(0, 10)
+}
+
+function formatDateFr(date) {
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 // ——— SelectableTree ———
@@ -197,6 +282,8 @@ export default function FilePicker() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [loading, setLoading] = useState(false)
   const [promptKey, setPromptKey] = useState('none')
+  const [periodStart, setPeriodStart] = useState(() => getLastWeekRange().start)
+  const [periodEnd, setPeriodEnd] = useState(() => getLastWeekRange().end)
 
   // Reset on open
   useEffect(() => { setSelectedIds(new Set()) }, [])
@@ -252,6 +339,32 @@ export default function FilePicker() {
     }
   }
 
+  const handleCopyPeriod = async (range = null) => {
+    const nextRange = range || { start: periodStart, end: periodEnd }
+    setLoading(true)
+    try {
+      const { text, count } = await buildPeriodConcatenation(tree, nextRange.start, nextRange.end)
+      if (count === 0) {
+        toast('Aucune note modifiee sur cette periode', 'error')
+        return
+      }
+      await navigator.clipboard.writeText(text)
+      toast(`${count} note(s) de la periode copiee(s)`)
+      dispatch({ type: 'TOGGLE_FILE_PICKER' })
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCopyLastWeek = () => {
+    const range = getLastWeekRange()
+    setPeriodStart(range.start)
+    setPeriodEnd(range.end)
+    handleCopyPeriod(range)
+  }
+
   const selectAll = () => {
     const ids = new Set()
     getFilesInTreeOrder(tree, new Set(tree.flatMap(n => getAllFileIds(n)))).forEach(f => ids.add(f.id))
@@ -287,6 +400,38 @@ export default function FilePicker() {
               </select>
             </label>
             {promptKey !== 'none' && <p>{COPY_PROMPTS[promptKey].text.split('\n')[0]}</p>}
+          </div>
+          <div className="picker-period-box">
+            <div>
+              <strong>Recap de periode</strong>
+              <p>Copie les notes modifiees sur une periode avec un preprompt de synthese.</p>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={handleCopyLastWeek}
+              disabled={loading}
+            >
+              Copier la derniere semaine
+            </button>
+            <div className="picker-period-grid">
+              <label>
+                Debut
+                <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+              </label>
+              <label>
+                Fin
+                <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => handleCopyPeriod()}
+              disabled={loading}
+            >
+              Copier cette periode
+            </button>
           </div>
           <SelectableTree
             nodes={tree}

@@ -15,7 +15,6 @@ app.use('/audio', express.static(RECORDINGS_DIR))
 
 // Routes
 app.use('/api/files', require('./routes/files'))
-app.use('/api/ai', require('./routes/ai'))
 app.use('/api/export', require('./routes/export'))
 app.use('/api/import', require('./routes/import'))
 app.use('/api/voice', require('./routes/voice'))

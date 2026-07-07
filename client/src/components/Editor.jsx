@@ -30,7 +30,6 @@ export default function Editor() {
 
   const textareaRef = useRef(null)
   const saveTimerRef = useRef(null)
-  const activeTimerRef = useRef(null)
   const previewTimerRef = useRef(null)
   const wordCountTimerRef = useRef(null)
 
@@ -115,33 +114,6 @@ export default function Editor() {
     }
     return () => { insertRef.current = null }
   }, [insertRef, triggerSave])
-
-  // AI active mode trigger (90s without typing)
-  useEffect(() => {
-    if (!currentFile) return
-    const reset = () => {
-      clearTimeout(activeTimerRef.current)
-      activeTimerRef.current = setTimeout(async () => {
-        const ta = textareaRef.current
-        if (!ta) return
-        const pos = ta.selectionStart
-        const text = ta.value
-        const paraStart = text.lastIndexOf('\n\n', pos - 1) + 2
-        const paraEnd = text.indexOf('\n\n', pos)
-        const para = text.slice(paraStart, paraEnd === -1 ? undefined : paraEnd).trim()
-        if (para.length < 30) return
-        try {
-          const { text: suggestion } = await api.activeAI(para)
-          if (suggestion) toast(`✦ ${suggestion}`, 'info')
-        } catch (_) {}
-      }, 90000)
-    }
-    window.addEventListener('keydown', reset)
-    return () => {
-      window.removeEventListener('keydown', reset)
-      clearTimeout(activeTimerRef.current)
-    }
-  }, [currentFile, toast])
 
   const handleChange = useCallback((e) => {
     const value = e.target.value

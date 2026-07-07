@@ -28,13 +28,6 @@ export const moveFile = (id, parent_id, sort_order) => req('PUT', `/files/${id}/
 export const unlockFolder = (id, password) => req('POST', `/files/${id}/unlock`, { password })
 export const lockFolder = (id, password) => req('POST', `/files/${id}/lock`, { password })
 
-// AI
-export const getAIModels = () => req('GET', '/ai/models')
-export const estimateAI = data => req('POST', '/ai/estimate', data)
-export const generateAI = (file_id, mode, options = {}) =>
-  req('POST', '/ai/generate', { file_id, mode, ...options })
-export const activeAI = paragraph => req('POST', '/ai/active', { paragraph })
-
 // Export / Import
 export const exportObsidian = () => {
   window.location.href = BASE + '/export/obsidian'
@@ -83,8 +76,6 @@ export const getQuotes = () => req('GET', '/life/quotes')
 export const createQuote = data => req('POST', '/life/quotes', data)
 export const updateQuote = (id, data) => req('PUT', `/life/quotes/${id}`, data)
 export const deleteQuote = id => req('DELETE', `/life/quotes/${id}`)
-export const generateLifeReport = data => req('POST', '/life/report', data)
-
 // Questionnaires
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)
