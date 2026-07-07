@@ -77,6 +77,26 @@ router.get('/obsidian', async (req, res) => {
     }))
   }
 
+  const factChecks = db.prepare('SELECT * FROM fact_checks WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
+  if (factChecks.length > 0) {
+    const statusLabel = { to_check: 'A verifier', true: 'Vrai', false: 'Faux', partial: 'Partiellement vrai' }
+    const body = factChecks.map(f => {
+      const meta = [
+        `Statut: ${statusLabel[f.status] || f.status}`,
+        f.source ? `Source: ${f.source}` : null,
+        f.tags ? `Tags: ${f.tags}` : null,
+        `Ajoute: ${f.created_at}`,
+      ].filter(Boolean).join('\n')
+      return `> ${f.claim.replace(/\n/g, '\n> ')}\n\n${meta}${f.notes ? `\n\nNotes:\n${f.notes}` : ''}`
+    }).join('\n\n---\n\n')
+
+    zip.file('_Opuscule/FactChecks.md', matter.stringify(body, {
+      title: 'Fact Check',
+      philoweek_type: 'fact_checks',
+      exported: new Date().toISOString(),
+    }))
+  }
+
   const questionnaireResults = db.prepare('SELECT * FROM questionnaire_results WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   if (questionnaireResults.length > 0) {
     zip.file('_Opuscule/QuestionnaireResults.json', JSON.stringify({

@@ -23,6 +23,9 @@ const NODE_TYPES = [
   { value: 'objective', label: 'Objectif', color: '#4caf7d' },
   { value: 'question', label: 'Question', color: '#d69d55' },
   { value: 'resource', label: 'Ressource', color: '#a08be0' },
+  { value: 'action', label: 'Action', color: '#e05555' },
+  // Bloc neutre : pas de badge de categorie affiche sur la carte (voir `blank`).
+  { value: 'blank', label: 'Bloc', color: '#d8d8d8', blank: true },
 ]
 
 const BORDER_COLORS = [
@@ -491,7 +494,7 @@ export default function GraphEditor() {
                       }
                     }}
                   >
-                    <span className="graph-node-type">{meta.label}</span>
+                    {!meta.blank && <span className="graph-node-type">{meta.label}</span>}
                     <strong>{node.title || 'Sans titre'}</strong>
                     {node.body ? (
                       <div

@@ -135,6 +135,11 @@ const SECTIONS = [
         title: 'Citations',
         text: "Vie intérieure garde tes citations favorites avec auteur, source, notes personnelles et tags.",
       },
+      {
+        icon: 'alert',
+        title: 'Fact Check',
+        text: "Note une idée reçue que tu n'as pas encore vérifiée, avec sa source. Change son statut (à vérifier / vrai / faux / partiellement vrai) le jour où tu prends le temps de creuser.",
+      },
     ],
   },
   {

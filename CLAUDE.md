@@ -54,12 +54,21 @@ PhiloWeek/
 ## Base de données (tables)
 
 ```sql
-files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order
+files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order, user_id
 file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
-timer_sessions — id, file_id, duration_seconds, activity_type, notes
-voice_notes  — id, file_id, filename, duration_seconds, title
+timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
+voice_notes  — id, file_id, filename, duration_seconds, title, user_id
+users        — id, username (unique, insensible à la casse), password_hash
+sessions     — id, user_id, token_hash, expires_at, user_agent
+fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
 ```
+
+Toutes les tables de contenu (`files`, `timer_sessions`, `voice_notes`, `quotes`,
+`inbox_resources`, `inbox_ideas`, `questionnaire_results`, `fact_checks`) ont une
+colonne `user_id` : chaque requête dans `server/routes/*.js` doit filtrer dessus
+(`WHERE user_id = ?` / `AND user_id = ?`) — voir la section authentification
+plus bas.
 
 ## Règle absolue : toute nouvelle feature doit être ajoutée au tutoriel
 
@@ -99,6 +108,28 @@ Voir **`RAILWAY.md`** pour la procédure complète. Points clés :
 - Pour changer le schéma : **ajoute** une entrée à la fin de `MIGRATIONS`, ne
   modifie jamais une migration déjà livrée. Elle ne tournera qu'une fois, sur
   bases existantes comme neuves.
+
+## Authentification et isolation multi-utilisateurs
+
+- Chaque compte (`users`) a son propre coffre : toutes les tables de contenu
+  ont une colonne `user_id`, et **chaque requête** dans `server/routes/*.js`
+  doit filtrer dessus (`req.user.id`, posé par le middleware `requireAuth`
+  dans `server/auth/middleware.js`, monté dans `server/index.js` avant tous
+  les routers sauf `/api/auth`).
+- Sessions : token aléatoire côté client dans un cookie `HttpOnly` +
+  `Secure` (via `paths.js` → `isRailway`) + `SameSite=Strict` ; seul son hash
+  SHA-256 est stocké côté serveur (`server/auth/session.js`, table
+  `sessions`) — jamais le token brut. Le logout supprime la ligne, donc la
+  révocation est immédiate (contrairement à un JWT).
+- Mots de passe des comptes : `server/auth/password.js` (scrypt renforcé,
+  format versionné `scrypt$2$...`). **Ne jamais confondre** avec
+  `hashPassword`/`verifyPassword` dans `server/routes/files.js`, qui
+  protègent les dossiers verrouillés (`locked_folder`) avec un format et des
+  paramètres différents — les deux doivent rester indépendants.
+- Nouvelle table de contenu = colonne `user_id` obligatoire dès la création
+  (pas besoin du pattern "nullable + script de rattachement" utilisé pour la
+  migration initiale de l'auth, qui ne concernait que les données
+  pré-existantes).
 
 ## Filet de sécurité manuel : export/import Obsidian
 

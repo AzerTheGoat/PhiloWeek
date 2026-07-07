@@ -186,6 +186,25 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_questionnaire_results_user_id ON questionnaire_results(user_id);
     `)
   },
+  // v3 → v4 : rubrique Fact Check (idees recues a verifier plus tard)
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS fact_checks (
+        id TEXT PRIMARY KEY,
+        claim TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'to_check' CHECK(status IN ('to_check', 'true', 'false', 'partial')),
+        notes TEXT,
+        source TEXT,
+        tags TEXT DEFAULT '[]',
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_fact_checks_user_id ON fact_checks(user_id);
+      CREATE INDEX IF NOT EXISTS idx_fact_checks_status ON fact_checks(status);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

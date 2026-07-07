@@ -85,6 +85,12 @@ export const getQuotes = () => req('GET', '/life/quotes')
 export const createQuote = data => req('POST', '/life/quotes', data)
 export const updateQuote = (id, data) => req('PUT', `/life/quotes/${id}`, data)
 export const deleteQuote = id => req('DELETE', `/life/quotes/${id}`)
+
+// Life / Fact Check
+export const getFactChecks = () => req('GET', '/life/fact-checks')
+export const createFactCheck = data => req('POST', '/life/fact-checks', data)
+export const updateFactCheck = (id, data) => req('PUT', `/life/fact-checks/${id}`, data)
+export const deleteFactCheck = id => req('DELETE', `/life/fact-checks/${id}`)
 // Questionnaires
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)

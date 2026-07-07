@@ -49,13 +49,20 @@ PhiloWeek/
 ## Base de données (tables)
 
 ```sql
-files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order
+files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order, user_id
 file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
-timer_sessions — id, file_id, duration_seconds, activity_type, notes
-voice_notes  — id, file_id, filename, duration_seconds, title
-quotes       — id, quote, author, source, notes, tags, created_at, updated_at
+timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
+voice_notes  — id, file_id, filename, duration_seconds, title, user_id
+quotes       — id, quote, author, source, notes, tags, user_id, created_at, updated_at
+fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
+users        — id, username (unique, insensible à la casse), password_hash
+sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
+
+Toutes les tables de contenu ont une colonne `user_id` : chaque requête dans
+`server/routes/*.js` doit filtrer dessus (middleware `requireAuth` pose
+`req.user.id`, voir `server/auth/`).
 
 ## Règle absolue : toute nouvelle feature doit être ajoutée au tutoriel
 
@@ -132,6 +139,13 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La vue `Vie` contient une bibliothèque de citations.
 - Les citations sont stockées dans la table `quotes` avec auteur, source, notes et tags.
 - L'export Obsidian ajoute les citations dans `_Opuscule/Citations.md` avec `philoweek_type: quotes`; l'import recrée les citations depuis ce fichier.
+
+## Vie intérieure : Fact Check
+
+- Deuxième section de la vue `Vie`, à côté des citations (`client/src/components/LifePage.jsx`).
+- Sert à noter une idée reçue pas encore vérifiée (`claim`), avec une source optionnelle, des notes et des tags — sans bloquer sur la vérification immédiate.
+- Stockées dans la table `fact_checks` avec un `status` : `to_check` (par défaut), `true`, `false`, `partial`. Le statut se change directement depuis la carte (select inline), pas besoin de rouvrir un formulaire.
+- L'export Obsidian ajoute les entrées dans `_Opuscule/FactChecks.md` avec `philoweek_type: fact_checks` (même format bloc-quote que les citations, plus une ligne `Statut:`); l'import recrée les entrées et remappe le libellé du statut vers sa valeur (`A verifier` → `to_check`, etc.).
 
 ## Graphes d'idées
 

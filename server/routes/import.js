@@ -59,6 +59,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         `INSERT INTO quotes (id, quote, author, source, notes, tags, user_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertFactCheck = db.prepare(
+        `INSERT INTO fact_checks (id, claim, status, notes, source, tags, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
       const insertQuestionnaireResult = db.prepare(
         `INSERT OR IGNORE INTO questionnaire_results (
           id, question_key, questionnaire_file_id, questionnaire_title, question_id,
@@ -108,6 +112,27 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 quote.tags,
                 req.user.id,
                 quote.created_at || now,
+                now
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (parsedSpecial.data.philoweek_type === 'fact_checks') {
+            const factChecks = parseFactChecksExport(parsedSpecial.content)
+            for (const factCheck of factChecks) {
+              const id = uuidv4()
+              const now = new Date().toISOString()
+              insertFactCheck.run(
+                id,
+                factCheck.claim,
+                factCheck.status,
+                factCheck.notes,
+                factCheck.source,
+                factCheck.tags,
+                req.user.id,
+                factCheck.created_at || now,
                 now
               )
               report.imported++
@@ -251,6 +276,44 @@ function parseQuotesExport(content) {
       }
     })
     .filter(q => q.quote)
+}
+
+const STATUS_LABEL_TO_VALUE = {
+  'a verifier': 'to_check',
+  'vrai': 'true',
+  'faux': 'false',
+  'partiellement vrai': 'partial',
+}
+
+function parseFactChecksExport(content) {
+  return String(content || '')
+    .split(/\n---\n/g)
+    .map(block => block.trim())
+    .filter(Boolean)
+    .map(block => {
+      const lines = block.split('\n')
+      const claimLines = []
+      let i = 0
+      while (i < lines.length && lines[i].startsWith('>')) {
+        claimLines.push(lines[i].replace(/^>\s?/, ''))
+        i++
+      }
+      const rest = lines.slice(i).join('\n').trim()
+      const statusLabel = matchLine(rest, 'Statut')
+      const source = matchLine(rest, 'Source')
+      const tags = matchLine(rest, 'Tags') || '[]'
+      const created = matchLine(rest, 'Ajoute')
+      const notesMatch = rest.match(/Notes:\n([\s\S]*)$/)
+      return {
+        claim: claimLines.join('\n').trim(),
+        status: STATUS_LABEL_TO_VALUE[String(statusLabel || '').trim().toLowerCase()] || 'to_check',
+        source,
+        tags,
+        created_at: created,
+        notes: notesMatch ? notesMatch[1].trim() : null,
+      }
+    })
+    .filter(f => f.claim)
 }
 
 function matchLine(text, label) {
