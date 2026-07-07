@@ -98,10 +98,12 @@
   position: relative;
   min-width: 0;
   overflow: hidden;
+  isolation: isolate;
   background:
+    radial-gradient(circle at center, rgba(124, 100, 240, 0.08), transparent 34%),
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 36px 36px;
+  background-size: auto, 42px 42px, 42px 42px;
 }
 
 .kg-canvas {
@@ -115,8 +117,8 @@
 .kg-canvas:active { cursor: grabbing }
 
 .kg-edge {
-  stroke: rgba(170, 180, 210, 0.3);
-  stroke-width: 2;
+  stroke: rgba(170, 180, 210, 0.24);
+  stroke-width: 1.5;
   transition: opacity 0.15s, stroke 0.15s;
 }
 
@@ -127,7 +129,7 @@
 
 .kg-edge.active {
   stroke: var(--accent-hover);
-  stroke-width: 3;
+  stroke-width: 2.4;
 }
 
 .kg-edge.dim,
@@ -136,15 +138,19 @@
 }
 
 .kg-node {
-  cursor: pointer;
-  transition: opacity 0.15s;
+  cursor: grab;
+  transition: opacity 0.15s, filter 0.15s;
+}
+
+.kg-node:active {
+  cursor: grabbing;
 }
 
 .kg-node circle {
-  fill: var(--bg-elevated);
+  fill: #1f2430;
   stroke: #6ba3e8;
-  stroke-width: 2.5;
-  filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.22));
+  stroke-width: 2;
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.34));
 }
 
 .kg-node-questionnaire circle { stroke: var(--success) }
@@ -152,26 +158,37 @@
 .kg-node-journal circle { stroke: #d65f78 }
 
 .kg-node.connected circle {
-  stroke-width: 3.5;
+  stroke-width: 2.8;
 }
 
 .kg-node.active circle {
-  fill: var(--accent-dim);
+  fill: #29233e;
   stroke: var(--accent-hover);
-  stroke-width: 4;
+  stroke-width: 3.4;
 }
 
 .kg-node text {
   fill: var(--text);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 10px;
+  font-weight: 800;
   pointer-events: none;
 }
 
-.kg-node .kg-node-kind {
-  fill: var(--text-2);
-  font-size: 10px;
-  font-weight: 500;
+.kg-node-label {
+  pointer-events: none;
+}
+
+.kg-node-label rect {
+  fill: color-mix(in srgb, var(--bg-sidebar) 92%, transparent);
+  stroke: var(--border);
+  stroke-width: 1;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+
+.kg-node-label text {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .kg-side {
