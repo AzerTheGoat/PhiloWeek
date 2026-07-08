@@ -121,6 +121,10 @@ export default function HistoricalTimeline() {
   }
 
   const editEvent = (event) => {
+    if (!event.can_edit) {
+      toast('Tu peux modifier seulement tes cartes.', 'error')
+      return
+    }
     setEditingId(event.id)
     const start = splitDateLabel(event.start_label)
     const end = splitDateLabel(event.end_label)
@@ -163,6 +167,10 @@ export default function HistoricalTimeline() {
   }
 
   const removeEvent = async (event) => {
+    if (!event.can_edit) {
+      toast('Tu peux supprimer seulement tes cartes.', 'error')
+      return
+    }
     if (!window.confirm(`Supprimer "${event.title}" ?`)) return
     try {
       await api.deleteHistoricalEvent(event.id)
@@ -233,6 +241,7 @@ export default function HistoricalTimeline() {
               <div>
                 <span>{formatSpan(focused)}</span>
                 <h2>{focused.title}</h2>
+                {focused.owner_username && <small className="timeline-owner">par {focused.owner_username}</small>}
                 {focused.description && <p>{focused.description}</p>}
                 <TagRow tags={parseTags(focused.tags)} activeTags={activeTags} onToggle={toggleTag} />
               </div>
@@ -322,6 +331,7 @@ export default function HistoricalTimeline() {
                   <div className="timeline-card-body">
                     <span>{formatSpan(item.event)}</span>
                     <strong>{item.event.title}</strong>
+                    {item.event.owner_username && <small className="timeline-owner">par {item.event.owner_username}</small>}
                     {item.event.category && <em>{item.event.category}</em>}
                     <TagRow tags={parseTags(item.event.tags)} compact activeTags={activeTags} onToggle={toggleTag} />
                   </div>
@@ -409,11 +419,14 @@ export default function HistoricalTimeline() {
               <article key={event.id} onClick={() => focusEvent(event)} className={event.id === focused?.id ? 'active' : ''}>
                 <span>{formatSpan(event)}</span>
                 <strong>{event.title}</strong>
+                {event.owner_username && <span className="timeline-owner">par {event.owner_username}</span>}
                 <TagRow tags={parseTags(event.tags)} compact activeTags={activeTags} onToggle={toggleTag} />
-                <small>
-                  <span onClick={(e) => { e.stopPropagation(); editEvent(event) }}>Modifier</span>
-                  <span onClick={(e) => { e.stopPropagation(); removeEvent(event) }}>Supprimer</span>
-                </small>
+                {Boolean(event.can_edit) && (
+                  <small>
+                    <span onClick={(e) => { e.stopPropagation(); editEvent(event) }}>Modifier</span>
+                    <span onClick={(e) => { e.stopPropagation(); removeEvent(event) }}>Supprimer</span>
+                  </small>
+                )}
               </article>
             ))}
           </div>

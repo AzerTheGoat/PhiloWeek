@@ -12,6 +12,7 @@ export default function Sidebar() {
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [featuresOpen, setFeaturesOpen] = useState(false)
   const importInputRef = useRef(null)
 
   const handleSearch = useCallback(async (q) => {
@@ -40,63 +41,71 @@ export default function Sidebar() {
   const handleAreaContextMenu = useCallback((e) => {
     e.preventDefault()
     showContextMenu(e.clientX, e.clientY, [
-      { icon: '📄', label: 'Nouveau fichier', action: () => showModal('new-file', {}) },
-      { icon: '◎', label: 'Nouveau graphe', action: () => showModal('new-graph', {}) },
-      { icon: '📁', label: 'Nouveau dossier', action: () => showModal('new-folder', {}) },
+      { label: 'Nouveau fichier', action: () => showModal('new-file', {}) },
+      { label: 'Nouveau graphe', action: () => showModal('new-graph', {}) },
+      { label: 'Nouveau dossier', action: () => showModal('new-folder', {}) },
       { separator: true },
-      { icon: '📥', label: 'Importer (.zip)', action: () => importInputRef.current?.click() },
-      { icon: '📤', label: 'Exporter', action: () => api.exportObsidian() },
+      { label: 'Importer (.zip)', action: () => importInputRef.current?.click() },
+      { label: 'Exporter', action: () => api.exportObsidian() },
     ])
   }, [showModal, showContextMenu])
+
+  const runFeature = useCallback((action) => {
+    action()
+    setFeaturesOpen(false)
+  }, [])
+
+  const createActions = [
+    { icon: 'plus', label: 'Fichier', action: () => showModal('new-file', {}) },
+    { icon: 'graph', label: 'Graphe', action: () => showModal('new-graph', {}) },
+    { icon: 'question', label: 'Quiz', action: () => showModal('new-questionnaire', {}) },
+    { icon: 'folder', label: 'Dossier', action: () => showModal('new-folder', {}) },
+  ]
+
+  const viewActions = [
+    { icon: 'journal', label: 'Journal', active: view === 'journal', action: openJournalToday },
+    { icon: 'idea', label: 'Idées', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
+    { icon: 'life', label: 'Vie', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
+    { icon: 'synthesis', label: 'Todo', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
+    { icon: 'timer', label: 'Timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
+    { icon: 'graph', label: 'Base', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
+    { icon: 'timeline', label: 'Frise', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
+    { icon: 'thought', label: 'Guide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },
+  ]
+
+  const toolActions = [
+    { icon: 'play', label: 'Réviser', action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }) },
+    { icon: 'copy', label: 'Copier', action: () => dispatch({ type: 'TOGGLE_FILE_PICKER' }) },
+    { icon: 'download', label: 'Export', action: api.exportObsidian },
+    { icon: 'upload', label: importing ? 'Import...' : 'Import', action: () => importInputRef.current?.click() },
+    { icon: theme === 'dark' ? 'sun' : 'moon', label: theme === 'dark' ? 'Clair' : 'Sombre', action: () => dispatch({ type: 'SET_THEME', payload: theme === 'dark' ? 'light' : 'dark' }) },
+    { icon: 'compass', label: 'Compte', action: () => showModal('account', {}) },
+  ]
 
   return (
     <aside className={`sidebar ${sidebarOpen ? '' : 'hidden'}`}>
       <div className="sidebar-header">
         <span className="sidebar-logo"><Icon name="ai" size={20} /></span>
         <div className="sidebar-actions">
-          <button title="Journal d'aujourd'hui" className="icon-btn" onClick={openJournalToday}>
-            <Icon name="journal" />
-          </button>
           <button
-            title="Nid à idées"
-            className={`icon-btn ${view === 'inbox' ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'inbox' })}
+            type="button"
+            title="Fonctionnalités"
+            className={`feature-toggle ${featuresOpen ? 'active' : ''}`}
+            onClick={() => setFeaturesOpen(prev => !prev)}
           >
-            <Icon name="idea" />
-          </button>
-          <button
-            title="Vie intérieure"
-            className={`icon-btn ${view === 'life' ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'life' })}
-          >
-            <Icon name="life" />
-          </button>
-          <button title="Timer" className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timer' })}>
-            <Icon name="timer" />
-          </button>
-          <button
-            title="Frise historique"
-            className={`icon-btn ${view === 'timeline' ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timeline' })}
-          >
-            <Icon name="timeline" />
-          </button>
-          <button
-            title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}
-            className="icon-btn"
-            onClick={() => dispatch({ type: 'SET_THEME', payload: theme === 'dark' ? 'light' : 'dark' })}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-          </button>
-          <button
-            title="Découvrir les fonctionnalités"
-            className={`icon-btn ${view === 'tutorial' ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'tutorial' })}
-          >
-            <Icon name="thought" />
+            <Icon name="compass" size={16} />
+            <span>Fonctions</span>
           </button>
         </div>
       </div>
+
+      {featuresOpen && (
+        <div className="feature-panel">
+          <FeatureGroup title="Créer" actions={createActions} runFeature={runFeature} />
+          <FeatureGroup title="Vues" actions={viewActions} runFeature={runFeature} />
+          <FeatureGroup title="Outils" actions={toolActions} runFeature={runFeature} />
+        </div>
+      )}
 
       <div className="sidebar-search">
         <input
@@ -130,45 +139,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      <div className="sidebar-footer">
-        <button className="footer-btn" onClick={() => showModal('new-file', {})} title="Nouveau fichier">
-          <Icon name="plus" size={16} /> Fichier
-        </button>
-        <button className="footer-btn" onClick={() => showModal('new-graph', {})} title="Nouveau graphe">
-          <Icon name="graph" size={16} /> Graphe
-        </button>
-        <button className="footer-btn" onClick={() => showModal('new-questionnaire', {})} title="Nouveau questionnaire">
-          <Icon name="question" size={16} /> Quiz
-        </button>
-        <button className="footer-btn" onClick={() => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' })} title="Lancer un questionnaire">
-          <Icon name="play" size={16} /> Reviser
-        </button>
-        <button className="footer-btn" onClick={() => showModal('new-folder', {})} title="Nouveau dossier">
-          <Icon name="folder" size={16} /> Dossier
-        </button>
-        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })} title="Voir le graphe de la base">
-          <Icon name="graph" size={16} /> Base
-        </button>
-        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timeline' })} title="Frise historique">
-          <Icon name="timeline" size={16} /> Frise
-        </button>
-        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'todos' })} title="Todos et dates limites">
-          <Icon name="synthesis" size={16} /> Todo
-        </button>
-        <button className="footer-btn" onClick={api.exportObsidian} title="Exporter vault Obsidian">
-          <Icon name="download" size={16} /> Export
-        </button>
-        <label className="footer-btn" title="Importer vault Obsidian (.zip)">
-          {importing ? '...' : <><Icon name="upload" size={16} /> Import</>}
-          <input ref={importInputRef} type="file" accept=".zip" hidden onChange={handleImport} />
-        </label>
-        <button className="footer-btn" onClick={() => dispatch({ type: 'TOGGLE_FILE_PICKER' })} title="Copier des notes sélectionnées">
-          <Icon name="copy" size={16} /> Copier
-        </button>
-        <button className="footer-btn" onClick={() => showModal('account', {})} title="Compte">
-          <Icon name="compass" size={16} /> Compte
-        </button>
-      </div>
+      <input ref={importInputRef} type="file" accept=".zip" hidden onChange={handleImport} />
 
       <div className="sidebar-version" title="Version déployée">v2.0.2</div>
 
@@ -180,5 +151,26 @@ export default function Sidebar() {
         {sidebarOpen ? '‹' : '›'}
       </button>
     </aside>
+  )
+}
+
+function FeatureGroup({ title, actions, runFeature }) {
+  return (
+    <section className="feature-group">
+      <h3>{title}</h3>
+      <div className="feature-grid">
+        {actions.map(action => (
+          <button
+            key={action.label}
+            type="button"
+            className={`feature-action ${action.active ? 'active' : ''}`}
+            onClick={() => runFeature(action.action)}
+          >
+            <Icon name={action.icon} size={17} />
+            <span>{action.label}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }

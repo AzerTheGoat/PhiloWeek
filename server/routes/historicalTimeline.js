@@ -7,9 +7,12 @@ const router = express.Router()
 router.get('/', (req, res) => {
   const db = getDb()
   const rows = db.prepare(`
-    SELECT * FROM historical_events
-    WHERE user_id = ?
-    ORDER BY start_year ASC, COALESCE(start_month, 0) ASC, COALESCE(start_day, 0) ASC, created_at ASC
+    SELECT historical_events.*,
+      users.username AS owner_username,
+      CASE WHEN historical_events.user_id = ? THEN 1 ELSE 0 END AS can_edit
+    FROM historical_events
+    LEFT JOIN users ON users.id = historical_events.user_id
+    ORDER BY start_year ASC, COALESCE(start_month, 0) ASC, COALESCE(start_day, 0) ASC, historical_events.created_at ASC
   `).all(req.user.id)
   res.json(rows)
 })
@@ -58,8 +61,8 @@ router.post('/', (req, res) => {
 
 router.put('/:id', (req, res) => {
   const db = getDb()
-  const existing = db.prepare('SELECT * FROM historical_events WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
-  if (!existing) return res.status(404).json({ error: 'Not found' })
+  const existing = getOwnedEvent(db, req.params.id, req.user.id)
+  if (existing?.error) return res.status(existing.status).json({ error: existing.error })
 
   const data = normalizePayload({ ...existingToPayload(existing), ...req.body })
   if (!data.title) return res.status(400).json({ error: 'title required' })
@@ -100,9 +103,18 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   const db = getDb()
+  const existing = getOwnedEvent(db, req.params.id, req.user.id)
+  if (existing?.error) return res.status(existing.status).json({ error: existing.error })
   db.prepare('DELETE FROM historical_events WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
   res.json({ ok: true })
 })
+
+function getOwnedEvent(db, id, userId) {
+  const event = db.prepare('SELECT * FROM historical_events WHERE id = ?').get(id)
+  if (!event) return { status: 404, error: 'Not found' }
+  if (event.user_id !== userId) return { status: 403, error: 'Tu peux modifier seulement tes cartes.' }
+  return event
+}
 
 function normalizePayload(body = {}) {
   const startText = body.start || body.start_label

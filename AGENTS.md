@@ -98,6 +98,12 @@ modified: 2025-01-15T14:22:00Z
 Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ```
 
+## Navigation et panneau Fonctionnalites
+
+- La sidebar garde l'arbre de fichiers comme surface principale.
+- Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` : creation de fichiers/graphes/quiz/dossiers, navigation Journal/Idees/Vie/Todo/Timer/Base/Frise/Guide, revision, copie, import/export, theme et compte.
+
 ## Graphes d'idees
 
 - La sidebar permet de creer un `Graphe` en plus d'un fichier `.md` classique.
@@ -222,6 +228,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Frise historique
 
 - La vue `Frise` est accessible depuis la sidebar et la navigation mobile.
+- Elle est commune a tous les comptes : chaque utilisateur voit tous les reperes de `historical_events`, mais ne peut modifier ou supprimer que ses propres cartes (`can_edit` renvoye par l'API).
 - Elle stocke les reperes historiques dans `historical_events`, avec dates ponctuelles ou periodes (`start_*` et `end_*`), description, categorie, couleur, tags et photo optionnelle en data URL.
 - Les tags sont visibles sur les cartes et servent de filtres : selectionner un ou plusieurs tags affiche les reperes qui correspondent a au moins l'un des tags actifs.
 - Les dates acceptent au minimum une annee (`1789`, `-44`) et peuvent inclure mois/jour (`1789-07-14`).

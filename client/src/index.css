@@ -274,6 +274,14 @@
   line-height: 1.45;
 }
 
+.timeline-owner {
+  display: block;
+  margin: -2px 0 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-style: normal;
+}
+
 .timeline-tags {
   display: flex;
   flex-wrap: wrap;
@@ -554,6 +562,10 @@
   white-space: nowrap;
 }
 
+.timeline-card-body .timeline-owner {
+  margin: -2px 0 4px;
+}
+
 .timeline-minimap {
   position: relative;
   height: 34px;
@@ -727,6 +739,10 @@
   display: block;
   margin: 3px 0 7px;
   font-size: 13px;
+}
+
+.timeline-event-list .timeline-owner {
+  margin: -4px 0 6px;
 }
 
 .timeline-event-list small {
@@ -1151,6 +1167,97 @@ a { color: var(--link) }
 .sidebar-actions {
   display: flex;
   gap: 2px;
+}
+
+.feature-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.feature-toggle:hover,
+.feature-toggle.active {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--text-3);
+}
+
+.feature-toggle.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border));
+}
+
+.feature-panel {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-sidebar) 94%, var(--bg-elevated));
+  max-height: min(460px, 54vh);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.feature-group + .feature-group {
+  margin-top: 12px;
+}
+
+.feature-group h3 {
+  margin: 0 0 7px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.feature-action {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.feature-action span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-action:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--text-3);
+}
+
+.feature-action.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
 }
 
 .sidebar-search {
