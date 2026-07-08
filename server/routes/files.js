@@ -135,6 +135,16 @@ router.delete('/:id', (req, res) => {
   const db = getDb()
   const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!file) return res.status(404).json({ error: 'Not found' })
+  if (file.type === 'folder' || file.type === 'locked_folder') {
+    const descendantCount = countDescendants(db, file.id, req.user.id)
+    if (descendantCount > 0 && req.query.confirm_children !== '1') {
+      return res.status(409).json({
+        error: `Ce dossier contient ${descendantCount} élément(s). Confirme la suppression du dossier et de tout son contenu.`,
+        requires_child_confirm: true,
+        child_count: descendantCount,
+      })
+    }
+  }
   db.prepare('DELETE FROM files WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
 })
@@ -264,6 +274,15 @@ router.post('/:id/lock', async (req, res) => {
 
   res.json({ ok: true })
 })
+
+function countDescendants(db, folderId, userId) {
+  let total = 0
+  const children = db.prepare('SELECT id FROM files WHERE parent_id = ? AND user_id = ?').all(folderId, userId)
+  for (const child of children) {
+    total += 1 + countDescendants(db, child.id, userId)
+  }
+  return total
+}
 
 module.exports = router
 

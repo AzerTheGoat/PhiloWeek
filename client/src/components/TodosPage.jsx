@@ -16,12 +16,15 @@ const SECTION_META = {
 }
 
 export default function TodosPage({ section = 'tasks' }) {
-  const { toast } = useApp()
+  const { currentUser, toast } = useApp()
   const [todos, setTodos] = useState([])
   const [filter, setFilter] = useState('open')
   const [form, setForm] = useState(() => ({ title: '', notes: '', due_at: todayInput() }))
   const [showForm, setShowForm] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [agendaMonth, setAgendaMonth] = useState(() => startOfMonth(todayInput()))
+  const [selectedAgendaDate, setSelectedAgendaDate] = useState(todayInput())
+  const [agendaNoticeClosed, setAgendaNoticeClosed] = useState(false)
 
   const [dashboard, setDashboard] = useState(() => ({ practices: [], checks: [], profile: { birth_date: '', life_expectancy_years: 85 }, today: todayInput() }))
   const [practiceForm, setPracticeForm] = useState({ title: '' })
@@ -32,6 +35,7 @@ export default function TodosPage({ section = 'tasks' }) {
 
   useEffect(() => {
     if (section === 'tasks') loadTodos(filter)
+    if (section === 'agenda') loadTodos('open')
   }, [section, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -77,6 +81,20 @@ export default function TodosPage({ section = 'tasks' }) {
     ? Math.round(agendaSeries.reduce((sum, day) => sum + day.percent, 0) / agendaSeries.length)
     : 0
   const currentStreak = useMemo(() => buildStreak(agendaSeries), [agendaSeries])
+  const tasksByDate = useMemo(() => groupTodosByDate(todos), [todos])
+  const agendaMonthGrid = useMemo(() => buildMonthGrid(agendaMonth), [agendaMonth])
+  const selectedDayTasks = tasksByDate.get(selectedAgendaDate) || []
+  const todayTasks = tasksByDate.get(dashboard.today) || []
+  const overdueTasks = todos.filter(todo => todo.status === 'open' && todo.due_at < dashboard.today)
+  const selectedDayPractices = useMemo(
+    () => dashboardAvailablePractices(dashboard.practices, selectedAgendaDate),
+    [dashboard.practices, selectedAgendaDate]
+  )
+  const selectedDayDone = selectedDayPractices.filter(practice => checkMap.get(`${practice.id}:${selectedAgendaDate}`)).length
+  const showAgendaNotice = section === 'agenda'
+    && !agendaNoticeClosed
+    && (todayTasks.length > 0 || overdueTasks.length > 0)
+    && !hasSeenAgendaNotice(currentUser?.id, dashboard.today)
 
   const lifeGrid = useMemo(() => {
     return buildLifeGrid(dashboard.profile, lifeUnit)
@@ -148,6 +166,11 @@ export default function TodosPage({ section = 'tasks' }) {
     } catch (err) {
       toast(err.message, 'error')
     }
+  }
+
+  function closeAgendaNotice() {
+    markAgendaNoticeSeen(currentUser?.id, dashboard.today)
+    setAgendaNoticeClosed(true)
   }
 
   async function addPractice(event) {
@@ -281,14 +304,27 @@ export default function TodosPage({ section = 'tasks' }) {
           activePractices={activePractices}
           practices={dashboard.practices}
           today={dashboard.today}
+          agendaMonth={agendaMonth}
+          setAgendaMonth={setAgendaMonth}
+          selectedDate={selectedAgendaDate}
+          setSelectedDate={setSelectedAgendaDate}
           checkMap={checkMap}
           todayDone={todayDone}
+          selectedDayDone={selectedDayDone}
           agendaCompletion={agendaCompletion}
           currentStreak={currentStreak}
           agendaSeries={agendaSeries}
+          agendaMonthGrid={agendaMonthGrid}
+          tasksByDate={tasksByDate}
+          selectedDayTasks={selectedDayTasks}
+          todayTasks={todayTasks}
+          overdueTasks={overdueTasks}
+          showAgendaNotice={showAgendaNotice}
+          closeAgendaNotice={closeAgendaNotice}
           practiceForm={practiceForm}
           setPracticeForm={setPracticeForm}
           addPractice={addPractice}
+          toggleTodo={toggleTodo}
           togglePractice={togglePractice}
           editingPracticeId={editingPracticeId}
           editingPracticeTitle={editingPracticeTitle}
@@ -405,14 +441,27 @@ function AgendaPanel({
   activePractices,
   practices,
   today,
+  agendaMonth,
+  setAgendaMonth,
+  selectedDate,
+  setSelectedDate,
   checkMap,
   todayDone,
+  selectedDayDone,
   agendaCompletion,
   currentStreak,
   agendaSeries,
+  agendaMonthGrid,
+  tasksByDate,
+  selectedDayTasks,
+  todayTasks,
+  overdueTasks,
+  showAgendaNotice,
+  closeAgendaNotice,
   practiceForm,
   setPracticeForm,
   addPractice,
+  toggleTodo,
   togglePractice,
   editingPracticeId,
   editingPracticeTitle,
@@ -425,6 +474,17 @@ function AgendaPanel({
 }) {
   return (
     <div className="agenda-dashboard">
+      {showAgendaNotice && (
+        <section className="agenda-day-alert">
+          <div>
+            <strong>{todayTasks.length} tâche(s) aujourd'hui</strong>
+            {overdueTasks.length > 0 && <span>{overdueTasks.length} tâche(s) en retard à rattraper.</span>}
+            {todayTasks.length > 0 && <span>Ton Agenda les affiche directement dans la journée.</span>}
+          </div>
+          <button type="button" className="btn-ghost" onClick={closeAgendaNotice}>Vu pour aujourd'hui</button>
+        </section>
+      )}
+
       <section className="agenda-hero">
         <div className="agenda-section-head">
           <div>
@@ -448,11 +508,85 @@ function AgendaPanel({
         </div>
       </section>
 
+      <section className="agenda-calendar-panel">
+        <div className="agenda-section-head">
+          <div>
+            <h3>Calendrier</h3>
+            <span>{monthLabel(agendaMonth)}</span>
+          </div>
+          <div className="agenda-calendar-nav">
+            <button type="button" className="icon-btn" onClick={() => setAgendaMonth(month => shiftMonth(month, -1))}>‹</button>
+            <button type="button" className="btn-ghost" onClick={() => { setAgendaMonth(startOfMonth(today)); setSelectedDate(today) }}>Aujourd'hui</button>
+            <button type="button" className="icon-btn" onClick={() => setAgendaMonth(month => shiftMonth(month, 1))}>›</button>
+          </div>
+        </div>
+        <div className="agenda-calendar-grid">
+          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(day => <span key={day} className="agenda-weekday">{day}</span>)}
+          {agendaMonthGrid.map(day => {
+            const dayTasks = tasksByDate.get(day.date) || []
+            const dayPractices = dashboardAvailablePractices(practices, day.date)
+            const dayDone = dayPractices.filter(practice => checkMap.get(`${practice.id}:${day.date}`)).length
+            return (
+              <button
+                key={day.date}
+                type="button"
+                className={[
+                  'agenda-calendar-day',
+                  !day.inMonth ? 'outside' : '',
+                  day.date === today ? 'today' : '',
+                  day.date === selectedDate ? 'selected' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => setSelectedDate(day.date)}
+              >
+                <strong>{dayNumber(day.date)}</strong>
+                <span>{dayTasks.length ? `${dayTasks.length} tâche${dayTasks.length > 1 ? 's' : ''}` : ''}</span>
+                {dayPractices.length > 0 && <em>{dayDone}/{dayPractices.length}</em>}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="agenda-day-panel">
+        <div className="agenda-section-head">
+          <div>
+            <h3>{selectedDate === today ? "Aujourd'hui" : formatDate(selectedDate)}</h3>
+            <span>{selectedDayTasks.length} tâche(s) · {selectedDayDone}/{dashboardAvailablePractices(practices, selectedDate).length} habitude(s)</span>
+          </div>
+        </div>
+        <div className="agenda-day-list">
+          {selectedDayTasks.length === 0 && <div className="todo-empty">Aucune tâche prévue ce jour-là.</div>}
+          {selectedDayTasks.map(todo => (
+            <article key={todo.id} className="agenda-task-card">
+              <button type="button" className="todo-check" onClick={() => toggleTodo(todo)} title="Terminer">✓</button>
+              <div>
+                <strong>{todo.title}</strong>
+                {todo.notes && <p>{todo.notes}</p>}
+              </div>
+            </article>
+          ))}
+          {overdueTasks.length > 0 && selectedDate === today && (
+            <div className="agenda-overdue">
+              <strong>À rattraper</strong>
+              {overdueTasks.map(todo => (
+                <article key={todo.id} className="agenda-task-card late">
+                  <button type="button" className="todo-check" onClick={() => toggleTodo(todo)} title="Terminer">✓</button>
+                  <div>
+                    <strong>{todo.title}</strong>
+                    <span>{formatDate(todo.due_at)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="agenda-today">
         <div className="agenda-section-head">
           <div>
-            <h3>Habitudes du jour</h3>
-            <span>{todayDone}/{activePractices.length} faites</span>
+            <h3>Habitudes</h3>
+            <span>{selectedDayDone}/{dashboardAvailablePractices(practices, selectedDate).length} faites le {formatShortDate(selectedDate)}</span>
           </div>
         </div>
 
@@ -470,15 +604,15 @@ function AgendaPanel({
 
         <div className="practice-check-list">
           {loading && <div className="todo-empty">Chargement...</div>}
-          {!loading && activePractices.length === 0 && <div className="todo-empty">Ajoute une habitude pour commencer.</div>}
-          {activePractices.map(practice => {
-            const done = checkMap.get(`${practice.id}:${today}`)
+          {!loading && dashboardAvailablePractices(practices, selectedDate).length === 0 && <div className="todo-empty">Ajoute une habitude pour commencer.</div>}
+          {dashboardAvailablePractices(practices, selectedDate).map(practice => {
+            const done = checkMap.get(`${practice.id}:${selectedDate}`)
             return (
               <button
                 key={practice.id}
                 type="button"
                 className={`practice-check ${done ? 'done' : ''}`}
-                onClick={() => togglePracticeCheck(practice)}
+                onClick={() => togglePracticeCheck(practice, selectedDate)}
               >
                 <span>{done ? '✓' : ''}</span>
                 {practice.title}
@@ -660,11 +794,72 @@ function toDateInput(date) {
   return next.toISOString().slice(0, 10)
 }
 
+function startOfMonth(dateText) {
+  const date = new Date(`${dateText}T00:00:00`)
+  return toDateInput(new Date(date.getFullYear(), date.getMonth(), 1))
+}
+
+function shiftMonth(dateText, delta) {
+  const date = new Date(`${dateText}T00:00:00`)
+  return toDateInput(new Date(date.getFullYear(), date.getMonth() + delta, 1))
+}
+
+function buildMonthGrid(monthText) {
+  const first = new Date(`${monthText}T00:00:00`)
+  const startOffset = (first.getDay() + 6) % 7
+  const start = new Date(first)
+  start.setDate(first.getDate() - startOffset)
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    return {
+      date: toDateInput(date),
+      inMonth: date.getMonth() === first.getMonth(),
+    }
+  })
+}
+
+function groupTodosByDate(todos) {
+  const map = new Map()
+  todos.forEach(todo => {
+    const key = String(todo.due_at || '').slice(0, 10)
+    if (!key) return
+    const list = map.get(key) || []
+    list.push(todo)
+    map.set(key, list)
+  })
+  return map
+}
+
+function dashboardAvailablePractices(practices, day) {
+  return practices.filter(practice => practice.active && wasPracticeAvailable(practice, day))
+}
+
 function wasPracticeAvailable(practice, day) {
   if (!practice.created_at) return true
   const created = String(practice.created_at).slice(0, 10)
   const archived = practice.archived_at ? String(practice.archived_at).slice(0, 10) : null
   return day >= created && (!archived || day <= archived)
+}
+
+function monthLabel(value) {
+  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date(`${value}T00:00:00`))
+}
+
+function dayNumber(value) {
+  return new Date(`${value}T00:00:00`).getDate()
+}
+
+function agendaNoticeKey(userId) {
+  return `pw-agenda-reminder-${userId || 'local'}`
+}
+
+function hasSeenAgendaNotice(userId, today) {
+  return localStorage.getItem(agendaNoticeKey(userId)) === today
+}
+
+function markAgendaNoticeSeen(userId, today) {
+  localStorage.setItem(agendaNoticeKey(userId), today)
 }
 
 function buildStreak(series) {

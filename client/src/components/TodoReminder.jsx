@@ -17,8 +17,9 @@ export default function TodoReminder() {
     let cancelled = false
     api.getTodoReminder()
       .then(rows => {
-        if (cancelled || !rows.length) return
-        setTodos(rows)
+        const dueNow = rows.filter(todo => String(todo.due_at || '').slice(0, 10) <= today)
+        if (cancelled || !dueNow.length) return
+        setTodos(dueNow)
         setVisible(true)
         localStorage.setItem(key, today)
       })
@@ -36,13 +37,13 @@ export default function TodoReminder() {
   if (!visible || urgentTodos.length === 0) return null
 
   return (
-    <div className="todo-reminder-backdrop" role="dialog" aria-modal="true" aria-label="Rappel des todos">
+    <div className="todo-reminder-backdrop" role="dialog" aria-modal="true" aria-label="Rappel agenda">
       <section className="todo-reminder-panel">
         <div className="todo-reminder-head">
-          <span className="todo-reminder-icon"><Icon name="synthesis" size={22} /></span>
+          <span className="todo-reminder-icon"><Icon name="calendar" size={22} /></span>
           <div>
-            <strong>Rappel Todo du jour</strong>
-            <p>Voici tes tâches ouvertes avec leurs dates limites.</p>
+            <strong>Agenda du jour</strong>
+            <p>Voici les tâches à faire aujourd'hui ou déjà en retard.</p>
           </div>
           <button type="button" className="icon-btn" onClick={() => setVisible(false)} title="Fermer">
             <Icon name="close" />
@@ -65,10 +66,10 @@ export default function TodoReminder() {
             className="btn-primary"
             onClick={() => {
               setVisible(false)
-              dispatch({ type: 'SET_VIEW', payload: 'todos' })
+              dispatch({ type: 'SET_VIEW', payload: 'agenda' })
             }}
           >
-            Ouvrir Todo
+            Ouvrir Agenda
           </button>
         </div>
       </section>

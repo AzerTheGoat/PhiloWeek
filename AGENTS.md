@@ -144,6 +144,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Déplacement des fichiers et dossiers
 
 - Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.
+- Supprimer un dossier non vide doit demander une confirmation explicite indiquant que tous ses enfants seront supprimes; le backend refuse aussi la suppression sans `confirm_children=1`.
 - Le dossier `Journal` racine ne doit pas être déplaçable.
 - Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
 - Les dossiers verrouillés ne peuvent pas recevoir de nouveaux fichiers tant qu'ils ne sont pas déverrouillés.
@@ -165,7 +166,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - Les vues `Taches`, `Agenda` et `Vie perso` sont trois sections separees dans le panneau `Fonctions`.
 - Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
-- La section `Agenda` permet de creer des habitudes quotidiennes, de les cocher par jour, de les renommer, de les archiver/reprendre, de les supprimer avec leur historique, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme type GitHub : les jours n'affichent leurs details qu'au survol, et la couleur fonce selon la part d'habitudes accomplies. L'interface ne propose pas de choix manuel de couleur pour les habitudes.
+- La section `Agenda` est un vrai calendrier mensuel : chaque jour affiche ses taches dues, ses habitudes du jour et un detail de la journee selectionnee.
+- L'Agenda permet aussi de creer des habitudes quotidiennes, de les cocher par jour, de les renommer, de les archiver/reprendre, de les supprimer avec leur historique, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme type GitHub : les jours n'affichent leurs details qu'au survol, et la couleur fonce selon la part d'habitudes accomplies. L'interface ne propose pas de choix manuel de couleur pour les habitudes.
+- Le rappel quotidien des taches s'affiche au plus une fois par jour pour les taches dues aujourd'hui ou en retard, puis ouvre la section `Agenda`.
 - La section `Vie perso` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points deja vecus.
 - À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
 - L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.

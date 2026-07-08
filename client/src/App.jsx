@@ -94,8 +94,7 @@ function AppShell() {
       toast('Retour en arriere effectue.')
     }
 
-    const handler = async (event) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey || event.altKey) return
+    const runRollback = async (event) => {
       event.preventDefault()
       event.stopPropagation()
       if (rollbackBusyRef.current) return
@@ -120,8 +119,23 @@ function AppShell() {
       }
     }
 
-    window.addEventListener('keydown', handler, { capture: true })
-    return () => window.removeEventListener('keydown', handler, { capture: true })
+    const keyHandler = async (event) => {
+      const isUndoKey = (event.key || '').toLowerCase() === 'z' || event.code === 'KeyZ'
+      if (!(event.ctrlKey || event.metaKey) || !isUndoKey || event.shiftKey || event.altKey) return
+      await runRollback(event)
+    }
+
+    const inputHandler = async (event) => {
+      if (event.inputType !== 'historyUndo') return
+      await runRollback(event)
+    }
+
+    window.addEventListener('keydown', keyHandler, { capture: true })
+    window.addEventListener('beforeinput', inputHandler, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', keyHandler, { capture: true })
+      window.removeEventListener('beforeinput', inputHandler, { capture: true })
+    }
   }, [loadTree, openFile, toast])
 
   return (

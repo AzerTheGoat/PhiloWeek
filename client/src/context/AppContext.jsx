@@ -201,8 +201,8 @@ export function AppProvider({ children }) {
     }
   }, [loadTree, toast])
 
-  const deleteFile = useCallback(async (id) => {
-    await api.deleteFile(id)
+  const deleteFile = useCallback(async (id, options = {}) => {
+    await api.deleteFile(id, Boolean(options.confirmChildren))
     if (state.openFileId === id) {
       dispatch({ type: 'CLEAR_OPEN_FILE' })
     }

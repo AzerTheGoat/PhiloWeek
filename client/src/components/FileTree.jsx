@@ -139,14 +139,18 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   }, [isFolder, isLocked, node, showModal, showContextMenu])
 
   const handleDelete = useCallback(async () => {
-    if (!confirm(`Supprimer "${node.name}" ?`)) return
+    const descendantCount = isFolder ? collectDescendantIds(node).length : 0
+    const message = isFolder && descendantCount > 0
+      ? `Supprimer le dossier "${node.name}" et ses ${descendantCount} élément(s) ?\n\nTous les fichiers et sous-dossiers dedans seront supprimés aussi.`
+      : `Supprimer "${node.name}" ?`
+    if (!window.confirm(message)) return
     try {
-      await deleteFile(node.id)
+      await deleteFile(node.id, { confirmChildren: isFolder && descendantCount > 0 })
       toast(`"${node.name}" supprimé`)
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [deleteFile, node, toast])
+  }, [deleteFile, isFolder, node, toast])
 
   const handleRename = useCallback(async () => {
     if (!renameVal.trim() || renameVal === node.name) { setRenaming(false); return }
