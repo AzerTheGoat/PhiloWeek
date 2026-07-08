@@ -64,7 +64,15 @@ export default function Editor() {
     }, AUTOSAVE_DELAY)
   }, [])
 
-  // Sync content when the opened file changes
+  // Resynchronise le contenu local à chaque (ré)ouverture de fichier.
+  // On dépend de l'OBJET `currentFile`, pas de `currentFile.content` :
+  //   - `saveFile` ne met jamais à jour `currentFile`, donc pendant la frappe
+  //     la référence ne change pas → aucune resynchro intempestive, la frappe
+  //     est préservée.
+  //   - `openFile` (déclenché notamment par le retour en arrière Ctrl+Z)
+  //     produit TOUJOURS un nouvel objet `currentFile`, même si le contenu
+  //     restauré est identique à la valeur de base précédente → l'éditeur
+  //     recharge alors le contenu serveur et abandonne son état local périmé.
   useEffect(() => {
     const prevId = prevFileIdRef.current
     // Save pending changes before switching files
@@ -78,8 +86,10 @@ export default function Editor() {
     setContent(newContent)
     setPreviewContent(newContent)
     setIsDirty(false)
+    // Annule tout autosave en attente : évite qu'une frappe non sauvegardée
+    // ré-écrase le contenu qu'on vient de restaurer.
     clearTimeout(saveTimerRef.current)
-  }, [currentFile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentFile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced word count
   useEffect(() => {

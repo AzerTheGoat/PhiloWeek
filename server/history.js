@@ -2,12 +2,10 @@ const { v4: uuidv4 } = require('uuid')
 const { getDb, updateAllLinks } = require('./db')
 
 const ONE_SECOND = 1000
-// Intervalle minimum entre deux snapshots d'un même utilisateur. Chaque
-// snapshot copie l'intégralité des données du compte : un intervalle trop
-// court (ex. autosave toutes les secondes) amplifie fortement les écritures.
-// 4 s reste sous le palier de rétention (< 5 min gardés) donc l'undo n'y perd
-// rien de perceptible.
-const MIN_SNAPSHOT_INTERVAL = 4 * ONE_SECOND
+// Intervalle minimum entre deux snapshots d'un même utilisateur (dédoublonne
+// les rafales d'autosave). Gardé à 1 s : au-delà, plusieurs actions distinctes
+// fusionnent dans un seul snapshot et l'undo « saute » trop loin.
+const MIN_SNAPSHOT_INTERVAL = ONE_SECOND
 const ONE_MINUTE = 60 * ONE_SECOND
 const FIVE_MINUTES = 5 * ONE_MINUTE
 const ONE_HOUR = 60 * ONE_MINUTE
