@@ -442,17 +442,25 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
           </div>
         </div>
         <div className="agenda-heatmap">
-          {agendaSeries.map(day => (
-            <button
-              key={day.day}
-              type="button"
-              className={day.day === today ? 'today' : ''}
-              style={{ '--day-fill': `${Math.max(6, day.percent)}%` }}
-              title={`${formatShortDate(day.day)} · ${day.done}/${day.total || 0}`}
-            >
-              <span>{new Date(`${day.day}T00:00:00`).getDate()}</span>
-            </button>
-          ))}
+          {agendaSeries.map(day => {
+            const label = `${formatShortDate(day.day)} · ${day.done}/${day.total || 0} pratiques · ${day.percent}%`
+            return (
+              <button
+                key={day.day}
+                type="button"
+                className={`level-${heatmapLevel(day)} ${day.day === today ? 'today' : ''}`}
+                title={label}
+                aria-label={label}
+              >
+                <span>{label}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="agenda-heatmap-legend" aria-hidden="true">
+          <span>Moins</span>
+          {[0, 1, 2, 3, 4].map(level => <i key={level} className={`level-${level}`} />)}
+          <span>Plus</span>
         </div>
       </section>
 
@@ -586,6 +594,14 @@ function buildStreak(series) {
     streak++
   }
   return streak
+}
+
+function heatmapLevel(day) {
+  if (!day.total || day.percent <= 0) return 0
+  if (day.percent < 34) return 1
+  if (day.percent < 67) return 2
+  if (day.percent < 100) return 3
+  return 4
 }
 
 function deadlineState(dueAt) {
