@@ -11,6 +11,49 @@ const PATHS = {
       <path d="m14.8 7.3 2.9 2.9" />
     </>
   ),
+  file: (
+    <>
+      <path d="M7 3.5h7l3.5 3.5v13.5H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" />
+      <path d="M14 3.5V7h3.5" />
+      <path d="M8.5 12h7" />
+      <path d="M8.5 15.5h5" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3.5v3" />
+      <path d="M16 3.5v3" />
+      <path d="M4 9h16" />
+      <path d="M8 13h.1" />
+      <path d="M12 13h.1" />
+      <path d="M16 13h.1" />
+      <path d="M8 17h.1" />
+      <path d="M12 17h.1" />
+    </>
+  ),
+  database: (
+    <>
+      <ellipse cx="12" cy="5.5" rx="7" ry="3" />
+      <path d="M5 5.5v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+      <path d="M5 11.5v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+    </>
+  ),
+  listCheck: (
+    <>
+      <path d="m4 7 1.5 1.5L8.5 5" />
+      <path d="M11 7h9" />
+      <path d="m4 14 1.5 1.5L8.5 12" />
+      <path d="M11 14h9" />
+      <path d="M11 20h9" />
+    </>
+  ),
+  quote: (
+    <>
+      <path d="M8 11H5.5A3.5 3.5 0 0 1 9 7.5V6a5 5 0 0 0-5 5v5h4Z" />
+      <path d="M18 11h-2.5A3.5 3.5 0 0 1 19 7.5V6a5 5 0 0 0-5 5v5h4Z" />
+    </>
+  ),
   journal: (
     <>
       <path d="M7 4.5h9.5A2.5 2.5 0 0 1 19 7v13H7a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z" />

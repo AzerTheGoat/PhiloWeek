@@ -248,11 +248,11 @@ function MobileNav() {
     { key: 'editor', label: 'Éditer', icon: 'edit', active: view === 'editor' && !sidebarOpen, action: () => dispatch({ type: 'SET_VIEW', payload: 'editor' }) },
     { key: 'journal', label: 'Journal', icon: 'journal', active: view === 'journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'journal' }) },
     { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
-    { key: 'todos', label: 'Todo', icon: 'synthesis', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
-    { key: 'agenda', label: 'Agenda', icon: 'journal', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
-    { key: 'graph', label: 'Graphe', icon: 'graph', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
+    { key: 'todos', label: 'Tâches', icon: 'listCheck', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
+    { key: 'agenda', label: 'Agenda', icon: 'calendar', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
+    { key: 'graph', label: 'Base', icon: 'database', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { key: 'timeline', label: 'Frise', icon: 'timeline', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
-    { key: 'timer', label: 'Timer', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
+    { key: 'timer', label: 'Focus', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
   ]
 

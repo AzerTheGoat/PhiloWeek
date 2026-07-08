@@ -131,6 +131,15 @@ router.put('/practices/:id/check', (req, res) => {
   res.json({ practice_id: req.params.id, entry_date: entryDate, done })
 })
 
+router.delete('/practices/:id', (req, res) => {
+  const db = getDb()
+  const existing = db.prepare('SELECT id FROM agenda_practices WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+  db.prepare('DELETE FROM agenda_checks WHERE practice_id = ? AND user_id = ?').run(req.params.id, req.user.id)
+  db.prepare('DELETE FROM agenda_practices WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
+  res.json({ ok: true })
+})
+
 router.put('/life-profile', (req, res) => {
   const db = getDb()
   const birthDate = req.body.birth_date ? normalizeDate(req.body.birth_date) : null

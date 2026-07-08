@@ -11,7 +11,7 @@ const ACTIVITIES = [
 ]
 
 export default function Timer() {
-  const { openFileId, currentFile, toast, dispatch, openJournalToday } = useApp()
+  const { openFileId, currentFile, toast, openJournalToday } = useApp()
   const [seconds, setSeconds] = useState(0)
   const [running, setRunning] = useState(false)
   const [activity, setActivity] = useState('thinking')
@@ -102,9 +102,6 @@ export default function Timer() {
   return (
     <div className="timer-view">
       <div className="timer-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-          <Icon name="back" />
-        </button>
         <h2>Timer de travail</h2>
       </div>
 

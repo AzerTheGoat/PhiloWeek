@@ -10,15 +10,13 @@ const STATUS_FILTERS = [
 ]
 
 const SECTION_META = {
-  tasks: { title: 'Todo', subtitle: 'Tâches et dates limites' },
-  agenda: { title: 'Agenda', subtitle: 'Pratiques quotidiennes et suivi' },
+  tasks: { title: 'Tâches', subtitle: 'Tâches et dates limites' },
+  agenda: { title: 'Agenda', subtitle: 'Habitudes quotidiennes et suivi' },
   life: { title: 'Vie', subtitle: 'Grille de vie et horizon personnel' },
 }
 
-const PRACTICE_COLORS = ['#6ba3e8', '#4caf7d', '#d69d55', '#a08be0', '#e05555', '#d8d8d8']
-
 export default function TodosPage({ section = 'tasks' }) {
-  const { dispatch, toast } = useApp()
+  const { toast } = useApp()
   const [todos, setTodos] = useState([])
   const [filter, setFilter] = useState('open')
   const [form, setForm] = useState(() => ({ title: '', notes: '', due_at: todayInput() }))
@@ -26,7 +24,9 @@ export default function TodosPage({ section = 'tasks' }) {
   const [loading, setLoading] = useState(false)
 
   const [dashboard, setDashboard] = useState(() => ({ practices: [], checks: [], profile: { birth_date: '', life_expectancy_years: 85 }, today: todayInput() }))
-  const [practiceForm, setPracticeForm] = useState({ title: '', color: PRACTICE_COLORS[0] })
+  const [practiceForm, setPracticeForm] = useState({ title: '' })
+  const [editingPracticeId, setEditingPracticeId] = useState(null)
+  const [editingPracticeTitle, setEditingPracticeTitle] = useState('')
   const [lifeUnit, setLifeUnit] = useState('week')
   const [dashboardLoading, setDashboardLoading] = useState(false)
 
@@ -112,7 +112,7 @@ export default function TodosPage({ section = 'tasks' }) {
       setTodos(prev => filter === 'done' ? prev : [created, ...prev].sort(sortTodos))
       setForm({ title: '', notes: '', due_at: todayInput() })
       setShowForm(false)
-      toast('Todo ajoutée')
+      toast('Tâche ajoutée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -135,7 +135,7 @@ export default function TodosPage({ section = 'tasks' }) {
     try {
       await api.deleteTodo(id)
       setTodos(prev => prev.filter(todo => todo.id !== id))
-      toast('Todo supprimée')
+      toast('Tâche supprimée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -156,8 +156,8 @@ export default function TodosPage({ section = 'tasks' }) {
     try {
       const created = await api.createPractice(practiceForm)
       setDashboard(prev => ({ ...prev, practices: [...prev.practices, created] }))
-      setPracticeForm({ title: '', color: PRACTICE_COLORS[0] })
-      toast('Pratique ajoutée')
+      setPracticeForm({ title: '' })
+      toast('Habitude ajoutée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -170,6 +170,47 @@ export default function TodosPage({ section = 'tasks' }) {
         ...prev,
         practices: prev.practices.map(item => item.id === practice.id ? updated : item),
       }))
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  function startEditPractice(practice) {
+    setEditingPracticeId(practice.id)
+    setEditingPracticeTitle(practice.title)
+  }
+
+  async function savePracticeTitle(practice) {
+    const title = editingPracticeTitle.trim()
+    if (!title) return
+    try {
+      const updated = await api.updatePractice(practice.id, { title })
+      setDashboard(prev => ({
+        ...prev,
+        practices: prev.practices.map(item => item.id === practice.id ? updated : item),
+      }))
+      setEditingPracticeId(null)
+      setEditingPracticeTitle('')
+      toast('Habitude modifiée')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function removePractice(practice) {
+    if (!window.confirm(`Supprimer "${practice.title}" et son historique ?`)) return
+    try {
+      await api.deletePractice(practice.id)
+      setDashboard(prev => ({
+        ...prev,
+        practices: prev.practices.filter(item => item.id !== practice.id),
+        checks: prev.checks.filter(check => check.practice_id !== practice.id),
+      }))
+      if (editingPracticeId === practice.id) {
+        setEditingPracticeId(null)
+        setEditingPracticeTitle('')
+      }
+      toast('Habitude supprimée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -206,9 +247,6 @@ export default function TodosPage({ section = 'tasks' }) {
   return (
     <div className={`todos-page ${section === 'agenda' ? 'agenda-page' : ''}`}>
       <div className="todos-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-          <Icon name="back" />
-        </button>
         <div>
           <h2>{SECTION_META[section]?.title || SECTION_META.tasks.title}</h2>
           <span>{headerSubtitle(section, stats, activePractices.length, agendaCompletion, currentStreak)}</span>
@@ -252,6 +290,13 @@ export default function TodosPage({ section = 'tasks' }) {
           setPracticeForm={setPracticeForm}
           addPractice={addPractice}
           togglePractice={togglePractice}
+          editingPracticeId={editingPracticeId}
+          editingPracticeTitle={editingPracticeTitle}
+          setEditingPracticeTitle={setEditingPracticeTitle}
+          startEditPractice={startEditPractice}
+          savePracticeTitle={savePracticeTitle}
+          cancelEditPractice={() => { setEditingPracticeId(null); setEditingPracticeTitle('') }}
+          removePractice={removePractice}
           togglePracticeCheck={togglePracticeCheck}
         />
       )}
@@ -270,7 +315,7 @@ export default function TodosPage({ section = 'tasks' }) {
 }
 
 function headerSubtitle(section, stats, activePractices, agendaCompletion, currentStreak) {
-  if (section === 'agenda') return `${activePractices} pratiques actives · ${agendaCompletion}% sur 28 jours · série ${currentStreak} j`
+  if (section === 'agenda') return `${activePractices} habitudes actives · ${agendaCompletion}% sur 28 jours · série ${currentStreak} j`
   if (section === 'life') return SECTION_META.life.subtitle
   return `${stats.late} en retard · ${stats.today} aujourd'hui · ${stats.total} visibles`
 }
@@ -321,7 +366,7 @@ function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loadi
 
       <div className="todo-list">
         {loading && <div className="todo-empty">Chargement...</div>}
-        {!loading && todos.length === 0 && <div className="todo-empty">Aucune todo ici.</div>}
+        {!loading && todos.length === 0 && <div className="todo-empty">Aucune tâche ici.</div>}
         {!loading && todos.map(todo => {
           const state = deadlineState(todo.due_at)
           return (
@@ -355,7 +400,29 @@ function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loadi
   )
 }
 
-function AgendaPanel({ loading, activePractices, practices, today, checkMap, todayDone, agendaCompletion, currentStreak, agendaSeries, practiceForm, setPracticeForm, addPractice, togglePractice, togglePracticeCheck }) {
+function AgendaPanel({
+  loading,
+  activePractices,
+  practices,
+  today,
+  checkMap,
+  todayDone,
+  agendaCompletion,
+  currentStreak,
+  agendaSeries,
+  practiceForm,
+  setPracticeForm,
+  addPractice,
+  togglePractice,
+  editingPracticeId,
+  editingPracticeTitle,
+  setEditingPracticeTitle,
+  startEditPractice,
+  savePracticeTitle,
+  cancelEditPractice,
+  removePractice,
+  togglePracticeCheck,
+}) {
   return (
     <div className="agenda-dashboard">
       <section className="agenda-hero">
@@ -384,7 +451,7 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
       <section className="agenda-today">
         <div className="agenda-section-head">
           <div>
-            <h3>Pratiques du jour</h3>
+            <h3>Habitudes du jour</h3>
             <span>{todayDone}/{activePractices.length} faites</span>
           </div>
         </div>
@@ -392,30 +459,18 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
         <form className="practice-form" onSubmit={addPractice}>
           <input
             className="todo-input"
-            placeholder="Nouvelle pratique"
+            placeholder="Nouvelle habitude"
             value={practiceForm.title}
             onChange={event => setPracticeForm(prev => ({ ...prev, title: event.target.value }))}
           />
           <div className="practice-form-row">
-            <div className="practice-color-row">
-              {PRACTICE_COLORS.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  className={practiceForm.color === color ? 'active' : ''}
-                  style={{ '--practice-color': color }}
-                  onClick={() => setPracticeForm(prev => ({ ...prev, color }))}
-                  title={color}
-                />
-              ))}
-            </div>
             <button className="btn-primary" disabled={!practiceForm.title.trim()}>Ajouter</button>
           </div>
         </form>
 
         <div className="practice-check-list">
           {loading && <div className="todo-empty">Chargement...</div>}
-          {!loading && activePractices.length === 0 && <div className="todo-empty">Ajoute une pratique pour commencer.</div>}
+          {!loading && activePractices.length === 0 && <div className="todo-empty">Ajoute une habitude pour commencer.</div>}
           {activePractices.map(practice => {
             const done = checkMap.get(`${practice.id}:${today}`)
             return (
@@ -423,7 +478,6 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
                 key={practice.id}
                 type="button"
                 className={`practice-check ${done ? 'done' : ''}`}
-                style={{ '--practice-color': practice.color }}
                 onClick={() => togglePracticeCheck(practice)}
               >
                 <span>{done ? '✓' : ''}</span>
@@ -443,7 +497,7 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
         </div>
         <div className="agenda-heatmap">
           {agendaSeries.map(day => {
-            const label = `${formatShortDate(day.day)} · ${day.done}/${day.total || 0} pratiques · ${day.percent}%`
+            const label = `${formatShortDate(day.day)} · ${day.done}/${day.total || 0} habitudes · ${day.percent}%`
             return (
               <button
                 key={day.day}
@@ -468,20 +522,46 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
         <div className="agenda-section-head">
           <div>
             <h3>Gestion</h3>
-            <span>Les pratiques archivées restent dans l'historique.</span>
+            <span>Les habitudes archivées restent dans l'historique.</span>
           </div>
         </div>
         <div className="practice-manage-list">
           {practices.map(practice => (
             <article key={practice.id} className={`practice-manage-card ${practice.active ? '' : 'archived'}`}>
-              <span className="practice-dot" style={{ '--practice-color': practice.color }} />
+              <span className="practice-dot" />
               <div>
-                <strong>{practice.title}</strong>
+                {editingPracticeId === practice.id ? (
+                  <input
+                    className="todo-input practice-edit-input"
+                    value={editingPracticeTitle}
+                    onChange={event => setEditingPracticeTitle(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') savePracticeTitle(practice)
+                      if (event.key === 'Escape') cancelEditPractice()
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <strong>{practice.title}</strong>
+                )}
                 <span>{practice.active ? 'Active' : `Archivée ${formatDate(practice.archived_at)}`}</span>
               </div>
-              <button type="button" onClick={() => togglePractice(practice, !practice.active)}>
-                {practice.active ? 'Archiver' : 'Reprendre'}
-              </button>
+              <div className="practice-manage-actions">
+                {editingPracticeId === practice.id ? (
+                  <>
+                    <button type="button" onClick={() => savePracticeTitle(practice)}>Valider</button>
+                    <button type="button" onClick={cancelEditPractice}>Annuler</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => startEditPractice(practice)}>Modifier</button>
+                    <button type="button" onClick={() => togglePractice(practice, !practice.active)}>
+                      {practice.active ? 'Archiver' : 'Reprendre'}
+                    </button>
+                    <button type="button" className="danger" onClick={() => removePractice(practice)}>Supprimer</button>
+                  </>
+                )}
+              </div>
             </article>
           ))}
         </div>

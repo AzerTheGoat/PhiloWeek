@@ -3,6 +3,14 @@ import { useApp } from '../context/useApp'
 import Icon from './Icons'
 import * as api from '../api'
 
+// N'autorise comme lien cliquable que http(s):// et les liens relatifs.
+// Neutralise javascript:, data:, etc. (XSS au clic sur une ressource).
+function safeHref(url) {
+  const value = String(url || '').trim()
+  if (/^https?:\/\//i.test(value) || value.startsWith('/')) return value
+  return undefined
+}
+
 const RESOURCE_TYPES = [
   { id: 'article', label: 'Article', icon: '📄' },
   { id: 'video', label: 'Vidéo', icon: '🎥' },
@@ -158,7 +166,7 @@ function ResourcesSection() {
               <span className="resource-type-icon">{typeIcon(r.type)}</span>
               <div className="resource-info">
                 <a
-                  href={r.url}
+                  href={safeHref(r.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="resource-title"
@@ -395,15 +403,11 @@ function IdeasSection() {
 // ——— InboxPage ———
 
 export default function InboxPage() {
-  const { dispatch } = useApp()
   const [mobileTab, setMobileTab] = useState('ideas')
 
   return (
     <div className="inbox-page">
       <div className="inbox-page-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-          <Icon name="back" />
-        </button>
         <h2><Icon name="idea" size={18} /> Nid à idées</h2>
       </div>
 

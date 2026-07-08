@@ -52,34 +52,33 @@ export default function Sidebar() {
 
   const runFeature = useCallback((action) => {
     action()
-    setFeaturesOpen(false)
   }, [])
 
   const createActions = [
-    { icon: 'plus', label: 'Fichier', action: () => showModal('new-file', {}) },
-    { icon: 'graph', label: 'Graphe', action: () => showModal('new-graph', {}) },
-    { icon: 'question', label: 'Quiz', action: () => showModal('new-questionnaire', {}) },
+    { icon: 'file', label: 'Note', action: () => showModal('new-file', {}) },
+    { icon: 'graph', label: 'Graphe d’idées', action: () => showModal('new-graph', {}) },
+    { icon: 'question', label: 'Questionnaire', action: () => showModal('new-questionnaire', {}) },
     { icon: 'folder', label: 'Dossier', action: () => showModal('new-folder', {}) },
   ]
 
   const viewActions = [
     { icon: 'journal', label: 'Journal', active: view === 'journal', action: openJournalToday },
-    { icon: 'idea', label: 'Idées', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
-    { icon: 'life', label: 'Vie int.', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
-    { icon: 'synthesis', label: 'Todo', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
-    { icon: 'journal', label: 'Agenda', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
+    { icon: 'idea', label: 'Boîte à idées', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
+    { icon: 'quote', label: 'Citations', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
+    { icon: 'listCheck', label: 'Tâches', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
+    { icon: 'calendar', label: 'Agenda', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
     { icon: 'life', label: 'Vie perso', active: view === 'life-grid', action: () => dispatch({ type: 'SET_VIEW', payload: 'life-grid' }) },
-    { icon: 'timer', label: 'Timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
-    { icon: 'graph', label: 'Base', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
-    { icon: 'timeline', label: 'Frise', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
-    { icon: 'thought', label: 'Guide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },
+    { icon: 'timer', label: 'Focus', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
+    { icon: 'database', label: 'Base de liens', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
+    { icon: 'timeline', label: 'Frise historique', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
+    { icon: 'thought', label: 'Aide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },
   ]
 
   const toolActions = [
     { icon: 'play', label: 'Réviser', action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }) },
-    { icon: 'copy', label: 'Copier', action: () => dispatch({ type: 'TOGGLE_FILE_PICKER' }) },
-    { icon: 'download', label: 'Export', action: api.exportObsidian },
-    { icon: 'upload', label: importing ? 'Import...' : 'Import', action: () => importInputRef.current?.click() },
+    { icon: 'copy', label: 'Copier notes', action: () => dispatch({ type: 'TOGGLE_FILE_PICKER' }) },
+    { icon: 'download', label: 'Exporter', action: api.exportObsidian },
+    { icon: 'upload', label: importing ? 'Import...' : 'Importer', action: () => importInputRef.current?.click() },
     { icon: theme === 'dark' ? 'sun' : 'moon', label: theme === 'dark' ? 'Clair' : 'Sombre', action: () => dispatch({ type: 'SET_THEME', payload: theme === 'dark' ? 'light' : 'dark' }) },
     { icon: 'compass', label: 'Compte', action: () => showModal('account', {}) },
   ]

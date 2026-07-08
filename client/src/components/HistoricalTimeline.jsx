@@ -24,7 +24,7 @@ const EMPTY_FORM = {
 }
 
 export default function HistoricalTimeline() {
-  const { toast, dispatch } = useApp()
+  const { toast } = useApp()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -224,15 +224,12 @@ export default function HistoricalTimeline() {
             onChange={event => setQuery(event.target.value)}
             placeholder="Rechercher une date, un theme..."
           />
-          <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-            <Icon name="back" size={17} />
-          </button>
         </div>
       </header>
 
       <section className="timeline-focus">
         <button type="button" className="timeline-jump" onClick={() => jump(-1)} disabled={!focused}>
-          <Icon name="back" size={17} />
+          ‹
         </button>
         <div className="timeline-focus-card">
           {focused ? (
@@ -254,7 +251,7 @@ export default function HistoricalTimeline() {
           )}
         </div>
         <button type="button" className="timeline-jump next" onClick={() => jump(1)} disabled={!focused}>
-          <Icon name="back" size={17} />
+          ›
         </button>
       </section>
 

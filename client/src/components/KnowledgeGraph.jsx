@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import * as api from '../api'
-import Icon from './Icons'
 
 const PROMPTS = [
   { key: 'none', label: 'Sans prompt' },
@@ -20,7 +19,7 @@ const KIND_LABELS = {
 }
 
 export default function KnowledgeGraph() {
-  const { dispatch, openFile, toast } = useApp()
+  const { openFile, toast } = useApp()
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [simNodes, setSimNodes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -324,9 +323,6 @@ export default function KnowledgeGraph() {
     <div className="knowledge-graph-view">
       <header className="kg-toolbar">
         <div className="kg-title">
-          <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-            <Icon name="back" />
-          </button>
           <div>
             <h2>Graphe de la base</h2>
             <span>{graph.nodes.length} noeud(s), {graph.edges.length} lien(s)</span>

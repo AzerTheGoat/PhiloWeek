@@ -102,7 +102,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - La sidebar garde l'arbre de fichiers comme surface principale.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
-- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` : creation de fichiers/graphes/quiz/dossiers, navigation Journal/Idees/Vie/Todo/Timer/Base/Frise/Guide, revision, copie, import/export, theme et compte.
+- Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
+- Les vues principales ne doivent pas afficher de bouton retour de page dans leur header; la navigation se fait par `Fonctions`, les onglets de fichiers et la navigation mobile.
 
 ## Graphes d'idees
 
@@ -161,9 +163,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Todo
 
-- Les vues `Todo`, `Agenda` et `Vie perso` sont trois sections separees dans le panneau `Fonctions`.
+- Les vues `Taches`, `Agenda` et `Vie perso` sont trois sections separees dans le panneau `Fonctions`.
 - Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
-- La section `Agenda` permet de creer des pratiques quotidiennes, de les cocher par jour, de les archiver/reprendre, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme type GitHub : les jours n'affichent leurs details qu'au survol, et la couleur fonce selon la part de pratiques accomplies.
+- La section `Agenda` permet de creer des habitudes quotidiennes, de les cocher par jour, de les renommer, de les archiver/reprendre, de les supprimer avec leur historique, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme type GitHub : les jours n'affichent leurs details qu'au survol, et la couleur fonce selon la part d'habitudes accomplies. L'interface ne propose pas de choix manuel de couleur pour les habitudes.
 - La section `Vie perso` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points deja vecus.
 - À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
 - L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.

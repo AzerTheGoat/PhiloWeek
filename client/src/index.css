@@ -1220,7 +1220,7 @@ a { color: var(--link) }
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
 }
 
@@ -1229,7 +1229,7 @@ a { color: var(--link) }
   align-items: center;
   gap: 7px;
   min-width: 0;
-  min-height: 36px;
+  min-height: 38px;
   padding: 7px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -5526,29 +5526,8 @@ kbd {
 }
 
 .practice-form-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.practice-color-row {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.practice-color-row button {
-  width: 25px;
-  height: 25px;
-  border-radius: 999px;
-  border: 2px solid var(--border);
-  background: var(--practice-color);
-}
-
-.practice-color-row button.active {
-  border-color: var(--text);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--practice-color) 34%, transparent);
+  justify-content: flex-end;
 }
 
 .practice-check-list,
@@ -5577,15 +5556,15 @@ kbd {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border: 2px solid var(--practice-color);
+  border: 2px solid var(--accent);
   border-radius: 999px;
-  color: var(--practice-color);
+  color: var(--accent);
   font-weight: 800;
 }
 
 .practice-check.done {
-  background: color-mix(in srgb, var(--practice-color) 11%, var(--bg-elevated));
-  border-color: var(--practice-color);
+  background: color-mix(in srgb, var(--accent) 11%, var(--bg-elevated));
+  border-color: var(--accent);
 }
 
 .agenda-chart-panel {
@@ -5724,7 +5703,7 @@ kbd {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  background: var(--practice-color);
+  background: var(--accent);
 }
 
 .practice-manage-card strong {
@@ -5737,9 +5716,24 @@ kbd {
   font-size: 12px;
 }
 
-.practice-manage-card button {
+.practice-edit-input {
+  padding: 5px 8px;
+}
+
+.practice-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.practice-manage-actions button {
   color: var(--accent-hover);
   font-size: 12px;
+}
+
+.practice-manage-actions button.danger {
+  color: var(--danger);
 }
 
 .life-dashboard {

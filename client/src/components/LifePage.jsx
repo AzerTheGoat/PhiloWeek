@@ -15,7 +15,7 @@ function statusMeta(value) {
 }
 
 export default function LifePage() {
-  const { dispatch, toast } = useApp()
+  const { toast } = useApp()
   const [quotes, setQuotes] = useState([])
   const [form, setForm] = useState({ quote: '', author: '', source: '', notes: '', tags: '' })
   const [showQuoteForm, setShowQuoteForm] = useState(false)
@@ -111,9 +111,6 @@ export default function LifePage() {
   return (
     <div className="life-page">
       <div className="life-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-          <Icon name="back" />
-        </button>
         <h2>Vie interieure</h2>
       </div>
 

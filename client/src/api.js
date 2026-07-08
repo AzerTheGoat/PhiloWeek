@@ -101,6 +101,7 @@ export const deleteTodo = id => req('DELETE', `/todos/${id}`)
 export const getTodoDashboard = (days = 42) => req('GET', `/todos/dashboard?days=${encodeURIComponent(days)}`)
 export const createPractice = data => req('POST', '/todos/practices', data)
 export const updatePractice = (id, data) => req('PUT', `/todos/practices/${id}`, data)
+export const deletePractice = id => req('DELETE', `/todos/practices/${id}`)
 export const setPracticeCheck = (id, data) => req('PUT', `/todos/practices/${id}/check`, data)
 export const updateLifeProfile = data => req('PUT', '/todos/life-profile', data)
 // Questionnaires

@@ -1,4 +1,3 @@
-import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
 const SECTIONS = [
@@ -121,9 +120,9 @@ const SECTIONS = [
         text: 'Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion) et consulte tes totaux du jour et l\'historique complet.',
       },
       {
-        icon: 'synthesis',
-        title: 'Dashboard Todo',
-        text: "Ajoute des tâches avec une date limite, coche tes pratiques du jour, suis l'évolution avec des barres, et affiche ta grille de vie en semaines ou en mois.",
+        icon: 'listCheck',
+        title: 'Taches, Agenda, Vie perso',
+        text: "Les taches, les habitudes quotidiennes et la grille de vie sont separees. L'Agenda permet de cocher, renommer, archiver ou supprimer tes habitudes.",
       },
     ],
   },
@@ -190,14 +189,9 @@ const SECTIONS = [
 ]
 
 export default function Tutorial() {
-  const { dispatch } = useApp()
-
   return (
     <div className="tutorial-view">
       <div className="tutorial-header">
-        <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
-          <Icon name="back" />
-        </button>
         <h2>Découvrir Opuscule</h2>
       </div>
 
