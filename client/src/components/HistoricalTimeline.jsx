@@ -9,8 +9,12 @@ const MONTH_LABELS_SHORT = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N
 
 const EMPTY_FORM = {
   title: '',
-  start: '',
-  end: '',
+  start_year: '',
+  start_month: '',
+  start_day: '',
+  end_year: '',
+  end_month: '',
+  end_day: '',
   category: '',
   color: COLORS[0],
   description: '',
@@ -118,10 +122,16 @@ export default function HistoricalTimeline() {
 
   const editEvent = (event) => {
     setEditingId(event.id)
+    const start = splitDateLabel(event.start_label)
+    const end = splitDateLabel(event.end_label)
     setForm({
       title: event.title || '',
-      start: event.start_label || '',
-      end: event.end_label || '',
+      start_year: start.year,
+      start_month: start.month,
+      start_day: start.day,
+      end_year: end.year,
+      end_month: end.month,
+      end_day: end.day,
       category: event.category || '',
       color: event.color || COLORS[0],
       description: event.description || '',
@@ -135,6 +145,8 @@ export default function HistoricalTimeline() {
     event.preventDefault()
     const payload = {
       ...form,
+      start: joinDateParts(form.start_year, form.start_month, form.start_day),
+      end: joinDateParts(form.end_year, form.end_month, form.end_day),
       tags: form.tags.split(',').map(tag => tag.trim()).filter(Boolean),
     }
     try {
@@ -336,9 +348,23 @@ export default function HistoricalTimeline() {
           <h2>{editingId ? 'Modifier' : 'Ajouter'}</h2>
           <form onSubmit={submit} className="timeline-form">
             <input value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="Titre" />
-            <div className="timeline-form-grid">
-              <input value={form.start} onChange={event => setForm({ ...form, start: event.target.value })} placeholder="Date: -44, 1789, 1789-07-14" />
-              <input value={form.end} onChange={event => setForm({ ...form, end: event.target.value })} placeholder="Fin, si periode" />
+            <div className="timeline-date-fields">
+              <span>Debut</span>
+              <input value={form.start_year} onChange={event => setForm({ ...form, start_year: event.target.value })} placeholder="Annee" inputMode="numeric" />
+              <select value={form.start_month} onChange={event => setForm({ ...form, start_month: event.target.value, start_day: event.target.value ? form.start_day : '' })}>
+                <option value="">Mois</option>
+                {MONTH_LABELS.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}
+              </select>
+              <input value={form.start_day} onChange={event => setForm({ ...form, start_day: event.target.value })} placeholder="Jour" inputMode="numeric" disabled={!form.start_month} />
+            </div>
+            <div className="timeline-date-fields">
+              <span>Fin</span>
+              <input value={form.end_year} onChange={event => setForm({ ...form, end_year: event.target.value })} placeholder="Annee" inputMode="numeric" />
+              <select value={form.end_month} onChange={event => setForm({ ...form, end_month: event.target.value, end_day: event.target.value ? form.end_day : '' })} disabled={!form.end_year.trim()}>
+                <option value="">Mois</option>
+                {MONTH_LABELS.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}
+              </select>
+              <input value={form.end_day} onChange={event => setForm({ ...form, end_day: event.target.value })} placeholder="Jour" inputMode="numeric" disabled={!form.end_month} />
             </div>
             <input value={form.category} onChange={event => setForm({ ...form, category: event.target.value })} placeholder="Theme: Rome, Revolution..." />
             <textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Ce qu'il faut retenir" />
@@ -370,7 +396,7 @@ export default function HistoricalTimeline() {
             )}
             <input value={form.image_caption} onChange={event => setForm({ ...form, image_caption: event.target.value })} placeholder="Legende photo" />
             <div className="timeline-form-actions">
-              <button type="submit" className="btn-primary" disabled={!form.title.trim() || !form.start.trim()}>
+              <button type="submit" className="btn-primary" disabled={!form.title.trim() || !form.start_year.trim()}>
                 {editingId ? 'Enregistrer' : 'Ajouter'}
               </button>
               {editingId && <button type="button" className="btn-ghost" onClick={resetForm}>Annuler</button>}
@@ -560,6 +586,25 @@ function parseTags(value) {
   } catch (_) {
     return []
   }
+}
+
+function splitDateLabel(value) {
+  const parts = String(value || '').trim().match(/^(-?\d{1,6})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/)
+  if (!parts) return { year: '', month: '', day: '' }
+  return {
+    year: parts[1] || '',
+    month: parts[2] ? parts[2].padStart(2, '0') : '',
+    day: parts[3] ? parts[3].padStart(2, '0') : '',
+  }
+}
+
+function joinDateParts(year, month, day) {
+  const y = String(year || '').trim()
+  if (!y) return ''
+  const m = String(month || '').trim()
+  const d = String(day || '').trim()
+  if (!m) return y
+  return d ? `${y}-${m}-${d.padStart(2, '0')}` : `${y}-${m}`
 }
 
 async function fileToWebpDataUrl(file) {

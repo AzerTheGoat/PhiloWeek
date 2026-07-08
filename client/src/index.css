@@ -601,7 +601,8 @@
 }
 
 .timeline-form input,
-.timeline-form textarea {
+.timeline-form textarea,
+.timeline-form select {
   width: 100%;
   padding: 9px 10px;
   border-radius: var(--radius);
@@ -609,6 +610,12 @@
   background: var(--bg-input);
   color: var(--text);
   font-size: 13px;
+}
+
+.timeline-form input:disabled,
+.timeline-form select:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
 }
 
 .timeline-form textarea {
@@ -620,6 +627,18 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.timeline-date-fields {
+  display: grid;
+  grid-template-columns: 54px 1fr 1fr 72px;
+  align-items: center;
+  gap: 7px;
+}
+
+.timeline-date-fields span {
+  color: var(--text-2);
+  font-size: 12px;
 }
 
 .timeline-colors {
@@ -6208,6 +6227,14 @@ kbd {
 
   .timeline-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .timeline-date-fields {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .timeline-date-fields span {
+    grid-column: 1 / -1;
   }
 
   .modal-overlay {

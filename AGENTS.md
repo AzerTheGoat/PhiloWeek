@@ -225,6 +225,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Elle stocke les reperes historiques dans `historical_events`, avec dates ponctuelles ou periodes (`start_*` et `end_*`), description, categorie, couleur, tags et photo optionnelle en data URL.
 - Les tags sont visibles sur les cartes et servent de filtres : selectionner un ou plusieurs tags affiche les reperes qui correspondent a au moins l'un des tags actifs.
 - Les dates acceptent au minimum une annee (`1789`, `-44`) et peuvent inclure mois/jour (`1789-07-14`).
+- Le formulaire de frise saisit les dates avec champs separes annee/mois/jour pour eviter de forcer l'utilisateur a taper le format ISO.
 - L'interface affiche une frise horizontale zoomable avec navigation par focus, mini-carte et placement automatique en lignes pour gerer les periodes qui se superposent.
 - A fort zoom, l'axe affiche une granularite mensuelle; les evenements proches sont empiles a faible zoom et se depilent automatiquement quand le zoom les espace assez.
 - Les photos sont compressees cote client avant stockage pour rester exportables avec le reste des donnees.
