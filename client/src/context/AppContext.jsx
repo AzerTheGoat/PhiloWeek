@@ -8,6 +8,7 @@ function isMobileViewport() {
 
 const init = {
   tree: [],
+  tabs: [],
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'knowledge-graph'
@@ -26,7 +27,12 @@ const init = {
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_TREE': {
-      const next = { ...state, tree: action.payload }
+      const flat = flattenTree(action.payload)
+      const fileById = new Map(flat.map(file => [file.id, file]))
+      const tabs = state.tabs
+        .filter(tab => fileById.has(tab.id))
+        .map(tab => ({ ...tab, ...tabFromFile(fileById.get(tab.id)) }))
+      const next = { ...state, tree: action.payload, tabs }
       if (state.openFileId && !treeHasId(action.payload, state.openFileId)) {
         next.openFile = null
         next.openFileId = null
@@ -34,16 +40,25 @@ function reducer(state, action) {
       return next
     }
     case 'SET_FILE_NAMES': return { ...state, fileNames: action.payload }
-    case 'OPEN_FILE': return {
-      ...state,
-      openFile: action.payload,
-      openFileId: action.payload?.id || null,
-      view: 'editor',
-      modal: null,
-      contextMenu: null,
-      showFilePicker: false,
-      showQuizLauncher: false,
-      sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+    case 'OPEN_FILE': {
+      const tab = tabFromFile(action.payload)
+      const tabs = tab
+        ? state.tabs.some(existing => existing.id === tab.id)
+          ? state.tabs.map(existing => existing.id === tab.id ? { ...existing, ...tab } : existing)
+          : [...state.tabs, tab]
+        : state.tabs
+      return {
+        ...state,
+        tabs,
+        openFile: action.payload,
+        openFileId: action.payload?.id || null,
+        view: 'editor',
+        modal: null,
+        contextMenu: null,
+        showFilePicker: false,
+        showQuizLauncher: false,
+        sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+      }
     }
     case 'SET_VIEW': return {
       ...state,
@@ -73,6 +88,22 @@ function reducer(state, action) {
       ...state,
       openFile: null,
       openFileId: null,
+    }
+    case 'CLOSE_TAB': {
+      const tabs = state.tabs.filter(tab => tab.id !== action.payload)
+      if (state.openFileId !== action.payload) return { ...state, tabs }
+      return { ...state, tabs, openFile: null, openFileId: null }
+    }
+    case 'CLOSE_ALL_TABS': return {
+      ...state,
+      tabs: [],
+      openFile: null,
+      openFileId: null,
+      view: 'editor',
+      contextMenu: null,
+      modal: null,
+      showFilePicker: false,
+      showQuizLauncher: false,
     }
     case 'ADD_TOAST': return { ...state, toasts: [...state.toasts, action.payload] }
     case 'REMOVE_TOAST': return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) }
@@ -178,6 +209,18 @@ export function AppProvider({ children }) {
     await loadTree()
   }, [loadTree, state.openFileId])
 
+  const closeTab = useCallback(async (id) => {
+    const index = state.tabs.findIndex(tab => tab.id === id)
+    const isActive = state.openFileId === id
+    const nextTab = isActive ? (state.tabs[index + 1] || state.tabs[index - 1]) : null
+    dispatch({ type: 'CLOSE_TAB', payload: id })
+    if (nextTab) await openFile(nextTab.id)
+  }, [openFile, state.openFileId, state.tabs])
+
+  const closeAllTabs = useCallback(() => {
+    dispatch({ type: 'CLOSE_ALL_TABS' })
+  }, [])
+
   const showContextMenu = useCallback((x, y, items) => {
     dispatch({ type: 'SET_CONTEXT_MENU', payload: { x, y, items } })
   }, [])
@@ -259,6 +302,8 @@ export function AppProvider({ children }) {
     dispatch,
     loadTree,
     openFile,
+    closeTab,
+    closeAllTabs,
     saveFile,
     deleteFile,
     toast,
@@ -284,6 +329,26 @@ function flattenTree(nodes) {
   }
   walk(nodes)
   return result
+}
+
+function tabFromFile(file) {
+  if (!file?.id || file.type === 'folder' || file.type === 'locked_folder') return null
+  const tab = {
+    id: file.id,
+    name: file.name,
+    type: file.type,
+    parent_id: file.parent_id || null,
+  }
+  const kind = getFileKind(file)
+  if (kind) tab.kind = kind
+  return tab
+}
+
+function getFileKind(file) {
+  if (/\.json$/i.test(file.name || '')) return 'questionnaire'
+  if (typeof file.content === 'string' && /philoweek_type:\s*graph/i.test(file.content)) return 'graph'
+  if (typeof file.content === 'string') return 'note'
+  return null
 }
 
 function treeHasId(nodes, id) {

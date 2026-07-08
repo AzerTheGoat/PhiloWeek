@@ -128,6 +128,8 @@ function AppShell() {
       <Sidebar />
 
       <main className="main-pane">
+        <FileTabs />
+
         {view === 'timer' ? (
           <Timer />
         ) : view === 'journal' ? (
@@ -159,6 +161,74 @@ function AppShell() {
       <Modals />
     </div>
   )
+}
+
+function FileTabs() {
+  const { tabs, openFileId, openFile, closeTab, closeAllTabs, showContextMenu } = useApp()
+
+  if (!tabs.length) return null
+
+  const openTabMenu = (event) => {
+    event.preventDefault()
+    showContextMenu(event.clientX, event.clientY, [
+      { icon: '×', label: 'Tout fermer', danger: true, action: closeAllTabs },
+    ])
+  }
+
+  return (
+    <div className="file-tabs" role="tablist" aria-label="Fichiers ouverts">
+      <div className="file-tabs-scroll">
+        {tabs.map(tab => (
+          <div
+            key={tab.id}
+            role="tab"
+            aria-selected={tab.id === openFileId}
+            className={`file-tab ${tab.id === openFileId ? 'active' : ''}`}
+            title={tab.name}
+          >
+            <button
+              type="button"
+              className="file-tab-main"
+              onClick={() => openFile(tab.id)}
+            >
+              <Icon name={getTabIcon(tab)} size={14} />
+              <span>{formatTabName(tab.name)}</span>
+            </button>
+            <button
+              type="button"
+              className="file-tab-close"
+              title="Fermer l'onglet"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                closeTab(tab.id)
+              }}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="file-tabs-menu"
+        title="Options des onglets"
+        onClick={openTabMenu}
+      >
+        ...
+      </button>
+    </div>
+  )
+}
+
+function formatTabName(name) {
+  return String(name || 'Sans titre').replace(/\.(md|json)$/i, '')
+}
+
+function getTabIcon(tab) {
+  if (tab.kind === 'graph') return 'graph'
+  if (tab.kind === 'questionnaire' || /\.json$/i.test(tab.name || '')) return 'question'
+  return 'edit'
 }
 
 function MobileNav() {

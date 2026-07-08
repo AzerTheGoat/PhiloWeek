@@ -210,6 +210,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La restauration remplace les donnees de contenu de l'utilisateur connecte dans une transaction SQLite, sans restaurer les comptes ni les sessions.
 - L'export Obsidian ajoute `_Opuscule/History.json` avec `philoweek_type: history`; l'import recree les instantanes disponibles.
 
+## Onglets de fichiers
+
+- La zone principale affiche une barre d'onglets pour les fichiers ouverts.
+- Ouvrir un fichier depuis la sidebar, la recherche ou une autre vue ajoute/active un onglet, sans dupliquer l'onglet si le fichier est deja ouvert.
+- Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees et questionnaires JSON.
+- Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
+- Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
+
 ## Experience mobile
 
 - Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers en tiroirs plein ecran.
