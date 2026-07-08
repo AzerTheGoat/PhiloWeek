@@ -90,6 +90,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           question_text, answer_text, expected_answer, correct, score, response_ms, user_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertHistorySnapshot = db.prepare(
+        `INSERT OR IGNORE INTO app_snapshots (id, user_id, created_at, reason, data_json)
+         VALUES (?, ?, ?, ?, ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
@@ -113,6 +117,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
                 req.user.id,
                 result.created_at || new Date().toISOString()
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'history') {
+            const snapshots = Array.isArray(jsonSpecial.snapshots) ? jsonSpecial.snapshots : []
+            for (const snapshot of snapshots) {
+              if (!snapshot?.data_json || !isValidJson(snapshot.data_json)) continue
+              insertHistorySnapshot.run(
+                snapshot.id || uuidv4(),
+                req.user.id,
+                normalizeIsoDate(snapshot.created_at) || new Date().toISOString(),
+                snapshot.reason || 'import',
+                snapshot.data_json
               )
               report.imported++
             }
@@ -338,6 +358,11 @@ function safeJson(rawContent) {
   catch (_) { return null }
 }
 
+function isValidJson(rawContent) {
+  try { JSON.parse(String(rawContent || '')); return true }
+  catch (_) { return false }
+}
+
 function parseQuotesExport(content) {
   return String(content || '')
     .split(/\n---\n/g)
@@ -416,6 +441,13 @@ function matchLine(text, label) {
 function normalizeDueDate(value) {
   const text = String(value || '').trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
+}
+
+function normalizeIsoDate(value) {
+  const text = String(value || '').trim()
+  if (!text) return null
+  const date = new Date(text)
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null
 }
 
 function normalizeColor(value) {

@@ -114,6 +114,9 @@ export const getKnowledgeGraph = () => req('GET', '/knowledge-graph')
 export const getKnowledgeGraphReferences = fileId => req('GET', `/knowledge-graph/${fileId}/references`)
 export const copyKnowledgeGraphBundle = data => req('POST', '/knowledge-graph/copy', data)
 
+// History
+export const rollbackHistory = (confirm = false) => req('POST', '/history/rollback', { confirm })
+
 // Timer
 export const getTimerSessions = file_id =>
   req('GET', `/timer${file_id ? `?file_id=${file_id}` : ''}`)

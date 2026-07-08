@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
+import * as api from './api'
 import AuthScreen from './components/AuthScreen'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
@@ -43,7 +44,8 @@ function AuthGate() {
 }
 
 function AppShell() {
-  const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
+  const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, toast } = useApp()
+  const rollbackBusyRef = useRef(false)
 
   useEffect(() => { loadTree() }, [])
 
@@ -78,6 +80,43 @@ function AppShell() {
     document.addEventListener('click', handler, { once: true })
     return () => document.removeEventListener('click', handler)
   }, [contextMenu, hideContextMenu])
+
+  useEffect(() => {
+    const rollback = async (confirm = false) => {
+      const result = await api.rollbackHistory(confirm)
+      toast(result.files_changed ? 'Fichiers restaures.' : 'Retour en arriere effectue.')
+      window.setTimeout(() => window.location.reload(), 250)
+    }
+
+    const handler = async (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey || event.altKey) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (rollbackBusyRef.current) return
+      rollbackBusyRef.current = true
+      try {
+        await rollback(false)
+      } catch (err) {
+        if (err.status === 409) {
+          const ok = window.confirm('Restaurer les fichiers a leur etat precedent ?')
+          if (ok) {
+            try {
+              await rollback(true)
+            } catch (confirmErr) {
+              toast(confirmErr.message || 'Retour en arriere impossible.', 'error')
+            }
+          }
+        } else {
+          toast(err.message || 'Retour en arriere impossible.', 'error')
+        }
+      } finally {
+        rollbackBusyRef.current = false
+      }
+    }
+
+    window.addEventListener('keydown', handler, { capture: true })
+    return () => window.removeEventListener('keydown', handler, { capture: true })
+  }, [toast])
 
   return (
     <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>

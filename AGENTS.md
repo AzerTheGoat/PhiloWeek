@@ -60,6 +60,7 @@ todos        — id, title, notes, status (open/done), due_at, user_id, created_
 agenda_practices — id, title, color, active, user_id, created_at, updated_at, archived_at
 agenda_checks — practice_id, entry_date, done, user_id, updated_at
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
+app_snapshots — id, user_id, created_at, reason, data_json
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
@@ -199,6 +200,15 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_Opuscule/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
 - Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
 - Le panneau `Copier` contient aussi un bloc `Recap de periode` avec `Copier la derniere semaine` et une periode personnalisable; il copie les notes modifiees dans la periode avec un preprompt de synthese prudent.
+
+## Retour en arriere global
+
+- L'application capture des instantanes globaux dans `app_snapshots` pour l'utilisateur connecte.
+- La retention garde au plus un instantane par seconde sur les 5 dernieres minutes, puis un par minute jusqu'a 1 heure, puis un par tranche de 5 minutes jusqu'a 24 heures.
+- `Ctrl+Z` / `Cmd+Z` est intercepte globalement dans l'app et appelle `POST /api/history/rollback`.
+- Si le rollback restaure des fichiers, l'interface demande confirmation; pour les autres donnees (Todo, Agenda, Vie, citations, fact-checks, quiz, timer, inbox), le rollback s'applique directement.
+- La restauration remplace les donnees de contenu de l'utilisateur connecte dans une transaction SQLite, sans restaurer les comptes ni les sessions.
+- L'export Obsidian ajoute `_Opuscule/History.json` avec `philoweek_type: history`; l'import recree les instantanes disponibles.
 
 ## Experience mobile
 

@@ -260,6 +260,21 @@ const MIGRATIONS = [
         ON agenda_checks(user_id, entry_date);
     `)
   },
+  // v6 -> v7 : historique global restaure par Ctrl+Z
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS app_snapshots (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        reason TEXT,
+        data_json TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_app_snapshots_user_created
+        ON app_snapshots(user_id, created_at);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne
