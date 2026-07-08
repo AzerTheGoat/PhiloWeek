@@ -252,6 +252,7 @@ function formatTabName(name) {
 
 function getTabIcon(tab) {
   if (tab.kind === 'graph') return 'graph'
+  if (tab.kind === 'definitions') return 'book'
   if (tab.kind === 'questionnaire' || /\.json$/i.test(tab.name || '')) return 'question'
   return 'edit'
 }

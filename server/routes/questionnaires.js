@@ -13,10 +13,10 @@ router.post('/session', (req, res) => {
   const questions = []
 
   for (const file of files) {
-    const parsed = parseQuestionnaire(file.content)
+    const parsed = parseReviewFile(file.content)
     if (!parsed) continue
     parsed.questions.forEach((question, index) => {
-      const normalized = normalizeQuestion(question, index, parsed, file)
+      const normalized = normalizeReviewQuestion(question, index, parsed, file)
       if (normalized) questions.push(withStats(normalized, stats.get(normalized.question_key)))
     })
   }
@@ -117,6 +117,7 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
       return questionnaireMatchesFile(parseQuestionnaire(file.content), target, targetPath)
     })
   } else if (scope === 'source_files') {
+    const directIds = new Set(Array.isArray(fileIds) ? fileIds.map(id => String(id)) : [])
     const targets = Array.isArray(fileIds)
       ? fileIds
         .map(id => db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(String(id), userId))
@@ -125,8 +126,9 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
       : []
     if (targets.length === 0) return []
     rows = rows.filter(file => {
-      if (!isQuestionnaireContent(file.name, file.content)) return false
+      if (directIds.has(String(file.id)) && isReviewContent(file.name, file.content)) return true
       const parsed = parseQuestionnaire(file.content)
+      if (!parsed) return false
       return targets.some(target => questionnaireMatchesFile(parsed, target.file, target.path))
     })
   } else if (scope === 'folders') {
@@ -135,7 +137,7 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
     rows = rows.filter(file => allowed.has(file.parent_id))
   }
 
-  return rows.filter(file => isQuestionnaireContent(file.name, file.content))
+  return rows.filter(file => isReviewContent(file.name, file.content))
 }
 
 function collectFolderScope(db, folderIds, userId) {
@@ -157,9 +159,22 @@ function isQuestionnaireContent(name, content) {
   return Boolean(parseQuestionnaire(content))
 }
 
+function isReviewContent(name, content) {
+  if (!/\.json$/i.test(String(name || ''))) return false
+  return Boolean(parseReviewFile(content))
+}
+
+function parseReviewFile(content) {
+  return parseQuestionnaire(content) || parseDefinitions(content)
+}
+
+function parseJsonContent(content) {
+  return JSON.parse(String(content || '').replace(/^\uFEFF/, ''))
+}
+
 function parseQuestionnaire(content) {
   try {
-    const parsed = JSON.parse(String(content || '').replace(/^﻿/, ''))
+    const parsed = parseJsonContent(content)
     if (!parsed || typeof parsed !== 'object') return null
     const questions = Array.isArray(parsed.questions) ? parsed.questions : []
     if (parsed.philoweek_type !== 'questionnaire' && questions.length === 0) return null
@@ -177,7 +192,39 @@ function parseQuestionnaire(content) {
   }
 }
 
-function normalizeQuestion(question, index, questionnaire, file) {
+function parseDefinitions(content) {
+  try {
+    const parsed = parseJsonContent(content)
+    if (!parsed || typeof parsed !== 'object') return null
+    const definitions = Array.isArray(parsed.definitions) ? parsed.definitions : []
+    if (parsed.philoweek_type !== 'definitions' && definitions.length === 0) return null
+    return {
+      id: parsed.id || parsed.slug || parsed.title || 'definitions',
+      title: parsed.title || 'Definitions',
+      description: parsed.description || '',
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      questions: definitions.map((item, index) => definitionToQuestion(item, index)),
+    }
+  } catch (_) {
+    return null
+  }
+}
+
+function definitionToQuestion(item, index) {
+  const term = item?.term || item?.word || item?.name || ''
+  const definition = item?.definition || item?.answer || item?.meaning || ''
+  const example = item?.example || item?.explanation || item?.notes || ''
+  return {
+    id: item?.id || hash(`${term}|${definition}`) || `definition-${index + 1}`,
+    type: 'definition',
+    prompt: term ? `Definis : ${term}` : `Definition ${index + 1}`,
+    answer: definition,
+    explanation: example,
+    tags: Array.isArray(item?.tags) ? item.tags : [],
+  }
+}
+
+function normalizeReviewQuestion(question, index, questionnaire, file) {
   if (!question || typeof question !== 'object') return null
   const prompt = question.prompt || question.question || question.text
   if (!prompt) return null
@@ -202,6 +249,7 @@ function normalizeQuestion(question, index, questionnaire, file) {
 }
 
 function normalizeType(type) {
+  if (type === 'definition') return 'definition'
   return ['open', 'mcq', 'true_false'].includes(type) ? type : 'open'
 }
 

@@ -345,7 +345,16 @@ function tabFromFile(file) {
 }
 
 function getFileKind(file) {
-  if (/\.json$/i.test(file.name || '')) return 'questionnaire'
+  if (/\.json$/i.test(file.name || '')) {
+    if (typeof file.content === 'string') {
+      try {
+        const parsed = JSON.parse(file.content || '{}')
+        if (parsed?.philoweek_type === 'definitions' || Array.isArray(parsed?.definitions)) return 'definitions'
+      } catch (_) {}
+      return 'questionnaire'
+    }
+    return null
+  }
   if (typeof file.content === 'string' && /philoweek_type:\s*graph/i.test(file.content)) return 'graph'
   if (typeof file.content === 'string') return 'note'
   return null

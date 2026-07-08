@@ -36,7 +36,7 @@ export default function GlobalQuizLauncher() {
   }, [])
 
   const selectAll = useCallback(() => {
-    setSelectedIds(new Set(collectMarkdownFiles(tree).map(file => file.id)))
+    setSelectedIds(new Set(collectReviewSourceFiles(tree).map(file => file.id)))
   }, [tree])
 
   const startQuiz = useCallback(async () => {
@@ -237,7 +237,7 @@ export default function GlobalQuizLauncher() {
           <div className="source-link-selection-strip">
             {selectedFiles.slice(0, 4).map(file => (
               <button key={file.id} type="button" onClick={() => handleToggle(file.id, false)}>
-                <span>{file.path.replace(/\.md$/i, '')}</span>
+                <span>{file.path.replace(/\.(md|json)$/i, '')}</span>
                 <Icon name="close" size={13} />
               </button>
             ))}
@@ -293,23 +293,23 @@ function QuizSourceNode({ node, depth, selectedIds, onToggle }) {
   const isFolder = node.type === 'folder' || node.type === 'locked_folder'
   const isLocked = node.type === 'locked_folder'
   const children = node.children || []
-  const descendantFiles = isFolder ? collectMarkdownFiles([node]) : []
-  const isMarkdownFile = node.type === 'file' && /\.md$/i.test(node.name)
+  const descendantFiles = isFolder ? collectReviewSourceFiles([node]) : []
+  const isSelectableFile = node.type === 'file' && isReviewSourceName(node.name)
   const checkedCount = descendantFiles.filter(file => selectedIds.has(file.id)).length
-  const isChecked = isMarkdownFile ? selectedIds.has(node.id) : descendantFiles.length > 0 && checkedCount === descendantFiles.length
-  const isIndeterminate = !isMarkdownFile && checkedCount > 0 && checkedCount < descendantFiles.length
+  const isChecked = isSelectableFile ? selectedIds.has(node.id) : descendantFiles.length > 0 && checkedCount === descendantFiles.length
+  const isIndeterminate = !isSelectableFile && checkedCount > 0 && checkedCount < descendantFiles.length
 
   const handleToggle = (event) => {
     event.stopPropagation()
     if (isLocked) return
-    if (isMarkdownFile) {
+    if (isSelectableFile) {
       onToggle(node.id)
       return
     }
     descendantFiles.forEach(file => onToggle(file.id, !isChecked))
   }
 
-  if (!isFolder && !isMarkdownFile) return null
+  if (!isFolder && !isSelectableFile) return null
 
   return (
     <li className="file-node">
@@ -324,7 +324,7 @@ function QuizSourceNode({ node, depth, selectedIds, onToggle }) {
           checked={isChecked}
           ref={el => { if (el) el.indeterminate = isIndeterminate }}
           onChange={handleToggle}
-          disabled={isLocked || (!isMarkdownFile && descendantFiles.length === 0)}
+          disabled={isLocked || (!isSelectableFile && descendantFiles.length === 0)}
           onClick={event => event.stopPropagation()}
         />
         <span className="file-icon">{isLocked ? 'lock' : isFolder ? (expanded ? 'v' : '>') : 'doc'}</span>
@@ -338,15 +338,15 @@ function QuizSourceNode({ node, depth, selectedIds, onToggle }) {
 }
 
 function collectSelectedFiles(tree, selectedIds) {
-  return collectMarkdownFiles(tree).filter(file => selectedIds.has(file.id))
+  return collectReviewSourceFiles(tree).filter(file => selectedIds.has(file.id))
 }
 
-function collectMarkdownFiles(tree, prefix = '') {
+function collectReviewSourceFiles(tree, prefix = '') {
   const files = []
   function walk(nodes, currentPrefix = '') {
     nodes.forEach(node => {
       const path = node.path || (currentPrefix ? `${currentPrefix}/${node.name}` : node.name)
-      if (node.type === 'file' && /\.md$/i.test(node.name)) {
+      if (node.type === 'file' && isReviewSourceName(node.name)) {
         files.push({ id: node.id, path, name: node.name })
       }
       if (node.children) walk(node.children, path)
@@ -354,6 +354,10 @@ function collectMarkdownFiles(tree, prefix = '') {
   }
   walk(tree || [], prefix)
   return files
+}
+
+function isReviewSourceName(name) {
+  return /\.(md|json)$/i.test(String(name || ''))
 }
 
 function getQuestionChoices(question) {
@@ -364,6 +368,7 @@ function getQuestionChoices(question) {
 }
 
 function getQuestionTypeLabel(type) {
+  if (type === 'definition') return 'Definition'
   if (type === 'mcq') return 'QCM'
   if (type === 'true_false') return 'Vrai / Faux'
   return 'Question ouverte'

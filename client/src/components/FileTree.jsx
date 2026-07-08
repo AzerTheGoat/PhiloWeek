@@ -123,6 +123,8 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       ? [
           { icon: '📄', label: 'Nouveau fichier ici', action: () => showModal('new-file', { parent_id: node.id }) },
           { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
+          { icon: '?', label: 'Nouveau questionnaire ici', action: () => showModal('new-questionnaire', { parent_id: node.id }) },
+          { icon: 'abc', label: 'Nouvelles definitions ici', action: () => showModal('new-definitions', { parent_id: node.id }) },
           { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
           { separator: true },
           { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
@@ -132,6 +134,11 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
         ].filter(Boolean)
       : [
+          { icon: 'doc', label: 'Nouveau fichier a cote', action: () => showModal('new-file', { parent_id: node.parent_id || null }) },
+          { icon: 'graph', label: 'Nouveau graphe a cote', action: () => showModal('new-graph', { parent_id: node.parent_id || null }) },
+          { icon: '?', label: 'Nouveau questionnaire a cote', action: () => showModal('new-questionnaire', { parent_id: node.parent_id || null }) },
+          { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
+          { separator: true },
           { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
           { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
         ]

@@ -668,6 +668,7 @@ function getQuestionChoices(question) {
 }
 
 function getQuestionTypeLabel(type) {
+  if (type === 'definition') return 'Definition'
   if (type === 'mcq') return 'QCM'
   if (type === 'true_false') return 'Vrai / Faux'
   return 'Question ouverte'

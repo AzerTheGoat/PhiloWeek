@@ -43,6 +43,8 @@ export default function Sidebar() {
     showContextMenu(e.clientX, e.clientY, [
       { label: 'Nouveau fichier', action: () => showModal('new-file', {}) },
       { label: 'Nouveau graphe', action: () => showModal('new-graph', {}) },
+      { label: 'Nouveau questionnaire', action: () => showModal('new-questionnaire', {}) },
+      { label: 'Nouvelles definitions', action: () => showModal('new-definitions', {}) },
       { label: 'Nouveau dossier', action: () => showModal('new-folder', {}) },
       { separator: true },
       { label: 'Importer (.zip)', action: () => importInputRef.current?.click() },
@@ -58,6 +60,7 @@ export default function Sidebar() {
     { icon: 'file', label: 'Note', action: () => showModal('new-file', {}) },
     { icon: 'graph', label: 'Graphe d’idées', action: () => showModal('new-graph', {}) },
     { icon: 'question', label: 'Questionnaire', action: () => showModal('new-questionnaire', {}) },
+    { icon: 'book', label: 'Definitions', action: () => showModal('new-definitions', {}) },
     { icon: 'folder', label: 'Dossier', action: () => showModal('new-folder', {}) },
   ]
 

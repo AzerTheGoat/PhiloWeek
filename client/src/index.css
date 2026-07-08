@@ -3929,6 +3929,78 @@ kbd {
   line-height: 1.45;
 }
 
+.definitions-editor .questionnaire-preview-pane {
+  gap: 12px;
+}
+
+.definition-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.55fr);
+  gap: 10px;
+}
+
+.definition-meta-grid label,
+.definition-description-field,
+.definition-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.definition-meta-grid input,
+.definition-description-field textarea,
+.definition-card input,
+.definition-card textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.definition-description-field {
+  margin-top: 10px;
+}
+
+.definition-description-field textarea,
+.definition-card textarea {
+  min-height: 78px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.definitions-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.definition-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.definition-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.definition-card-head span {
+  color: var(--accent-hover);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .source-files-card {
   background: var(--bg-elevated);
 }

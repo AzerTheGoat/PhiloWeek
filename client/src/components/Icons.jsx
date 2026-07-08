@@ -62,6 +62,14 @@ const PATHS = {
       <path d="M7 20a2 2 0 0 1 0-4h12" />
     </>
   ),
+  book: (
+    <>
+      <path d="M5 4.5h6.5a3 3 0 0 1 3 3V20a3 3 0 0 0-3-3H5Z" />
+      <path d="M19 4.5h-6.5a3 3 0 0 0-3 3V20a3 3 0 0 1 3-3H19Z" />
+      <path d="M8 8h3" />
+      <path d="M16 8h-3" />
+    </>
+  ),
   idea: (
     <>
       <path d="M9 18h6" />

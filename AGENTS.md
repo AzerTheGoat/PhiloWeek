@@ -103,7 +103,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La sidebar garde l'arbre de fichiers comme surface principale.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
-- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
+- Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, questionnaire, definitions et dossier quand le contexte le permet.
 - Les vues principales ne doivent pas afficher de bouton retour de page dans leur header; la navigation se fait par `Fonctions`, les onglets de fichiers et la navigation mobile.
 
 ## Graphes d'idees
@@ -212,6 +213,16 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_Opuscule/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
 - Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
 - Le panneau `Copier` contient aussi un bloc `Recap de periode` avec `Copier la derniere semaine` et une periode personnalisable; il copie les notes modifiees dans la periode avec un preprompt de synthese prudent.
+
+## Definitions JSON
+
+- La sidebar permet de creer un fichier `Definitions`, stocke comme `.json` avec `philoweek_type: definitions`.
+- Un fichier de definitions contient `title`, `description`, `tags` et un tableau `definitions` avec `term`, `definition`, `example` et `tags`.
+- `DefinitionsEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme fiche de definitions.
+- L'editeur permet d'ajouter, modifier et supprimer les mots sans ecrire le JSON a la main, tout en gardant un mode JSON de secours.
+- Les definitions passent dans le moteur de revision existant : le mot devient la question, la definition la correction, et l'exemple l'explication.
+- Dans le panneau global `Reviser`, selectionner directement un fichier Definitions lance la revision de ses mots; les resultats sont stockes dans `questionnaire_results` comme les quiz.
+- L'export/import Obsidian inclut les fichiers Definitions tels quels, puisqu'ils restent des fichiers `.json` standards.
 
 ## Retour en arriere global
 

@@ -4,9 +4,11 @@ import EditorToolbar from './EditorToolbar'
 import Preview from './Preview'
 import GraphEditor from './GraphEditor'
 import QuestionnaireEditor from './QuestionnaireEditor'
+import DefinitionsEditor from './DefinitionsEditor'
 import Icon from './Icons'
 import { isGraphFile } from '../utils/graphFile'
 import { isQuestionnaireFile } from '../utils/questionnaireFile'
+import { isDefinitionsFile } from '../utils/definitionsFile'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
@@ -243,6 +245,7 @@ export default function Editor() {
 
   if (!currentFile) return null
   if (isGraphFile(currentFile)) return <GraphEditor />
+  if (isDefinitionsFile(currentFile)) return <DefinitionsEditor />
   if (isQuestionnaireFile(currentFile)) return <QuestionnaireEditor />
 
   return (
