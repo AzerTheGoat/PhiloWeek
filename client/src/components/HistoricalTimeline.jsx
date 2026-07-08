@@ -4,6 +4,8 @@ import Icon from './Icons'
 import * as api from '../api'
 
 const COLORS = ['#6ba3e8', '#7c64f0', '#4caf7d', '#e0a84f', '#e05555', '#59b6a9']
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_LABELS_SHORT = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
 
 const EMPTY_FORM = {
   title: '',
@@ -24,7 +26,7 @@ export default function HistoricalTimeline() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState(null)
   const [focusId, setFocusId] = useState(null)
-  const [zoom, setZoom] = useState(36)
+  const [zoom, setZoom] = useState(72)
   const [query, setQuery] = useState('')
   const [activeTags, setActiveTags] = useState([])
   const railRef = useRef(null)
@@ -243,8 +245,8 @@ export default function HistoricalTimeline() {
               Zoom
               <input
                 type="range"
-                min="16"
-                max="90"
+                min="24"
+                max="540"
                 value={zoom}
                 onChange={event => setZoom(Number(event.target.value))}
               />
@@ -281,7 +283,7 @@ export default function HistoricalTimeline() {
             <div className="timeline-canvas" style={{ width: layout.width, height: layout.height }}>
               <div className="timeline-axis" style={{ top: layout.axisTop }}>
                 {layout.ticks.map(tick => (
-                  <span key={tick.year} style={{ left: tick.x }}>{formatYear(tick.year)}</span>
+                  <span key={tick.id} className={tick.kind} style={{ left: tick.x }}>{tick.label}</span>
                 ))}
               </div>
               {layout.items.map(item => (
@@ -293,10 +295,14 @@ export default function HistoricalTimeline() {
                     left: item.x,
                     top: item.y,
                     width: item.width,
+                    zIndex: item.event.id === focused?.id ? 1000 : item.zIndex,
                     borderColor: item.event.color || COLORS[0],
                   }}
                   onClick={() => focusEvent(item.event)}
                 >
+                  {item.stackCount > 1 && item.stackIndex === item.stackCount - 1 && (
+                    <span className="timeline-stack-badge">{item.stackCount}</span>
+                  )}
                   {item.event.end_year !== null && (
                     <div className="timeline-duration" style={{ background: item.event.color || COLORS[0] }} />
                   )}
@@ -421,29 +427,64 @@ function buildLayout(events, zoom) {
   const max = Math.ceil(Math.max(...values) + 1)
   const leftPad = 90
   const width = Math.max(900, (max - min) * zoom + leftPad * 2)
-  const lanes = []
-  const items = events.slice().sort(compareEvents).map(event => {
+  const cardWidth = zoom > 260 ? 250 : zoom > 120 ? 224 : 206
+  const cardHeight = 190
+  const stackGap = Math.max(90, Math.min(178, cardWidth * 0.72))
+  const rawItems = events.slice().sort(compareEvents).map(event => {
     const start = dateValue(event)
     const end = Math.max(start, endValue(event))
-    let lane = lanes.findIndex(lastEnd => start > lastEnd + 0.08)
-    if (lane < 0) {
-      lane = lanes.length
-      lanes.push(end)
-    } else {
-      lanes[lane] = end
-    }
     const x = leftPad + (start - min) * zoom
     const endX = leftPad + (end - min) * zoom
-    const durationWidth = Math.max(150, endX - x + 150)
     return {
       event,
+      start,
+      end,
       x,
-      y: 30 + lane * 148,
-      width: Math.min(320, durationWidth),
+      endX,
+      width: event.end_year !== null ? Math.min(340, Math.max(cardWidth, endX - x + cardWidth)) : cardWidth,
       minimapLeft: ((start - min) / Math.max(1, max - min)) * 100,
     }
   })
-  const height = Math.max(380, 80 + lanes.length * 148)
+
+  const clusters = []
+  for (const item of rawItems) {
+    const last = clusters[clusters.length - 1]
+    if (last && item.x - last.lastX < stackGap) {
+      last.items.push(item)
+      last.lastX = item.x
+      last.endX = Math.max(last.endX, item.endX)
+      last.width = Math.max(last.width, item.width)
+    } else {
+      clusters.push({ items: [item], x: item.x, lastX: item.x, endX: item.endX, width: item.width })
+    }
+  }
+
+  const lanes = []
+  const items = []
+  clusters.forEach(cluster => {
+    const stackWidth = Math.min(76, Math.max(0, cluster.items.length - 1) * 16)
+    const clusterRight = cluster.x + Math.max(cluster.width, cardWidth) + stackWidth
+    let lane = lanes.findIndex(right => cluster.x > right + 18)
+    if (lane < 0) {
+      lane = lanes.length
+      lanes.push(clusterRight)
+    } else {
+      lanes[lane] = clusterRight
+    }
+    cluster.items.forEach((item, index) => {
+      const offset = Math.min(index, 5)
+      items.push({
+        ...item,
+        x: cluster.x + offset * 16,
+        y: 30 + lane * cardHeight + offset * 10,
+        width: item.width,
+        stackIndex: index,
+        stackCount: cluster.items.length,
+        zIndex: 10 + index,
+      })
+    })
+  })
+  const height = Math.max(420, 100 + lanes.length * cardHeight)
   return {
     width,
     height,
@@ -455,11 +496,37 @@ function buildLayout(events, zoom) {
 
 function buildTicks(min, max, zoom, leftPad) {
   const span = max - min
+  if (zoom >= 180 && span <= 40) {
+    const ticks = []
+    for (let year = min; year <= max; year++) {
+      ticks.push({
+        id: `year-${year}`,
+        kind: 'year',
+        year,
+        label: formatYear(year),
+        x: leftPad + (year - min) * zoom,
+      })
+      const monthStep = zoom >= 360 ? 1 : 3
+      for (let month = monthStep; month < 12; month += monthStep) {
+        const value = year + month / 12
+        if (value <= min || value >= max) continue
+        ticks.push({
+          id: `month-${year}-${month}`,
+          kind: 'month',
+          year,
+          month,
+          label: zoom >= 360 ? MONTH_LABELS[month] : MONTH_LABELS_SHORT[month],
+          x: leftPad + (value - min) * zoom,
+        })
+      }
+    }
+    return ticks
+  }
   const step = span > 800 ? 200 : span > 300 ? 100 : span > 120 ? 50 : span > 40 ? 10 : span > 15 ? 5 : 1
   const first = Math.ceil(min / step) * step
   const ticks = []
   for (let year = first; year <= max; year += step) {
-    ticks.push({ year, x: leftPad + (year - min) * zoom })
+    ticks.push({ id: `year-${year}`, kind: 'year', year, label: formatYear(year), x: leftPad + (year - min) * zoom })
   }
   return ticks
 }

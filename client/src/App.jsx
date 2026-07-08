@@ -173,7 +173,9 @@ function FileTabs() {
 
   const openTabMenu = (event) => {
     event.preventDefault()
-    showContextMenu(event.clientX, event.clientY, [
+    event.stopPropagation()
+    const rect = event.currentTarget.getBoundingClientRect()
+    showContextMenu(rect.right - 8, rect.bottom + 4, [
       { icon: '×', label: 'Tout fermer', danger: true, action: closeAllTabs },
     ])
   }
@@ -216,6 +218,7 @@ function FileTabs() {
         type="button"
         className="file-tabs-menu"
         title="Options des onglets"
+        onMouseDown={(event) => event.stopPropagation()}
         onClick={openTabMenu}
       >
         ...
