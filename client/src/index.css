@@ -1493,6 +1493,60 @@ a { color: var(--link) }
   font-size: 13px;
 }
 
+.welcome-quote {
+  margin: 0 auto 32px;
+  max-width: 440px;
+  padding: 16px 20px;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.welcome-quote blockquote {
+  margin: 0;
+  font-family: var(--font-prose);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.welcome-quote figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  min-height: 20px;
+}
+
+.welcome-quote cite {
+  color: var(--text-2);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.welcome-quote-refresh {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.welcome-quote-refresh:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;

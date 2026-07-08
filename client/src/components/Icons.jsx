@@ -209,6 +209,12 @@ const PATHS = {
       <path d="M18 6v4" />
     </>
   ),
+  refresh: (
+    <>
+      <path d="M20 11a8 8 0 1 0-.9 4.5" />
+      <path d="M20 5v6h-6" />
+    </>
+  ),
 }
 
 export default function Icon({ name, size = 20, className = '' }) {

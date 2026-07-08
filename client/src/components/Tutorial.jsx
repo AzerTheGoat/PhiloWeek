@@ -145,6 +145,11 @@ const SECTIONS = [
         text: "Vie intérieure garde tes citations favorites avec auteur, source, notes personnelles et tags.",
       },
       {
+        icon: 'quote',
+        title: "Citation à l'accueil",
+        text: "À chaque ouverture de l'écran d'accueil, une de tes citations s'affiche. Le tirage parcourt toute ta collection sans répétition avant de recommencer un cycle (jamais deux fois la même d'affilée). Le bouton ↻ en tire une autre.",
+      },
+      {
         icon: 'alert',
         title: 'Fact Check',
         text: "Note une idée reçue que tu n'as pas encore vérifiée, avec sa source. Change son statut (à vérifier / vrai / faux / partiellement vrai) le jour où tu prends le temps de creuser.",

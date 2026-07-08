@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
 import * as api from './api'
+import { pickNextQuote } from './utils/quoteBag'
 import AuthScreen from './components/AuthScreen'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
@@ -306,6 +307,7 @@ function Welcome() {
             <Icon name="thought" size={16} /> Découvrir les fonctionnalités
           </button>
         </div>
+        <WelcomeQuote />
         <div className="welcome-shortcuts">
           <span><kbd>↑</kbd> Sélectionner dans Fichiers</span>
           <span><kbd>[[</kbd> Lier des notes</span>
@@ -313,5 +315,51 @@ function Welcome() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Citation du jour : une nouvelle à chaque chargement de l'accueil, via un
+// sac mélangé (pas de répétition avant d'avoir tout vu). Le bouton ↻ en tire
+// une autre sans recharger la page.
+function WelcomeQuote() {
+  const [quotes, setQuotes] = useState(null) // null = pas encore chargé
+  const [quote, setQuote] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    api.getQuotes()
+      .then(rows => {
+        if (cancelled) return
+        const list = Array.isArray(rows) ? rows : []
+        setQuotes(list)
+        setQuote(pickNextQuote(list))
+      })
+      .catch(() => { if (!cancelled) setQuotes([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  if (!quote) return null
+
+  const attribution = [quote.author, quote.source].filter(Boolean).join(' — ')
+  const canRotate = Array.isArray(quotes) && quotes.length > 1
+
+  return (
+    <figure className="welcome-quote">
+      <blockquote>{quote.quote}</blockquote>
+      <figcaption>
+        {attribution && <cite>{attribution}</cite>}
+        {canRotate && (
+          <button
+            type="button"
+            className="welcome-quote-refresh"
+            title="Une autre citation"
+            aria-label="Une autre citation"
+            onClick={() => setQuote(pickNextQuote(quotes))}
+          >
+            <Icon name="refresh" size={14} />
+          </button>
+        )}
+      </figcaption>
+    </figure>
   )
 }
