@@ -11,7 +11,7 @@ const init = {
   tabs: [],
   openFileId: null,
   openFile: null,
-  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'knowledge-graph' | 'timeline'
+  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline'
   theme: localStorage.getItem('pw-theme') || 'dark',
   sidebarOpen: !isMobileViewport(),
   toasts: [],

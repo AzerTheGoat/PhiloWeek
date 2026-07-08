@@ -161,10 +161,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Todo
 
-- La vue `Todo` est accessible depuis la sidebar et la navigation mobile; elle fonctionne comme un petit dashboard avec les onglets `Taches`, `Agenda` et `Vie`.
+- Les vues `Todo`, `Agenda` et `Vie perso` sont trois sections separees dans le panneau `Fonctions`.
 - Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
-- L'onglet `Agenda` permet de créer des pratiques quotidiennes, de les cocher par jour, de les archiver/reprendre, et d'afficher une évolution sur les derniers jours.
-- L'onglet `Vie` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points déjà vécus.
+- La section `Agenda` permet de creer des pratiques quotidiennes, de les cocher par jour, de les archiver/reprendre, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme.
+- La section `Vie perso` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points deja vecus.
 - À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
 - L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.
 - L'export Obsidian ajoute aussi `_Opuscule/Dashboard.json` avec `philoweek_type: dashboard` pour les pratiques, coches d'agenda et le profil de vie; l'import recrée ces données.

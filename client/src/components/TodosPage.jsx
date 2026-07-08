@@ -5,21 +5,20 @@ import * as api from '../api'
 
 const STATUS_FILTERS = [
   { value: 'open', label: 'Ouvertes' },
-  { value: 'done', label: 'Terminees' },
+  { value: 'done', label: 'Terminées' },
   { value: 'all', label: 'Toutes' },
 ]
 
-const DASHBOARD_TABS = [
-  { value: 'tasks', label: 'Taches' },
-  { value: 'agenda', label: 'Agenda' },
-  { value: 'life', label: 'Vie' },
-]
+const SECTION_META = {
+  tasks: { title: 'Todo', subtitle: 'Tâches et dates limites' },
+  agenda: { title: 'Agenda', subtitle: 'Pratiques quotidiennes et suivi' },
+  life: { title: 'Vie', subtitle: 'Grille de vie et horizon personnel' },
+}
 
 const PRACTICE_COLORS = ['#6ba3e8', '#4caf7d', '#d69d55', '#a08be0', '#e05555', '#d8d8d8']
 
-export default function TodosPage() {
+export default function TodosPage({ section = 'tasks' }) {
   const { dispatch, toast } = useApp()
-  const [tab, setTab] = useState('tasks')
   const [todos, setTodos] = useState([])
   const [filter, setFilter] = useState('open')
   const [form, setForm] = useState(() => ({ title: '', notes: '', due_at: todayInput() }))
@@ -32,12 +31,12 @@ export default function TodosPage() {
   const [dashboardLoading, setDashboardLoading] = useState(false)
 
   useEffect(() => {
-    loadTodos(filter)
-  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (section === 'tasks') loadTodos(filter)
+  }, [section, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (tab === 'agenda' || tab === 'life') loadDashboard()
-  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (section === 'agenda' || section === 'life') loadDashboard()
+  }, [section]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = useMemo(() => {
     const open = todos.filter(todo => todo.status === 'open')
@@ -74,9 +73,10 @@ export default function TodosPage() {
   }, [agendaDays, dashboard.practices, checkMap])
 
   const todayDone = activePractices.filter(practice => checkMap.get(`${practice.id}:${dashboard.today}`)).length
-  const monthCompletion = agendaSeries.length
+  const agendaCompletion = agendaSeries.length
     ? Math.round(agendaSeries.reduce((sum, day) => sum + day.percent, 0) / agendaSeries.length)
     : 0
+  const currentStreak = useMemo(() => buildStreak(agendaSeries), [agendaSeries])
 
   const lifeGrid = useMemo(() => {
     return buildLifeGrid(dashboard.profile, lifeUnit)
@@ -112,7 +112,7 @@ export default function TodosPage() {
       setTodos(prev => filter === 'done' ? prev : [created, ...prev].sort(sortTodos))
       setForm({ title: '', notes: '', due_at: todayInput() })
       setShowForm(false)
-      toast('Todo ajoutee')
+      toast('Todo ajoutée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -135,7 +135,7 @@ export default function TodosPage() {
     try {
       await api.deleteTodo(id)
       setTodos(prev => prev.filter(todo => todo.id !== id))
-      toast('Todo supprimee')
+      toast('Todo supprimée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -157,7 +157,7 @@ export default function TodosPage() {
       const created = await api.createPractice(practiceForm)
       setDashboard(prev => ({ ...prev, practices: [...prev.practices, created] }))
       setPracticeForm({ title: '', color: PRACTICE_COLORS[0] })
-      toast('Pratique ajoutee')
+      toast('Pratique ajoutée')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -204,16 +204,16 @@ export default function TodosPage() {
   }
 
   return (
-    <div className="todos-page">
+    <div className={`todos-page ${section === 'agenda' ? 'agenda-page' : ''}`}>
       <div className="todos-header">
         <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
           <Icon name="back" />
         </button>
         <div>
-          <h2>Dashboard</h2>
-          <span>{stats.late} en retard · {stats.today} aujourd'hui · {activePractices.length} pratiques actives</span>
+          <h2>{SECTION_META[section]?.title || SECTION_META.tasks.title}</h2>
+          <span>{headerSubtitle(section, stats, activePractices.length, agendaCompletion, currentStreak)}</span>
         </div>
-        {tab === 'tasks' && (
+        {section === 'tasks' && (
           <button type="button" className="btn-primary" onClick={() => setShowForm(open => !open)}>
             <Icon name={showForm ? 'close' : 'plus'} size={16} />
             {showForm ? 'Fermer' : 'Ajouter'}
@@ -221,15 +221,7 @@ export default function TodosPage() {
         )}
       </div>
 
-      <div className="todos-dashboard-tabs">
-        {DASHBOARD_TABS.map(item => (
-          <button key={item.value} className={tab === item.value ? 'active' : ''} onClick={() => setTab(item.value)}>
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'tasks' && (
+      {section === 'tasks' && (
         <TasksPanel
           filter={filter}
           setFilter={setFilter}
@@ -245,7 +237,7 @@ export default function TodosPage() {
         />
       )}
 
-      {tab === 'agenda' && (
+      {section === 'agenda' && (
         <AgendaPanel
           loading={dashboardLoading}
           activePractices={activePractices}
@@ -253,7 +245,8 @@ export default function TodosPage() {
           today={dashboard.today}
           checkMap={checkMap}
           todayDone={todayDone}
-          monthCompletion={monthCompletion}
+          agendaCompletion={agendaCompletion}
+          currentStreak={currentStreak}
           agendaSeries={agendaSeries}
           practiceForm={practiceForm}
           setPracticeForm={setPracticeForm}
@@ -263,7 +256,7 @@ export default function TodosPage() {
         />
       )}
 
-      {tab === 'life' && (
+      {section === 'life' && (
         <LifePanel
           profile={dashboard.profile}
           lifeGrid={lifeGrid}
@@ -274,6 +267,12 @@ export default function TodosPage() {
       )}
     </div>
   )
+}
+
+function headerSubtitle(section, stats, activePractices, agendaCompletion, currentStreak) {
+  if (section === 'agenda') return `${activePractices} pratiques actives · ${agendaCompletion}% sur 28 jours · série ${currentStreak} j`
+  if (section === 'life') return SECTION_META.life.subtitle
+  return `${stats.late} en retard · ${stats.today} aujourd'hui · ${stats.total} visibles`
 }
 
 function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loading, todos, toggleTodo, updateDueDate, removeTodo }) {
@@ -309,7 +308,7 @@ function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loadi
               onChange={event => setForm(prev => ({ ...prev, due_at: event.target.value }))}
             />
           </label>
-          <button className="btn-primary" disabled={!form.title.trim() || !form.due_at}>Creer</button>
+          <button className="btn-primary" disabled={!form.title.trim() || !form.due_at}>Créer</button>
         </div>
         <textarea
           className="todo-input"
@@ -339,8 +338,8 @@ function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loadi
                 <div className="todo-card-title">{todo.title}</div>
                 {todo.notes && <p>{todo.notes}</p>}
                 <div className="todo-meta">
-                  <span>Creee {formatDateTime(todo.created_at)}</span>
-                  {todo.completed_at && <span>Terminee {formatDateTime(todo.completed_at)}</span>}
+                  <span>Créée {formatDateTime(todo.created_at)}</span>
+                  {todo.completed_at && <span>Terminée {formatDateTime(todo.completed_at)}</span>}
                 </div>
               </div>
               <div className="todo-deadline">
@@ -356,16 +355,38 @@ function TasksPanel({ filter, setFilter, form, setForm, showForm, addTodo, loadi
   )
 }
 
-function AgendaPanel({ loading, activePractices, practices, today, checkMap, todayDone, monthCompletion, agendaSeries, practiceForm, setPracticeForm, addPractice, togglePractice, togglePracticeCheck }) {
+function AgendaPanel({ loading, activePractices, practices, today, checkMap, todayDone, agendaCompletion, currentStreak, agendaSeries, practiceForm, setPracticeForm, addPractice, togglePractice, togglePracticeCheck }) {
   return (
     <div className="agenda-dashboard">
-      <section className="agenda-today">
+      <section className="agenda-hero">
         <div className="agenda-section-head">
           <div>
             <h3>Aujourd'hui</h3>
-            <span>{todayDone}/{activePractices.length} cochees</span>
+            <span>{formatDate(today)}</span>
           </div>
-          <strong>{monthCompletion}% sur 28 jours</strong>
+        </div>
+        <div className="agenda-score-ring" style={{ '--agenda-score': `${activePractices.length ? (todayDone / activePractices.length) * 100 : 0}%` }}>
+          <strong>{todayDone}/{activePractices.length}</strong>
+          <span>cochées</span>
+        </div>
+        <div className="agenda-metrics">
+          <div>
+            <strong>{agendaCompletion}%</strong>
+            <span>moyenne 28 j</span>
+          </div>
+          <div>
+            <strong>{currentStreak} j</strong>
+            <span>série actuelle</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="agenda-today">
+        <div className="agenda-section-head">
+          <div>
+            <h3>Pratiques du jour</h3>
+            <span>{todayDone}/{activePractices.length} faites</span>
+          </div>
         </div>
 
         <form className="practice-form" onSubmit={addPractice}>
@@ -375,19 +396,21 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
             value={practiceForm.title}
             onChange={event => setPracticeForm(prev => ({ ...prev, title: event.target.value }))}
           />
-          <div className="practice-color-row">
-            {PRACTICE_COLORS.map(color => (
-              <button
-                key={color}
-                type="button"
-                className={practiceForm.color === color ? 'active' : ''}
-                style={{ '--practice-color': color }}
-                onClick={() => setPracticeForm(prev => ({ ...prev, color }))}
-                title={color}
-              />
-            ))}
+          <div className="practice-form-row">
+            <div className="practice-color-row">
+              {PRACTICE_COLORS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  className={practiceForm.color === color ? 'active' : ''}
+                  style={{ '--practice-color': color }}
+                  onClick={() => setPracticeForm(prev => ({ ...prev, color }))}
+                  title={color}
+                />
+              ))}
+            </div>
+            <button className="btn-primary" disabled={!practiceForm.title.trim()}>Ajouter</button>
           </div>
-          <button className="btn-primary" disabled={!practiceForm.title.trim()}>Ajouter</button>
         </form>
 
         <div className="practice-check-list">
@@ -414,15 +437,21 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
       <section className="agenda-chart-panel">
         <div className="agenda-section-head">
           <div>
-            <h3>Evolution</h3>
+            <h3>Rythme</h3>
             <span>28 derniers jours</span>
           </div>
         </div>
-        <div className="agenda-bars">
+        <div className="agenda-heatmap">
           {agendaSeries.map(day => (
-            <div key={day.day} className="agenda-bar-wrap" title={`${formatShortDate(day.day)} · ${day.percent}%`}>
-              <div className="agenda-bar" style={{ height: `${Math.max(4, day.percent)}%` }} />
-            </div>
+            <button
+              key={day.day}
+              type="button"
+              className={day.day === today ? 'today' : ''}
+              style={{ '--day-fill': `${Math.max(6, day.percent)}%` }}
+              title={`${formatShortDate(day.day)} · ${day.done}/${day.total || 0}`}
+            >
+              <span>{new Date(`${day.day}T00:00:00`).getDate()}</span>
+            </button>
           ))}
         </div>
       </section>
@@ -430,8 +459,8 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
       <section className="agenda-practices-panel">
         <div className="agenda-section-head">
           <div>
-            <h3>Pratiques</h3>
-            <span>Celles qui viennent et partent restent dans l'historique.</span>
+            <h3>Gestion</h3>
+            <span>Les pratiques archivées restent dans l'historique.</span>
           </div>
         </div>
         <div className="practice-manage-list">
@@ -440,7 +469,7 @@ function AgendaPanel({ loading, activePractices, practices, today, checkMap, tod
               <span className="practice-dot" style={{ '--practice-color': practice.color }} />
               <div>
                 <strong>{practice.title}</strong>
-                <span>{practice.active ? 'Active' : `Archivee ${formatDate(practice.archived_at)}`}</span>
+                <span>{practice.active ? 'Active' : `Archivée ${formatDate(practice.archived_at)}`}</span>
               </div>
               <button type="button" onClick={() => togglePractice(practice, !practice.active)}>
                 {practice.active ? 'Archiver' : 'Reprendre'}
@@ -468,7 +497,7 @@ function LifePanel({ profile, lifeGrid, lifeUnit, setLifeUnit, saveLifeProfile }
         <div className="agenda-section-head">
           <div>
             <h3>Grille de vie</h3>
-            <span>Chaque point represente une semaine ou un mois.</span>
+            <span>Chaque point représente une semaine ou un mois.</span>
           </div>
         </div>
         <div className="life-config-grid">
@@ -496,7 +525,7 @@ function LifePanel({ profile, lifeGrid, lifeUnit, setLifeUnit, saveLifeProfile }
         ) : (
           <>
             <div className="life-grid-summary">
-              <strong>{lifeGrid.lived} points vecus</strong>
+              <strong>{lifeGrid.lived} points vécus</strong>
               <span>{lifeGrid.remaining} restants sur {lifeGrid.total}</span>
             </div>
             <div className={`life-dot-grid ${lifeUnit}`}>
@@ -548,6 +577,15 @@ function wasPracticeAvailable(practice, day) {
   const created = String(practice.created_at).slice(0, 10)
   const archived = practice.archived_at ? String(practice.archived_at).slice(0, 10) : null
   return day >= created && (!archived || day <= archived)
+}
+
+function buildStreak(series) {
+  let streak = 0
+  for (let i = series.length - 1; i >= 0; i--) {
+    if (!series[i].total || series[i].percent < 100) break
+    streak++
+  }
+  return streak
 }
 
 function deadlineState(dueAt) {

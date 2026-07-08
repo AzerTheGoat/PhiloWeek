@@ -65,8 +65,10 @@ export default function Sidebar() {
   const viewActions = [
     { icon: 'journal', label: 'Journal', active: view === 'journal', action: openJournalToday },
     { icon: 'idea', label: 'Idées', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
-    { icon: 'life', label: 'Vie', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
+    { icon: 'life', label: 'Vie int.', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
     { icon: 'synthesis', label: 'Todo', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
+    { icon: 'journal', label: 'Agenda', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
+    { icon: 'life', label: 'Vie perso', active: view === 'life-grid', action: () => dispatch({ type: 'SET_VIEW', payload: 'life-grid' }) },
     { icon: 'timer', label: 'Timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { icon: 'graph', label: 'Base', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { icon: 'timeline', label: 'Frise', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },

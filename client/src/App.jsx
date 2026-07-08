@@ -140,7 +140,11 @@ function AppShell() {
         ) : view === 'life' ? (
           <LifePage />
         ) : view === 'todos' ? (
-          <TodosPage />
+          <TodosPage section="tasks" />
+        ) : view === 'agenda' ? (
+          <TodosPage section="agenda" />
+        ) : view === 'life-grid' ? (
+          <TodosPage section="life" />
         ) : view === 'knowledge-graph' ? (
           <KnowledgeGraph />
         ) : view === 'timeline' ? (
@@ -245,6 +249,7 @@ function MobileNav() {
     { key: 'journal', label: 'Journal', icon: 'journal', active: view === 'journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'journal' }) },
     { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
     { key: 'todos', label: 'Todo', icon: 'synthesis', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
+    { key: 'agenda', label: 'Agenda', icon: 'journal', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
     { key: 'graph', label: 'Graphe', icon: 'graph', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { key: 'timeline', label: 'Frise', icon: 'timeline', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
     { key: 'timer', label: 'Timer', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },

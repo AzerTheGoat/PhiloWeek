@@ -5404,6 +5404,12 @@ kbd {
   gap: 0;
 }
 
+.agenda-page .agenda-dashboard {
+  grid-template-columns: minmax(220px, 0.7fr) minmax(300px, 1.1fr) minmax(280px, 1fr);
+  align-content: start;
+}
+
+.agenda-hero,
 .agenda-today,
 .agenda-chart-panel,
 .agenda-practices-panel,
@@ -5415,12 +5421,20 @@ kbd {
   border-bottom: 1px solid var(--border);
 }
 
+.agenda-chart-panel {
+  border-right: none;
+}
+
 .agenda-practices-panel,
 .life-grid-panel {
   border-right: none;
 }
 
 .agenda-practices-panel {
+  grid-column: 1 / -1;
+}
+
+.agenda-page .agenda-practices-panel {
   grid-column: 1 / -1;
 }
 
@@ -5447,11 +5461,75 @@ kbd {
   font-size: 12px;
 }
 
+.agenda-score-ring {
+  --agenda-score: 0%;
+  width: 132px;
+  aspect-ratio: 1;
+  margin: 10px auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, var(--bg-sidebar) 0 58%, transparent 59%),
+    conic-gradient(var(--accent) var(--agenda-score), var(--bg-hover) 0);
+}
+
+.agenda-score-ring strong,
+.agenda-score-ring span {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+
+.agenda-score-ring strong {
+  margin-top: -12px;
+  font-size: 24px;
+}
+
+.agenda-score-ring span {
+  margin-top: 26px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.agenda-metrics {
+  display: grid;
+  gap: 8px;
+}
+
+.agenda-metrics div {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.agenda-metrics strong,
+.agenda-metrics span {
+  display: block;
+}
+
+.agenda-metrics strong {
+  font-size: 18px;
+}
+
+.agenda-metrics span {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
 .practice-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.practice-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .practice-color-row {
@@ -5508,6 +5586,31 @@ kbd {
 .practice-check.done {
   background: color-mix(in srgb, var(--practice-color) 11%, var(--bg-elevated));
   border-color: var(--practice-color);
+}
+
+.agenda-heatmap {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(28px, 1fr));
+  gap: 8px;
+}
+
+.agenda-heatmap button {
+  --day-fill: 6%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) var(--day-fill), var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) var(--day-fill), var(--bg-elevated));
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agenda-heatmap button.today {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  color: var(--accent-hover);
 }
 
 .agenda-bars {
@@ -5670,6 +5773,11 @@ kbd {
     grid-template-columns: 1fr;
   }
 
+  .agenda-page .agenda-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-hero,
   .agenda-today,
   .agenda-chart-panel,
   .agenda-practices-panel,
@@ -5706,6 +5814,7 @@ kbd {
   }
 
   .agenda-today,
+  .agenda-hero,
   .agenda-chart-panel,
   .agenda-practices-panel,
   .life-config-panel,
@@ -5716,6 +5825,15 @@ kbd {
   .agenda-bars {
     height: 150px;
     gap: 3px;
+  }
+
+  .agenda-heatmap {
+    grid-template-columns: repeat(7, minmax(32px, 1fr));
+    gap: 6px;
+  }
+
+  .practice-form-row {
+    grid-template-columns: 1fr;
   }
 
   .practice-manage-card {
