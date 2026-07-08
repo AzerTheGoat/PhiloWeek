@@ -44,7 +44,7 @@ function AuthGate() {
 }
 
 function AppShell() {
-  const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, toast } = useApp()
+  const { theme, sidebarOpen, view, currentFile, loadTree, openFile, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, toast } = useApp()
   const rollbackBusyRef = useRef(false)
 
   useEffect(() => { loadTree() }, [])
@@ -84,8 +84,13 @@ function AppShell() {
   useEffect(() => {
     const rollback = async (confirm = false) => {
       const result = await api.rollbackHistory(confirm)
-      toast(result.files_changed ? 'Fichiers restaures.' : 'Retour en arriere effectue.')
-      window.setTimeout(() => window.location.reload(), 250)
+      await loadTree()
+      if (result.focus_file_id) {
+        await openFile(result.focus_file_id)
+      } else {
+        window.setTimeout(() => window.location.reload(), 250)
+      }
+      toast('Retour en arriere effectue.')
     }
 
     const handler = async (event) => {
@@ -98,7 +103,7 @@ function AppShell() {
         await rollback(false)
       } catch (err) {
         if (err.status === 409) {
-          const ok = window.confirm('Restaurer les fichiers a leur etat precedent ?')
+          const ok = window.confirm('Ce retour en arriere va restaurer ou deplacer un fichier. Continuer ?')
           if (ok) {
             try {
               await rollback(true)
@@ -116,7 +121,7 @@ function AppShell() {
 
     window.addEventListener('keydown', handler, { capture: true })
     return () => window.removeEventListener('keydown', handler, { capture: true })
-  }, [toast])
+  }, [loadTree, openFile, toast])
 
   return (
     <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>

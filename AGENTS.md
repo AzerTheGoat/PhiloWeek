@@ -206,7 +206,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'application capture des instantanes globaux dans `app_snapshots` pour l'utilisateur connecte.
 - La retention garde au plus un instantane par seconde sur les 5 dernieres minutes, puis un par minute jusqu'a 1 heure, puis un par tranche de 5 minutes jusqu'a 24 heures.
 - `Ctrl+Z` / `Cmd+Z` est intercepte globalement dans l'app et appelle `POST /api/history/rollback`.
-- Si le rollback restaure des fichiers, l'interface demande confirmation; pour les autres donnees (Todo, Agenda, Vie, citations, fact-checks, quiz, timer, inbox), le rollback s'applique directement.
+- Si le rollback restaure un fichier supprime ou change l'emplacement d'un fichier/dossier, l'interface demande confirmation; les simples modifications de contenu s'appliquent directement et ouvrent le fichier concerne.
 - La restauration remplace les donnees de contenu de l'utilisateur connecte dans une transaction SQLite, sans restaurer les comptes ni les sessions.
 - L'export Obsidian ajoute `_Opuscule/History.json` avec `philoweek_type: history`; l'import recree les instantanes disponibles.
 

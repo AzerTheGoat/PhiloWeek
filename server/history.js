@@ -126,14 +126,15 @@ function rollbackLatestSnapshot(db, userId, { confirm = false } = {}) {
 
   const target = parseSnapshot(row.data_json)
   const current = collectSnapshot(db, userId)
-  const filesChanged = fileDataChanged(current, target)
-  if (filesChanged && !confirm) {
+  const fileChange = describeFileChange(current, target)
+  if (fileChange.requiresConfirmation && !confirm) {
     return {
       ok: false,
       status: 409,
       requiresConfirmation: true,
       restored_at: row.created_at,
-      error: 'Ce retour en arriere va restaurer des fichiers.',
+      focus_file_id: fileChange.focusFileId,
+      error: 'Ce retour en arriere va restaurer ou deplacer un fichier.',
     }
   }
 
@@ -143,7 +144,13 @@ function rollbackLatestSnapshot(db, userId, { confirm = false } = {}) {
   })
   tx()
 
-  return { ok: true, restored_at: row.created_at, files_changed: filesChanged }
+  return {
+    ok: true,
+    restored_at: row.created_at,
+    files_changed: fileChange.changed,
+    focus_file_id: fileChange.focusFileId,
+    requires_confirmation: fileChange.requiresConfirmation,
+  }
 }
 
 function collectSnapshot(db, userId) {
@@ -246,18 +253,6 @@ function keepBucket(row, time, size, buckets, keep) {
   keep.add(row.id)
 }
 
-function fileDataChanged(current, target) {
-  return stableJson({
-    files: current.files || [],
-    file_links: current.file_links || [],
-    file_tags: current.file_tags || [],
-  }) !== stableJson({
-    files: target.files || [],
-    file_links: target.file_links || [],
-    file_tags: target.file_tags || [],
-  })
-}
-
 function parseSnapshot(raw) {
   try {
     const parsed = JSON.parse(raw)
@@ -269,6 +264,64 @@ function parseSnapshot(raw) {
 
 function stableJson(value) {
   return JSON.stringify(value)
+}
+
+function describeFileChange(current, target) {
+  const currentFiles = Array.isArray(current.files) ? current.files : []
+  const targetFiles = Array.isArray(target.files) ? target.files : []
+  const currentById = new Map(currentFiles.map(file => [file.id, file]))
+  const targetById = new Map(targetFiles.map(file => [file.id, file]))
+
+  const restored = targetFiles.find(file => !currentById.has(file.id))
+  const moved = targetFiles.find(file => {
+    const currentFile = currentById.get(file.id)
+    return currentFile && (currentFile.parent_id || null) !== (file.parent_id || null)
+  })
+
+  const contentChanged = targetFiles.find(file => {
+    if (file.type !== 'file') return false
+    const currentFile = currentById.get(file.id)
+    return currentFile && stableJson(normalizeFileContent(currentFile)) !== stableJson(normalizeFileContent(file))
+  })
+
+  const deletedByRollback = currentFiles.find(file => !targetById.has(file.id))
+  const relationChanged = stableJson({
+    file_links: current.file_links || [],
+    file_tags: current.file_tags || [],
+  }) !== stableJson({
+    file_links: target.file_links || [],
+    file_tags: target.file_tags || [],
+  })
+
+  const focusFileId =
+    firstFocusableFileId(restored, targetFiles) ||
+    firstFocusableFileId(moved, targetFiles) ||
+    firstFocusableFileId(contentChanged, targetFiles) ||
+    firstFocusableFileId(deletedByRollback, targetFiles)
+
+  return {
+    changed: Boolean(restored || moved || contentChanged || deletedByRollback || relationChanged),
+    requiresConfirmation: Boolean(restored || moved),
+    focusFileId,
+  }
+}
+
+function normalizeFileContent(file) {
+  return {
+    name: file.name,
+    type: file.type,
+    content: file.content,
+    password_hash: file.password_hash,
+    encrypted_content: file.encrypted_content,
+    sort_order: file.sort_order,
+  }
+}
+
+function firstFocusableFileId(file, allTargetFiles) {
+  if (!file) return null
+  if (file.type === 'file') return file.id
+  const child = allTargetFiles.find(candidate => candidate.type === 'file' && candidate.parent_id === file.id)
+  return child ? child.id : null
 }
 
 module.exports = {
