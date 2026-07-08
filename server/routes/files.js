@@ -3,6 +3,11 @@ const router = express.Router()
 const crypto = require('crypto')
 const { getDb, updateTags, updateLinks, updateAllLinks } = require('../db')
 const { v4: uuidv4 } = require('uuid')
+const { hashPassword: hashPasswordStrong, verifyPassword: verifyPasswordStrong } = require('../auth/password')
+
+// Ancien sel statique — conservé UNIQUEMENT pour déchiffrer les dossiers
+// verrouillés avant la migration vers le format GCM (sel aléatoire).
+const LEGACY_KEY_SALT = 'philoweek-salt-v2'
 
 // GET /api/files — full tree
 router.get('/', (req, res) => {
@@ -185,22 +190,17 @@ router.post('/:id/unlock', async (req, res) => {
   ).get(req.params.id, req.user.id)
   if (!folder) return res.status(404).json({ error: 'Not found' })
 
-  const valid = verifyPassword(password, folder.password_hash)
+  const valid = verifyFolderPassword(password, folder.password_hash)
   if (!valid) return res.status(401).json({ error: 'Wrong password' })
 
   const children = db.prepare('SELECT * FROM files WHERE parent_id = ? AND user_id = ?').all(req.params.id, req.user.id)
-  const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
 
   let decrypted
   try {
     decrypted = children.map(child => {
       if (!child.encrypted_content) return child
       try {
-        const iv = Buffer.from(child.encrypted_content.slice(0, 32), 'hex')
-        const ciphertext = child.encrypted_content.slice(32)
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
-        let plain = decipher.update(ciphertext, 'hex', 'utf8')
-        plain += decipher.final('utf8')
+        const plain = decryptContent(child.encrypted_content, password)
         return { ...child, content: plain, encrypted_content: null }
       } catch {
         throw new Error(`Could not decrypt "${child.name}"`)
@@ -240,15 +240,18 @@ router.post('/:id/unlock', async (req, res) => {
 router.post('/:id/lock', async (req, res) => {
   const db = getDb()
   const { password } = req.body
-  if (!password || password.length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' })
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' })
   }
 
   const folder = db.prepare('SELECT id FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!folder) return res.status(404).json({ error: 'Not found' })
 
-  const hash = hashPassword(password)
-  const key = crypto.scryptSync(password, 'philoweek-salt-v2', 32)
+  // Sel aléatoire par opération de verrouillage : une clé différente à chaque
+  // fois, plus de sel statique partagé entre tous les comptes.
+  const salt = crypto.randomBytes(16)
+  const key = crypto.scryptSync(password, salt, 32)
+  const hash = hashPasswordStrong(password)
 
   db.prepare("UPDATE files SET type = 'locked_folder', password_hash = ? WHERE id = ?").run(hash, req.params.id)
 
@@ -256,11 +259,7 @@ router.post('/:id/lock', async (req, res) => {
   const updateEnc = db.prepare('UPDATE files SET encrypted_content = ?, content = NULL WHERE id = ?')
   for (const child of children) {
     if (!child.content) continue
-    const iv = crypto.randomBytes(16)
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
-    let enc = cipher.update(child.content, 'utf8', 'hex')
-    enc += cipher.final('hex')
-    updateEnc.run(iv.toString('hex') + enc, child.id)
+    updateEnc.run(encryptContent(child.content, key, salt), child.id)
   }
 
   res.json({ ok: true })
@@ -285,18 +284,53 @@ function validateParent(db, parentId, userId) {
   return null
 }
 
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex')
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex')
-  return `scrypt$1$${salt}$${hash}`
+// Vérifie le mot de passe d'un dossier verrouillé. Accepte les DEUX formats :
+//   - scrypt$2$... : nouveau hash fort (auth/password.js), utilisé aux
+//     nouveaux verrouillages
+//   - scrypt$1$...  : ancien hash hérité, conservé pour les dossiers
+//     verrouillés avant la migration
+function verifyFolderPassword(password, storedHash) {
+  if (verifyPasswordStrong(password, storedHash)) return true
+  return verifyLegacyFolderPassword(password, storedHash)
 }
 
-function verifyPassword(password, storedHash) {
+function verifyLegacyFolderPassword(password, storedHash) {
   if (!storedHash) return false
   const parts = String(storedHash).split('$')
-  if (parts[0] !== 'scrypt' || parts.length !== 4) return false
+  if (parts[0] !== 'scrypt' || parts[1] !== '1' || parts.length !== 4) return false
   const [, , salt, expected] = parts
   const actual = crypto.scryptSync(password, salt, 64)
   const expectedBuffer = Buffer.from(expected, 'hex')
   return expectedBuffer.length === actual.length && crypto.timingSafeEqual(expectedBuffer, actual)
+}
+
+// Nouveau format authentifié : `gcm$v1$<sel>$<iv>$<tag>$<ciphertext>` (hex).
+// AES-256-GCM garantit l'intégrité (déchiffrement échoue si altéré).
+function encryptContent(plaintext, key, salt) {
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  let enc = cipher.update(plaintext, 'utf8', 'hex')
+  enc += cipher.final('hex')
+  const tag = cipher.getAuthTag().toString('hex')
+  return `gcm$v1$${salt.toString('hex')}$${iv.toString('hex')}$${tag}$${enc}`
+}
+
+function decryptContent(blob, password) {
+  if (typeof blob === 'string' && blob.startsWith('gcm$')) {
+    const [, , saltHex, ivHex, tagHex, ciphertext] = blob.split('$')
+    const key = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), 32)
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'))
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
+    let plain = decipher.update(ciphertext, 'hex', 'utf8')
+    plain += decipher.final('utf8')
+    return plain
+  }
+  // Ancien format : AES-256-CBC, sel statique, iv = 32 premiers caractères hex.
+  const key = crypto.scryptSync(password, LEGACY_KEY_SALT, 32)
+  const iv = Buffer.from(blob.slice(0, 32), 'hex')
+  const ciphertext = blob.slice(32)
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+  let plain = decipher.update(ciphertext, 'hex', 'utf8')
+  plain += decipher.final('utf8')
+  return plain
 }

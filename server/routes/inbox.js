@@ -3,6 +3,11 @@ const router = express.Router()
 const { getDb } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 
+// N'accepte que des URL http(s). Bloque javascript:, data:, file:, etc.
+function isSafeUrl(url) {
+  return /^https?:\/\//i.test(String(url || '').trim())
+}
+
 // ——— Resources ———
 
 router.get('/resources', (req, res) => {
@@ -20,6 +25,7 @@ router.post('/resources', (req, res) => {
   const db = getDb()
   const { url, title, type, notes } = req.body
   if (!url) return res.status(400).json({ error: 'url required' })
+  if (!isSafeUrl(url)) return res.status(400).json({ error: 'URL invalide (http(s) uniquement)' })
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 
 const AUTOSAVE_DELAY = 650
 const CANVAS_PADDING = 800
@@ -927,22 +928,5 @@ function normalizeSearch(value) {
 }
 
 function renderNodeMarkdown(markdown) {
-  return sanitizeNodeHtml(marked(String(markdown || '')))
-}
-
-function sanitizeNodeHtml(html) {
-  if (typeof document === 'undefined') return html
-  const template = document.createElement('template')
-  template.innerHTML = html
-  template.content.querySelectorAll('script, style, iframe, object, embed').forEach(element => element.remove())
-  template.content.querySelectorAll('*').forEach(element => {
-    Array.from(element.attributes).forEach(attribute => {
-      const name = attribute.name.toLowerCase()
-      const value = attribute.value.trim().toLowerCase()
-      if (name.startsWith('on') || value.startsWith('javascript:')) {
-        element.removeAttribute(attribute.name)
-      }
-    })
-  })
-  return template.innerHTML
+  return sanitizeHtml(marked(String(markdown || '')))
 }

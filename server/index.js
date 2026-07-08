@@ -18,14 +18,38 @@ const PORT = process.env.PORT || 3001
 app.set('trust proxy', 1)
 
 app.use(helmet({
-  // CSP strict = amélioration future à faire avec un audit complet des
-  // sources chargées ; désactivé pour ne rien casser silencieusement.
-  contentSecurityPolicy: false,
+  // CSP : le build Vite ne charge que des scripts EXTERNES (/assets/*.js),
+  // donc `script-src 'self'` suffit et bloque tout script inline / handler
+  // on* / URL javascript: injecté via une note Markdown (défense en
+  // profondeur en plus du nettoyage HTML côté client).
+  // On reste permissif sur images/styles/média pour ne rien casser :
+  //   - images de notes (http/https) et images base64 (data:) de la frise
+  //   - favicon data: dans index.html
+  //   - lecture audio des notes vocales (blob:)
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:', 'http:', 'blob:'],
+      mediaSrc: ["'self'", 'blob:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'self'"],
+      upgradeInsecureRequests: null,
+    },
+  },
 }))
 app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3001'], credentials: true }))
 app.use(cookieParser())
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+// 12 Mo : large pour des notes avec quelques images base64, mais coupe
+// l'abus mémoire des anciens 50 Mo. L'import de coffre (.zip) a sa propre
+// limite via multer et n'est pas concerné.
+app.use(express.json({ limit: '12mb' }))
+app.use(express.urlencoded({ extended: true, limit: '12mb' }))
 
 // Routes d'auth : non protégées (ce sont les points d'entrée), montées
 // AVANT le garde requireAuth ci-dessous.

@@ -1,6 +1,7 @@
 import { memo, useMemo, useCallback } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/useApp'
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -32,7 +33,7 @@ const Preview = memo(function Preview({ content }) {
       return `<a class="wiki-link unresolved">${label}</a>`
     })
 
-    return marked(body)
+    return sanitizeHtml(marked(body))
   }, [content, nameToId])
 
   const handleClick = useCallback((e) => {

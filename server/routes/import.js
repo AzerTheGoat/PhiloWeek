@@ -380,7 +380,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     res.json({ ok: true, report })
   } catch (err) {
     console.error('Import error:', err)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: "Import impossible. Le fichier n'a pas pu être traité." })
   }
 })
 

@@ -9,7 +9,10 @@ const { SESSION_COOKIE } = require('../auth/middleware')
 const { isRailway } = require('../paths')
 
 const USERNAME_RE = /^[a-zA-Z0-9_-]{3,32}$/
-const COOKIE_OPTS = { httpOnly: true, secure: isRailway, sameSite: 'strict', path: '/' }
+// Secure sur Railway (HTTPS) et sur toute prod (NODE_ENV=production).
+// En dev local HTTP, reste non-Secure pour que le cookie parte quand même.
+const SECURE_COOKIES = isRailway || process.env.NODE_ENV === 'production'
+const COOKIE_OPTS = { httpOnly: true, secure: SECURE_COOKIES, sameSite: 'strict', path: '/' }
 
 // Hash factice précalculé une fois au démarrage : sert à faire une
 // comparaison scrypt même quand l'utilisateur n'existe pas, pour qu'un
