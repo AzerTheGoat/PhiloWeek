@@ -84,6 +84,11 @@ const SECTIONS = [
         title: 'Dupliquer / Supprimer / Détacher',
         text: "Touche Suppr pour effacer la sélection. Clic droit sur une carte : dupliquer, détacher ses liens, ou supprimer — agit sur tout le groupe si plusieurs cartes sont sélectionnées.",
       },
+      {
+        icon: 'graph',
+        title: 'Vue mémorisée & création dans le champ',
+        text: "Chaque graphe retient ton zoom et ta position de vue : en le rouvrant, tu reviens exactement où tu l'avais laissé. Et un nouveau bloc apparaît au centre de la zone visible (avec un léger décalage pour ne pas empiler), plus jamais à une position fixe hors écran.",
+      },
     ],
   },
   {

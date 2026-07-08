@@ -71,6 +71,16 @@ export default function GraphEditor() {
   const marqueeRef = useRef(null)
   const stageRef = useRef(null)
   const viewportRef = useRef(null)
+  // Persistance de la vue (zoom + position de scroll) par graphe
+  const pendingViewRef = useRef(null)   // vue à restaurer pour le fichier courant
+  const viewReadyRef = useRef(false)    // true une fois la restauration faite
+  const viewSaveTimerRef = useRef(null) // debounce de la sauvegarde au scroll
+
+  // Refs toujours à jour — pour sauvegarder la vue au démontage
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const fileIdRef = useRef(currentFile?.id)
+  fileIdRef.current = currentFile?.id
 
   useEffect(() => {
     setGraph(parseGraph(currentFile?.content, currentFile?.name))
@@ -82,20 +92,68 @@ export default function GraphEditor() {
     setEdgeArrowStyle('end')
     setDirty(false)
     clearTimeout(saveTimerRef.current)
+
+    // Charge la vue (zoom + scroll) sauvegardée pour ce graphe. La
+    // restauration effective du scroll est faite par l'effet ci-dessous une
+    // fois le zoom cible appliqué.
+    const savedView = loadGraphView(currentFile?.id)
+    viewReadyRef.current = false
+    pendingViewRef.current = savedView
+      ? { mode: 'saved', zoom: savedView.zoom, scrollLeft: savedView.scrollLeft, scrollTop: savedView.scrollTop }
+      : { mode: 'default', zoom: 1 }
+    setZoom(savedView ? savedView.zoom : 1)
   }, [currentFile?.id])
 
+  // Restaure la position de scroll une fois le zoom cible appliqué :
+  //   - vue sauvegardée → scroll exact quitté la dernière fois
+  //   - sinon → cadrage par défaut sur le coin haut-gauche des cartes
   useEffect(() => {
     const stage = stageRef.current
-    if (!stage) return undefined
-    const nextGraph = parseGraph(currentFile?.content, currentFile?.name)
-    const minX = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.x)) : 0
-    const minY = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.y)) : 0
+    const pending = pendingViewRef.current
+    if (!stage || !pending) return undefined
+    if (zoom !== pending.zoom) return undefined // attendre l'application du zoom cible
     const frame = requestAnimationFrame(() => {
-      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 120) * zoom)
-      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 120) * zoom)
+      if (pending.mode === 'saved') {
+        stage.scrollLeft = pending.scrollLeft
+        stage.scrollTop = pending.scrollTop
+      } else {
+        const nextGraph = parseGraph(currentFile?.content, currentFile?.name)
+        const minX = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.x)) : 0
+        const minY = nextGraph.nodes.length ? Math.min(...nextGraph.nodes.map(node => node.y)) : 0
+        stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 120) * zoom)
+        stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 120) * zoom)
+      }
+      pendingViewRef.current = null
+      viewReadyRef.current = true
     })
     return () => cancelAnimationFrame(frame)
-  }, [currentFile?.id])
+  }, [currentFile?.id, currentFile?.content, zoom])
+
+  // Sauvegarde la vue à chaque changement de zoom (une fois la vue restaurée)
+  useEffect(() => {
+    if (!viewReadyRef.current) return
+    const stage = stageRef.current
+    saveGraphView(currentFile?.id, {
+      zoom,
+      scrollLeft: stage?.scrollLeft ?? 0,
+      scrollTop: stage?.scrollTop ?? 0,
+    })
+  }, [zoom, currentFile?.id])
+
+  // Sauvegarde la vue au scroll (débounce léger)
+  const handleStageScroll = useCallback(() => {
+    if (!viewReadyRef.current) return
+    clearTimeout(viewSaveTimerRef.current)
+    viewSaveTimerRef.current = setTimeout(() => {
+      const stage = stageRef.current
+      if (!stage) return
+      saveGraphView(fileIdRef.current, {
+        zoom: zoomRef.current,
+        scrollLeft: stage.scrollLeft,
+        scrollTop: stage.scrollTop,
+      })
+    }, 300)
+  }, [])
 
   const selectedNode = useMemo(
     () => graph.nodes.find(node => node.id === selectedId) || null,
@@ -157,32 +215,59 @@ export default function GraphEditor() {
   }, [persist])
 
   useEffect(() => {
-    return () => clearTimeout(saveTimerRef.current)
+    return () => {
+      clearTimeout(saveTimerRef.current)
+      clearTimeout(viewSaveTimerRef.current)
+      // Sauvegarde immédiate de la vue au démontage (quitter le graphe)
+      const stage = stageRef.current
+      if (viewReadyRef.current && stage && fileIdRef.current) {
+        saveGraphView(fileIdRef.current, {
+          zoom: zoomRef.current,
+          scrollLeft: stage.scrollLeft,
+          scrollTop: stage.scrollTop,
+        })
+      }
+    }
   }, [])
 
   const addNode = useCallback((type = 'idea') => {
     const meta = NODE_TYPES.find(item => item.value === type) || NODE_TYPES[0]
     const id = makeId()
-    updateGraph(prev => ({
-      ...prev,
-      nodes: [
-        ...prev.nodes,
-        {
-          id,
-          type,
-          title: meta.label,
-          body: '',
-          color: meta.color,
-          width: DEFAULT_NODE_WIDTH,
-          height: DEFAULT_NODE_HEIGHT,
-          x: 140 + (prev.nodes.length % 3) * 180,
-          y: 120 + Math.floor(prev.nodes.length / 3) * 150,
-        },
-      ],
-    }))
+    // Place le nouveau bloc au centre de la zone actuellement visible
+    // (tient compte du scroll + zoom courants), pas à une position fixe.
+    const center = getViewCenter(stageRef.current, zoom)
+    updateGraph(prev => {
+      // Léger décalage en cascade pour ne pas empiler les blocs successifs
+      const spread = ((prev.nodes.length % 5) - 2) * 30
+      const position = center
+        ? {
+            x: center.x - DEFAULT_NODE_WIDTH / 2 + spread,
+            y: center.y - DEFAULT_NODE_HEIGHT / 2 + spread,
+          }
+        : {
+            x: 140 + (prev.nodes.length % 3) * 180,
+            y: 120 + Math.floor(prev.nodes.length / 3) * 150,
+          }
+      return {
+        ...prev,
+        nodes: [
+          ...prev.nodes,
+          {
+            id,
+            type,
+            title: meta.label,
+            body: '',
+            color: meta.color,
+            width: DEFAULT_NODE_WIDTH,
+            height: DEFAULT_NODE_HEIGHT,
+            ...position,
+          },
+        ],
+      }
+    })
     setSelectedId(id)
     setSelectedIds(new Set([id]))
-  }, [updateGraph])
+  }, [updateGraph, zoom])
 
   const updateNode = useCallback((id, patch) => {
     updateGraph(prev => ({
@@ -444,6 +529,7 @@ export default function GraphEditor() {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onWheel={handleWheel}
+          onScroll={handleStageScroll}
         >
           <div
             className="graph-canvas"
@@ -855,6 +941,48 @@ function stringifyFrontmatter(data) {
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10)
+}
+
+// Coordonnées "graphe" du centre de la zone actuellement visible dans le
+// stage (inverse de la transformation left = x + CANVAS_PADDING, scale(zoom)).
+function getViewCenter(stage, zoom) {
+  if (!stage) return null
+  const x = (stage.scrollLeft + stage.clientWidth / 2) / zoom - CANVAS_PADDING
+  const y = (stage.scrollTop + stage.clientHeight / 2) / zoom - CANVAS_PADDING
+  return { x, y }
+}
+
+// Vue (zoom + scroll) persistée par graphe dans localStorage. C'est une
+// préférence d'affichage : volontairement hors du JSON du graphe et de la DB.
+const GRAPH_VIEW_KEY = id => `pw-graph-view:${id}`
+
+function loadGraphView(id) {
+  if (!id) return null
+  try {
+    const raw = localStorage.getItem(GRAPH_VIEW_KEY(id))
+    if (!raw) return null
+    const view = JSON.parse(raw)
+    const scrollLeft = Number(view.scrollLeft)
+    const scrollTop = Number(view.scrollTop)
+    if (!Number.isFinite(scrollLeft) || !Number.isFinite(scrollTop)) return null
+    return { zoom: clampZoom(view.zoom), scrollLeft, scrollTop }
+  } catch (_) {
+    return null
+  }
+}
+
+function saveGraphView(id, view) {
+  if (!id) return
+  try {
+    localStorage.setItem(GRAPH_VIEW_KEY(id), JSON.stringify({
+      zoom: clampZoom(view.zoom),
+      scrollLeft: Math.max(0, Math.round(view.scrollLeft || 0)),
+      scrollTop: Math.max(0, Math.round(view.scrollTop || 0)),
+    }))
+  } catch (_) {
+    // localStorage indisponible (mode privé, quota) : la vue ne sera pas
+    // restaurée, sans casser l'éditeur.
+  }
 }
 
 function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
