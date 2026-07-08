@@ -135,6 +135,19 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
+  const historicalEvents = db.prepare(`
+    SELECT * FROM historical_events
+    WHERE user_id = ?
+    ORDER BY start_year ASC, COALESCE(start_month, 0) ASC, COALESCE(start_day, 0) ASC
+  `).all(req.user.id)
+  if (historicalEvents.length > 0) {
+    zip.file('_Opuscule/HistoricalTimeline.json', JSON.stringify({
+      philoweek_type: 'historical_timeline',
+      exported: new Date().toISOString(),
+      events: historicalEvents,
+    }, null, 2))
+  }
+
   const historySnapshots = db.prepare(`
     SELECT id, created_at, reason, data_json
     FROM app_snapshots

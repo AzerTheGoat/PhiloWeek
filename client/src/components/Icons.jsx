@@ -155,6 +155,17 @@ const PATHS = {
       <path d="M4 17h.1" />
     </>
   ),
+  timeline: (
+    <>
+      <path d="M4 12h16" />
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="18" cy="12" r="2" />
+      <path d="M6 6v4" />
+      <path d="M12 14v4" />
+      <path d="M18 6v4" />
+    </>
+  ),
 }
 
 export default function Icon({ name, size = 20, className = '' }) {

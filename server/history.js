@@ -20,6 +20,7 @@ const USER_TABLES = [
   'agenda_checks',
   'life_profiles',
   'questionnaire_results',
+  'historical_events',
 ]
 
 const RELATION_TABLES = [
@@ -47,6 +48,7 @@ const DELETE_ORDER = [
   'voice_notes',
   'timer_sessions',
   'questionnaire_results',
+  'historical_events',
   'agenda_checks',
   'agenda_practices',
   'life_profiles',
@@ -73,6 +75,7 @@ const INSERT_ORDER = [
   'agenda_checks',
   'life_profiles',
   'questionnaire_results',
+  'historical_events',
 ]
 
 function historyCaptureMiddleware(req, res, next) {

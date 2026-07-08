@@ -12,6 +12,7 @@ import LifePage from './components/LifePage'
 import TodosPage from './components/TodosPage'
 import TodoReminder from './components/TodoReminder'
 import KnowledgeGraph from './components/KnowledgeGraph'
+import HistoricalTimeline from './components/HistoricalTimeline'
 import Tutorial from './components/Tutorial'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
@@ -142,6 +143,8 @@ function AppShell() {
           <TodosPage />
         ) : view === 'knowledge-graph' ? (
           <KnowledgeGraph />
+        ) : view === 'timeline' ? (
+          <HistoricalTimeline />
         ) : view === 'tutorial' ? (
           <Tutorial />
         ) : currentFile ? (
@@ -240,6 +243,7 @@ function MobileNav() {
     { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
     { key: 'todos', label: 'Todo', icon: 'synthesis', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
     { key: 'graph', label: 'Graphe', icon: 'graph', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
+    { key: 'timeline', label: 'Frise', icon: 'timeline', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
     { key: 'timer', label: 'Timer', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
   ]

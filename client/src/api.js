@@ -114,6 +114,12 @@ export const getKnowledgeGraph = () => req('GET', '/knowledge-graph')
 export const getKnowledgeGraphReferences = fileId => req('GET', `/knowledge-graph/${fileId}/references`)
 export const copyKnowledgeGraphBundle = data => req('POST', '/knowledge-graph/copy', data)
 
+// Historical timeline
+export const getHistoricalEvents = () => req('GET', '/historical-timeline')
+export const createHistoricalEvent = data => req('POST', '/historical-timeline', data)
+export const updateHistoricalEvent = (id, data) => req('PUT', `/historical-timeline/${id}`, data)
+export const deleteHistoricalEvent = id => req('DELETE', `/historical-timeline/${id}`)
+
 // History
 export const rollbackHistory = (confirm = false) => req('POST', '/history/rollback', { confirm })
 

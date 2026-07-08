@@ -1,0 +1,507 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useApp } from '../context/useApp'
+import Icon from './Icons'
+import * as api from '../api'
+
+const COLORS = ['#6ba3e8', '#7c64f0', '#4caf7d', '#e0a84f', '#e05555', '#59b6a9']
+
+const EMPTY_FORM = {
+  title: '',
+  start: '',
+  end: '',
+  category: '',
+  color: COLORS[0],
+  description: '',
+  image_data: '',
+  image_caption: '',
+  tags: '',
+}
+
+export default function HistoricalTimeline() {
+  const { toast, dispatch } = useApp()
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [editingId, setEditingId] = useState(null)
+  const [focusId, setFocusId] = useState(null)
+  const [zoom, setZoom] = useState(36)
+  const [query, setQuery] = useState('')
+  const [activeTags, setActiveTags] = useState([])
+  const railRef = useRef(null)
+  const dragRef = useRef(null)
+
+  const loadEvents = useCallback(async () => {
+    setLoading(true)
+    try {
+      const rows = await api.getHistoricalEvents()
+      setEvents(rows)
+      setFocusId(current => current || rows[0]?.id || null)
+    } catch (err) {
+      toast(err.message || 'Frise impossible a charger', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => { loadEvents() }, [loadEvents])
+
+  const allTags = useMemo(() => {
+    const counts = new Map()
+    events.forEach(event => {
+      parseTags(event.tags).forEach(tag => counts.set(tag, (counts.get(tag) || 0) + 1))
+    })
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([tag, count]) => ({ tag, count }))
+  }, [events])
+
+  const filteredEvents = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const selected = new Set(activeTags)
+    const rows = events.filter(event => {
+      const eventTags = parseTags(event.tags)
+      if (selected.size > 0 && !eventTags.some(tag => selected.has(tag))) return false
+      if (!q) return true
+      return [
+          event.title,
+          event.description,
+          event.category,
+          event.tags,
+          event.start_label,
+          event.end_label,
+        ].some(value => String(value || '').toLowerCase().includes(q))
+    })
+    return rows.slice().sort(compareEvents)
+  }, [activeTags, events, query])
+
+  const layout = useMemo(() => buildLayout(filteredEvents, zoom), [filteredEvents, zoom])
+  const focused = filteredEvents.find(event => event.id === focusId) || filteredEvents[0] || null
+
+  useEffect(() => {
+    if (!filteredEvents.length) setFocusId(null)
+    else if (!focused) setFocusId(filteredEvents[0].id)
+  }, [filteredEvents, focused])
+
+  const focusEvent = useCallback((event) => {
+    if (!event) return
+    setFocusId(event.id)
+    requestAnimationFrame(() => {
+      const rail = railRef.current
+      const node = rail?.querySelector(`[data-event-id="${event.id}"]`)
+      if (!rail || !node) return
+      const railRect = rail.getBoundingClientRect()
+      const nodeRect = node.getBoundingClientRect()
+      const delta = nodeRect.left - railRect.left - railRect.width * 0.42
+      rail.scrollTo({ left: rail.scrollLeft + delta, behavior: 'smooth' })
+    })
+  }, [])
+
+  const jump = (direction) => {
+    if (!filteredEvents.length) return
+    const index = Math.max(0, filteredEvents.findIndex(event => event.id === focused?.id))
+    const next = filteredEvents[Math.min(filteredEvents.length - 1, Math.max(0, index + direction))]
+    focusEvent(next)
+  }
+
+  const toggleTag = (tag) => {
+    setActiveTags(current => current.includes(tag)
+      ? current.filter(item => item !== tag)
+      : [...current, tag])
+  }
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM)
+    setEditingId(null)
+  }
+
+  const editEvent = (event) => {
+    setEditingId(event.id)
+    setForm({
+      title: event.title || '',
+      start: event.start_label || '',
+      end: event.end_label || '',
+      category: event.category || '',
+      color: event.color || COLORS[0],
+      description: event.description || '',
+      image_data: event.image_data || '',
+      image_caption: event.image_caption || '',
+      tags: parseTags(event.tags).join(', '),
+    })
+  }
+
+  const submit = async (event) => {
+    event.preventDefault()
+    const payload = {
+      ...form,
+      tags: form.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+    }
+    try {
+      const saved = editingId
+        ? await api.updateHistoricalEvent(editingId, payload)
+        : await api.createHistoricalEvent(payload)
+      await loadEvents()
+      setFocusId(saved.id)
+      resetForm()
+      toast(editingId ? 'Date modifiee' : 'Date ajoutee')
+    } catch (err) {
+      toast(err.message || 'Date invalide', 'error')
+    }
+  }
+
+  const removeEvent = async (event) => {
+    if (!window.confirm(`Supprimer "${event.title}" ?`)) return
+    try {
+      await api.deleteHistoricalEvent(event.id)
+      await loadEvents()
+      toast('Date supprimee')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  const handleImage = async (file) => {
+    if (!file) return
+    try {
+      const imageData = await fileToWebpDataUrl(file)
+      setForm(current => ({ ...current, image_data: imageData }))
+    } catch (_) {
+      toast('Image impossible a lire', 'error')
+    }
+  }
+
+  const beginPan = (event) => {
+    if (!railRef.current) return
+    dragRef.current = {
+      x: event.clientX,
+      left: railRef.current.scrollLeft,
+    }
+    railRef.current.classList.add('is-panning')
+  }
+
+  const movePan = (event) => {
+    if (!dragRef.current || !railRef.current) return
+    railRef.current.scrollLeft = dragRef.current.left - (event.clientX - dragRef.current.x)
+  }
+
+  const endPan = () => {
+    dragRef.current = null
+    railRef.current?.classList.remove('is-panning')
+  }
+
+  return (
+    <div className="timeline-page">
+      <header className="timeline-header">
+        <div>
+          <span className="timeline-kicker">Frise memoire</span>
+          <h1>Dates historiques</h1>
+        </div>
+        <div className="timeline-actions">
+          <input
+            className="timeline-search"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Rechercher une date, un theme..."
+          />
+          <button className="icon-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'editor' })} title="Retour">
+            <Icon name="back" size={17} />
+          </button>
+        </div>
+      </header>
+
+      <section className="timeline-focus">
+        <button type="button" className="timeline-jump" onClick={() => jump(-1)} disabled={!focused}>
+          <Icon name="back" size={17} />
+        </button>
+        <div className="timeline-focus-card">
+          {focused ? (
+            <>
+              {focused.image_data && <img src={focused.image_data} alt="" />}
+              <div>
+                <span>{formatSpan(focused)}</span>
+                <h2>{focused.title}</h2>
+                {focused.description && <p>{focused.description}</p>}
+                <TagRow tags={parseTags(focused.tags)} activeTags={activeTags} onToggle={toggleTag} />
+              </div>
+            </>
+          ) : (
+            <div>
+              <span>Aucune date</span>
+              <h2>Ajoute ton premier repere</h2>
+            </div>
+          )}
+        </div>
+        <button type="button" className="timeline-jump next" onClick={() => jump(1)} disabled={!focused}>
+          <Icon name="back" size={17} />
+        </button>
+      </section>
+
+      <div className="timeline-workspace">
+        <section className="timeline-stage">
+          <div className="timeline-stage-toolbar">
+            <span>{filteredEvents.length} repere{filteredEvents.length > 1 ? 's' : ''}</span>
+            <label>
+              Zoom
+              <input
+                type="range"
+                min="16"
+                max="90"
+                value={zoom}
+                onChange={event => setZoom(Number(event.target.value))}
+              />
+            </label>
+          </div>
+          <div className="timeline-tag-filter">
+            <button
+              type="button"
+              className={activeTags.length === 0 ? 'active' : ''}
+              onClick={() => setActiveTags([])}
+            >
+              Tous
+            </button>
+            {allTags.map(({ tag, count }) => (
+              <button
+                key={tag}
+                type="button"
+                className={activeTags.includes(tag) ? 'active' : ''}
+                onClick={() => toggleTag(tag)}
+              >
+                #{tag} <span>{count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div
+            ref={railRef}
+            className="timeline-rail"
+            onMouseDown={beginPan}
+            onMouseMove={movePan}
+            onMouseUp={endPan}
+            onMouseLeave={endPan}
+          >
+            <div className="timeline-canvas" style={{ width: layout.width, height: layout.height }}>
+              <div className="timeline-axis" style={{ top: layout.axisTop }}>
+                {layout.ticks.map(tick => (
+                  <span key={tick.year} style={{ left: tick.x }}>{formatYear(tick.year)}</span>
+                ))}
+              </div>
+              {layout.items.map(item => (
+                <article
+                  key={item.event.id}
+                  data-event-id={item.event.id}
+                  className={`timeline-card ${item.event.image_data ? 'has-image' : 'no-image'} ${item.event.id === focused?.id ? 'active' : ''}`}
+                  style={{
+                    left: item.x,
+                    top: item.y,
+                    width: item.width,
+                    borderColor: item.event.color || COLORS[0],
+                  }}
+                  onClick={() => focusEvent(item.event)}
+                >
+                  {item.event.end_year !== null && (
+                    <div className="timeline-duration" style={{ background: item.event.color || COLORS[0] }} />
+                  )}
+                  {item.event.image_data && <img src={item.event.image_data} alt="" />}
+                  <div className="timeline-card-body">
+                    <span>{formatSpan(item.event)}</span>
+                    <strong>{item.event.title}</strong>
+                    {item.event.category && <em>{item.event.category}</em>}
+                    <TagRow tags={parseTags(item.event.tags)} compact activeTags={activeTags} onToggle={toggleTag} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="timeline-minimap">
+            {layout.items.map(item => (
+              <button
+                key={item.event.id}
+                type="button"
+                className={item.event.id === focused?.id ? 'active' : ''}
+                style={{ left: `${item.minimapLeft}%`, background: item.event.color || COLORS[0] }}
+                title={item.event.title}
+                onClick={() => focusEvent(item.event)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <aside className="timeline-editor-panel">
+          <h2>{editingId ? 'Modifier' : 'Ajouter'}</h2>
+          <form onSubmit={submit} className="timeline-form">
+            <input value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="Titre" />
+            <div className="timeline-form-grid">
+              <input value={form.start} onChange={event => setForm({ ...form, start: event.target.value })} placeholder="Date: -44, 1789, 1789-07-14" />
+              <input value={form.end} onChange={event => setForm({ ...form, end: event.target.value })} placeholder="Fin, si periode" />
+            </div>
+            <input value={form.category} onChange={event => setForm({ ...form, category: event.target.value })} placeholder="Theme: Rome, Revolution..." />
+            <textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Ce qu'il faut retenir" />
+            <input value={form.tags} onChange={event => setForm({ ...form, tags: event.target.value })} placeholder="Tags separes par virgules" />
+            <div className="timeline-colors">
+              {COLORS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  className={form.color === color ? 'active' : ''}
+                  style={{ background: color }}
+                  onClick={() => setForm({ ...form, color })}
+                  title={color}
+                />
+              ))}
+            </div>
+            <label className="timeline-image-picker">
+              <Icon name="upload" size={16} />
+              Ajouter une photo
+              <input type="file" accept="image/*" hidden onChange={event => handleImage(event.target.files?.[0])} />
+            </label>
+            {form.image_data && (
+              <div className="timeline-image-preview">
+                <img src={form.image_data} alt="" />
+                <button type="button" className="icon-btn" onClick={() => setForm({ ...form, image_data: '' })}>
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+            )}
+            <input value={form.image_caption} onChange={event => setForm({ ...form, image_caption: event.target.value })} placeholder="Legende photo" />
+            <div className="timeline-form-actions">
+              <button type="submit" className="btn-primary" disabled={!form.title.trim() || !form.start.trim()}>
+                {editingId ? 'Enregistrer' : 'Ajouter'}
+              </button>
+              {editingId && <button type="button" className="btn-ghost" onClick={resetForm}>Annuler</button>}
+            </div>
+          </form>
+
+          <div className="timeline-event-list">
+            {loading && <p>Chargement...</p>}
+            {!loading && filteredEvents.map(event => (
+              <article key={event.id} onClick={() => focusEvent(event)} className={event.id === focused?.id ? 'active' : ''}>
+                <span>{formatSpan(event)}</span>
+                <strong>{event.title}</strong>
+                <TagRow tags={parseTags(event.tags)} compact activeTags={activeTags} onToggle={toggleTag} />
+                <small>
+                  <span onClick={(e) => { e.stopPropagation(); editEvent(event) }}>Modifier</span>
+                  <span onClick={(e) => { e.stopPropagation(); removeEvent(event) }}>Supprimer</span>
+                </small>
+              </article>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
+function TagRow({ tags, compact = false, activeTags = [], onToggle }) {
+  if (!tags.length) return null
+  return (
+    <div className={`timeline-tags ${compact ? 'compact' : ''}`}>
+      {tags.map(tag => (
+        <button
+          key={tag}
+          type="button"
+          className={activeTags.includes(tag) ? 'active' : ''}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggle?.(tag)
+          }}
+        >
+          #{tag}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function buildLayout(events, zoom) {
+  if (!events.length) {
+    return { width: 900, height: 360, axisTop: 180, items: [], ticks: [] }
+  }
+  const values = events.flatMap(event => [dateValue(event), endValue(event)])
+  const min = Math.floor(Math.min(...values) - 1)
+  const max = Math.ceil(Math.max(...values) + 1)
+  const leftPad = 90
+  const width = Math.max(900, (max - min) * zoom + leftPad * 2)
+  const lanes = []
+  const items = events.slice().sort(compareEvents).map(event => {
+    const start = dateValue(event)
+    const end = Math.max(start, endValue(event))
+    let lane = lanes.findIndex(lastEnd => start > lastEnd + 0.08)
+    if (lane < 0) {
+      lane = lanes.length
+      lanes.push(end)
+    } else {
+      lanes[lane] = end
+    }
+    const x = leftPad + (start - min) * zoom
+    const endX = leftPad + (end - min) * zoom
+    const durationWidth = Math.max(150, endX - x + 150)
+    return {
+      event,
+      x,
+      y: 30 + lane * 148,
+      width: Math.min(320, durationWidth),
+      minimapLeft: ((start - min) / Math.max(1, max - min)) * 100,
+    }
+  })
+  const height = Math.max(380, 80 + lanes.length * 148)
+  return {
+    width,
+    height,
+    axisTop: height - 48,
+    items,
+    ticks: buildTicks(min, max, zoom, leftPad),
+  }
+}
+
+function buildTicks(min, max, zoom, leftPad) {
+  const span = max - min
+  const step = span > 800 ? 200 : span > 300 ? 100 : span > 120 ? 50 : span > 40 ? 10 : span > 15 ? 5 : 1
+  const first = Math.ceil(min / step) * step
+  const ticks = []
+  for (let year = first; year <= max; year += step) {
+    ticks.push({ year, x: leftPad + (year - min) * zoom })
+  }
+  return ticks
+}
+
+function compareEvents(a, b) {
+  return dateValue(a) - dateValue(b) || String(a.title).localeCompare(String(b.title))
+}
+
+function dateValue(event) {
+  return Number(event.start_year) + ((Number(event.start_month) || 1) - 1) / 12 + ((Number(event.start_day) || 1) - 1) / 372
+}
+
+function endValue(event) {
+  if (event.end_year === null || event.end_year === undefined || event.end_year === '') return dateValue(event)
+  return Number(event.end_year) + ((Number(event.end_month) || 1) - 1) / 12 + ((Number(event.end_day) || 1) - 1) / 372
+}
+
+function formatSpan(event) {
+  return event.end_label ? `${event.start_label} - ${event.end_label}` : event.start_label
+}
+
+function formatYear(year) {
+  if (year < 0) return `${Math.abs(year)} av.`
+  return String(year)
+}
+
+function parseTags(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'))
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch (_) {
+    return []
+  }
+}
+
+async function fileToWebpDataUrl(file) {
+  const bitmap = await createImageBitmap(file)
+  const canvas = document.createElement('canvas')
+  const max = 1100
+  const ratio = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  canvas.width = Math.round(bitmap.width * ratio)
+  canvas.height = Math.round(bitmap.height * ratio)
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/webp', 0.82)
+}

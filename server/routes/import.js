@@ -94,6 +94,13 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         `INSERT OR IGNORE INTO app_snapshots (id, user_id, created_at, reason, data_json)
          VALUES (?, ?, ?, ?, ?)`
       )
+      const insertHistoricalEvent = db.prepare(
+        `INSERT OR IGNORE INTO historical_events (
+          id, title, start_label, start_year, start_month, start_day,
+          end_label, end_year, end_month, end_day, description, category, color,
+          image_data, image_caption, tags, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
@@ -133,6 +140,37 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 normalizeIsoDate(snapshot.created_at) || new Date().toISOString(),
                 snapshot.reason || 'import',
                 snapshot.data_json
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'historical_timeline') {
+            const events = Array.isArray(jsonSpecial.events) ? jsonSpecial.events : []
+            const now = new Date().toISOString()
+            for (const event of events) {
+              if (!event.title || !Number.isFinite(Number(event.start_year))) continue
+              insertHistoricalEvent.run(
+                event.id || uuidv4(),
+                String(event.title).trim(),
+                String(event.start_label || event.start_year).trim(),
+                Math.round(Number(event.start_year)),
+                nullableInt(event.start_month, 1, 12),
+                nullableInt(event.start_day, 1, 31),
+                event.end_label ? String(event.end_label).trim() : null,
+                nullableInt(event.end_year, -999999, 999999),
+                nullableInt(event.end_month, 1, 12),
+                nullableInt(event.end_day, 1, 31),
+                event.description || null,
+                event.category || null,
+                normalizeColor(event.color),
+                normalizeImage(event.image_data),
+                event.image_caption || null,
+                normalizeJsonArray(event.tags),
+                req.user.id,
+                normalizeIsoDate(event.created_at) || now,
+                normalizeIsoDate(event.updated_at) || now
               )
               report.imported++
             }
@@ -453,6 +491,30 @@ function normalizeIsoDate(value) {
 function normalizeColor(value) {
   const color = String(value || '').trim()
   return /^#[0-9a-f]{6}$/i.test(color) ? color : '#6ba3e8'
+}
+
+function normalizeImage(value) {
+  const text = String(value || '').trim()
+  return /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text) ? text : null
+}
+
+function normalizeJsonArray(value) {
+  if (Array.isArray(value)) return JSON.stringify(value.map(String))
+  try {
+    const parsed = JSON.parse(String(value || '[]'))
+    return JSON.stringify(Array.isArray(parsed) ? parsed.map(String) : [])
+  } catch (_) {
+    return '[]'
+  }
+}
+
+function nullableInt(value, min, max) {
+  if (value === null || value === undefined || value === '') return null
+  const next = Number(value)
+  if (!Number.isFinite(next)) return null
+  const rounded = Math.round(next)
+  if (rounded < min || rounded > max) return null
+  return rounded
 }
 
 function clampInt(value, min, max, fallback) {

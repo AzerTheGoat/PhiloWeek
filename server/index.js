@@ -46,6 +46,7 @@ app.use('/api/life', require('./routes/life'))
 app.use('/api/todos', require('./routes/todos'))
 app.use('/api/questionnaires', require('./routes/questionnaires'))
 app.use('/api/knowledge-graph', require('./routes/knowledgeGraph'))
+app.use('/api/historical-timeline', require('./routes/historicalTimeline'))
 
 // Serve built React app
 const clientBuild = path.join(__dirname, 'public')

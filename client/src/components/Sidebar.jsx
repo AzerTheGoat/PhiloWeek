@@ -75,6 +75,13 @@ export default function Sidebar() {
             <Icon name="timer" />
           </button>
           <button
+            title="Frise historique"
+            className={`icon-btn ${view === 'timeline' ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timeline' })}
+          >
+            <Icon name="timeline" />
+          </button>
+          <button
             title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}
             className="icon-btn"
             onClick={() => dispatch({ type: 'SET_THEME', payload: theme === 'dark' ? 'light' : 'dark' })}
@@ -141,6 +148,9 @@ export default function Sidebar() {
         </button>
         <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' })} title="Voir le graphe de la base">
           <Icon name="graph" size={16} /> Base
+        </button>
+        <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'timeline' })} title="Frise historique">
+          <Icon name="timeline" size={16} /> Frise
         </button>
         <button className="footer-btn" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'todos' })} title="Todos et dates limites">
           <Icon name="synthesis" size={16} /> Todo

@@ -61,6 +61,7 @@ agenda_practices — id, title, color, active, user_id, created_at, updated_at, 
 agenda_checks — practice_id, entry_date, done, user_id, updated_at
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
 app_snapshots — id, user_id, created_at, reason, data_json
+historical_events — id, title, start_label/year/month/day, end_label/year/month/day, description, category, color, image_data, image_caption, tags, user_id
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
@@ -217,6 +218,16 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees et questionnaires JSON.
 - Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
 - Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
+
+## Frise historique
+
+- La vue `Frise` est accessible depuis la sidebar et la navigation mobile.
+- Elle stocke les reperes historiques dans `historical_events`, avec dates ponctuelles ou periodes (`start_*` et `end_*`), description, categorie, couleur, tags et photo optionnelle en data URL.
+- Les tags sont visibles sur les cartes et servent de filtres : selectionner un ou plusieurs tags affiche les reperes qui correspondent a au moins l'un des tags actifs.
+- Les dates acceptent au minimum une annee (`1789`, `-44`) et peuvent inclure mois/jour (`1789-07-14`).
+- L'interface affiche une frise horizontale zoomable avec navigation par focus, mini-carte et placement automatique en lignes pour gerer les periodes qui se superposent.
+- Les photos sont compressees cote client avant stockage pour rester exportables avec le reste des donnees.
+- L'export Obsidian ajoute `_Opuscule/HistoricalTimeline.json` avec `philoweek_type: historical_timeline`; l'import recree les reperes.
 
 ## Experience mobile
 

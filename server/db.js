@@ -275,6 +275,35 @@ const MIGRATIONS = [
         ON app_snapshots(user_id, created_at);
     `)
   },
+  // v7 -> v8 : frise historique personnelle
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS historical_events (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        start_label TEXT NOT NULL,
+        start_year INTEGER NOT NULL,
+        start_month INTEGER,
+        start_day INTEGER,
+        end_label TEXT,
+        end_year INTEGER,
+        end_month INTEGER,
+        end_day INTEGER,
+        description TEXT,
+        category TEXT,
+        color TEXT NOT NULL DEFAULT '#6ba3e8',
+        image_data TEXT,
+        image_caption TEXT,
+        tags TEXT DEFAULT '[]',
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_historical_events_user_start
+        ON historical_events(user_id, start_year, start_month, start_day);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne
