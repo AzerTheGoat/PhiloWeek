@@ -148,6 +148,32 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
+  const articles = db.prepare(`
+    SELECT * FROM articles
+    WHERE user_id = ?
+    ORDER BY COALESCE(published_at, updated_at) DESC
+  `).all(req.user.id)
+  const articleComments = db.prepare(`
+    SELECT article_comments.*
+    FROM article_comments
+    WHERE article_comments.user_id = ?
+    ORDER BY article_comments.created_at ASC
+  `).all(req.user.id)
+  const articleReactions = db.prepare(`
+    SELECT * FROM article_reactions
+    WHERE user_id = ?
+    ORDER BY created_at ASC
+  `).all(req.user.id)
+  if (articles.length > 0 || articleComments.length > 0 || articleReactions.length > 0) {
+    zip.file('_Opuscule/SocialJournal.json', JSON.stringify({
+      philoweek_type: 'social_journal',
+      exported: new Date().toISOString(),
+      articles,
+      comments: articleComments,
+      reactions: articleReactions,
+    }, null, 2))
+  }
+
   const historySnapshots = db.prepare(`
     SELECT id, created_at, reason, data_json
     FROM app_snapshots

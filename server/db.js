@@ -304,6 +304,56 @@ const MIGRATIONS = [
         ON historical_events(user_id, start_year, start_month, start_day);
     `)
   },
+  // v8 -> v9 : journal public, articles sociaux et liens vers la frise
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS articles (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        excerpt TEXT,
+        content TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published')),
+        published_on TEXT,
+        published_at TEXT,
+        cover_image_data TEXT,
+        tags TEXT DEFAULT '[]',
+        event_id TEXT REFERENCES historical_events(id) ON DELETE SET NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS article_comments (
+        id TEXT PRIMARY KEY,
+        article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS article_reactions (
+        article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        reaction TEXT NOT NULL DEFAULT 'like' CHECK(reaction IN ('like')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (article_id, user_id, reaction)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_articles_status_date
+        ON articles(status, published_on, published_at);
+      CREATE INDEX IF NOT EXISTS idx_articles_user_updated
+        ON articles(user_id, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_articles_event
+        ON articles(event_id);
+      CREATE INDEX IF NOT EXISTS idx_article_comments_article
+        ON article_comments(article_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_article_comments_user
+        ON article_comments(user_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_article_reactions_user
+        ON article_reactions(user_id, created_at);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

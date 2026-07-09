@@ -62,6 +62,9 @@ agenda_checks — practice_id, entry_date, done, user_id, updated_at
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
 app_snapshots — id, user_id, created_at, reason, data_json
 historical_events — id, title, start_label/year/month/day, end_label/year/month/day, description, category, color, image_data, image_caption, tags, user_id
+articles     — id, title, excerpt, content, status (draft/published), published_on, published_at, cover_image_data, tags, event_id, user_id, created_at, updated_at
+article_comments — id, article_id, body, user_id, created_at, updated_at
+article_reactions — article_id, user_id, reaction (like), created_at
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 ```
@@ -253,6 +256,18 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - A fort zoom, l'axe affiche une granularite mensuelle; les evenements proches sont empiles a faible zoom et se depilent automatiquement quand le zoom les espace assez.
 - Les photos sont compressees cote client avant stockage pour rester exportables avec le reste des donnees.
 - L'export Obsidian ajoute `_Opuscule/HistoricalTimeline.json` avec `philoweek_type: historical_timeline`; l'import recree les reperes.
+
+## Journal public et articles sociaux
+
+- La vue `Journal public` est accessible depuis le panneau `Fonctions` et la navigation mobile sous `Articles`.
+- Les articles sont stockes dans `articles` avec un statut `draft` ou `published`; seuls les articles publies sont lisibles par tous les comptes.
+- Un brouillon reste visible seulement par son auteur dans l'onglet `Mes articles`.
+- Chaque article affiche son auteur (`users.username`), sa date de journal (`published_on`), ses tags, son accroche, son contenu Markdown et une image de couverture optionnelle.
+- Un article peut etre lie a une carte de la frise via `articles.event_id`; la frise affiche alors les articles publies associes au repere et permet de les ouvrir dans le journal public.
+- Le journal public propose un onglet `Aujourd hui` pour l'article du jour, un `Fil` commun et `Mes articles` pour retrouver ses publications et brouillons.
+- Les interactions sociales sont stockees dans `article_reactions` (like par utilisateur) et `article_comments`; un auteur peut supprimer les commentaires sous ses articles, et chaque utilisateur peut supprimer ses propres commentaires.
+- Les routes du journal public sont regroupees dans `server/routes/socialJournal.js`; elles doivent garder la lecture publique des articles publies mais filtrer toute modification par `req.user.id`.
+- L'export Obsidian ajoute `_Opuscule/SocialJournal.json` avec `philoweek_type: social_journal`; l'import recrée les articles du compte courant, ses commentaires, ses likes et conserve les liens vers la frise quand le repere existe.
 
 ## Experience mobile
 

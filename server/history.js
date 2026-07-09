@@ -25,6 +25,9 @@ const USER_TABLES = [
   'life_profiles',
   'questionnaire_results',
   'historical_events',
+  'articles',
+  'article_comments',
+  'article_reactions',
 ]
 
 const RELATION_TABLES = [
@@ -53,6 +56,9 @@ const DELETE_ORDER = [
   'timer_sessions',
   'questionnaire_results',
   'historical_events',
+  'article_reactions',
+  'article_comments',
+  'articles',
   'agenda_checks',
   'agenda_practices',
   'life_profiles',
@@ -80,6 +86,9 @@ const INSERT_ORDER = [
   'life_profiles',
   'questionnaire_results',
   'historical_events',
+  'articles',
+  'article_comments',
+  'article_reactions',
 ]
 
 function historyCaptureMiddleware(req, res, next) {

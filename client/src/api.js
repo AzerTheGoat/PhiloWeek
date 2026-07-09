@@ -122,6 +122,23 @@ export const createHistoricalEvent = data => req('POST', '/historical-timeline',
 export const updateHistoricalEvent = (id, data) => req('PUT', `/historical-timeline/${id}`, data)
 export const deleteHistoricalEvent = id => req('DELETE', `/historical-timeline/${id}`)
 
+// Social journal
+export const getArticles = ({ scope = 'feed', q = '', date = '' } = {}) => {
+  const p = new URLSearchParams()
+  p.set('scope', scope)
+  if (q) p.set('q', q)
+  if (date) p.set('date', date)
+  return req('GET', `/social-journal/articles?${p}`)
+}
+export const getArticle = id => req('GET', `/social-journal/articles/${id}`)
+export const createArticle = data => req('POST', '/social-journal/articles', data)
+export const updateArticle = (id, data) => req('PUT', `/social-journal/articles/${id}`, data)
+export const deleteArticle = id => req('DELETE', `/social-journal/articles/${id}`)
+export const toggleArticleReaction = id => req('POST', `/social-journal/articles/${id}/reaction`)
+export const getArticleComments = id => req('GET', `/social-journal/articles/${id}/comments`)
+export const createArticleComment = (id, body) => req('POST', `/social-journal/articles/${id}/comments`, { body })
+export const deleteArticleComment = id => req('DELETE', `/social-journal/comments/${id}`)
+
 // History
 export const rollbackHistory = (confirm = false) => req('POST', '/history/rollback', { confirm })
 

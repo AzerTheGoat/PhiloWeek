@@ -24,7 +24,7 @@ const EMPTY_FORM = {
 }
 
 export default function HistoricalTimeline() {
-  const { toast } = useApp()
+  const { toast, dispatch } = useApp()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -210,6 +210,14 @@ export default function HistoricalTimeline() {
     railRef.current?.classList.remove('is-panning')
   }
 
+  const openLinkedArticle = (articleId) => {
+    window.sessionStorage.setItem('pw-open-article', articleId)
+    dispatch({ type: 'SET_VIEW', payload: 'social-journal' })
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('philoweek:open-article', { detail: { articleId } }))
+    }, 50)
+  }
+
   return (
     <div className="timeline-page">
       <header className="timeline-header">
@@ -241,6 +249,7 @@ export default function HistoricalTimeline() {
                 {focused.owner_username && <small className="timeline-owner">par {focused.owner_username}</small>}
                 {focused.description && <p>{focused.description}</p>}
                 <TagRow tags={parseTags(focused.tags)} activeTags={activeTags} onToggle={toggleTag} />
+                <LinkedArticles articles={focused.linked_articles} onOpen={openLinkedArticle} />
               </div>
             </>
           ) : (
@@ -325,6 +334,9 @@ export default function HistoricalTimeline() {
                     <div className="timeline-duration" style={{ background: item.event.color || COLORS[0] }} />
                   )}
                   {item.event.image_data && <img src={item.event.image_data} alt="" />}
+                  {item.event.linked_articles?.length > 0 && (
+                    <span className="timeline-article-badge">{item.event.linked_articles.length} article{item.event.linked_articles.length > 1 ? 's' : ''}</span>
+                  )}
                   <div className="timeline-card-body">
                     <span>{formatSpan(item.event)}</span>
                     <strong>{item.event.title}</strong>
@@ -417,6 +429,7 @@ export default function HistoricalTimeline() {
                 <span>{formatSpan(event)}</span>
                 <strong>{event.title}</strong>
                 {event.owner_username && <span className="timeline-owner">par {event.owner_username}</span>}
+                <LinkedArticles articles={event.linked_articles} compact onOpen={openLinkedArticle} />
                 <TagRow tags={parseTags(event.tags)} compact activeTags={activeTags} onToggle={toggleTag} />
                 {Boolean(event.can_edit) && (
                   <small>
@@ -429,6 +442,28 @@ export default function HistoricalTimeline() {
           </div>
         </aside>
       </div>
+    </div>
+  )
+}
+
+function LinkedArticles({ articles = [], compact = false, onOpen }) {
+  if (!articles.length) return null
+  const visible = compact ? articles.slice(0, 2) : articles.slice(0, 4)
+  return (
+    <div className={`timeline-linked-articles ${compact ? 'compact' : ''}`}>
+      {visible.map(article => (
+        <button
+          key={article.id}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onOpen?.(article.id)
+          }}
+        >
+          <Icon name="newspaper" size={14} />
+          <span>{article.title}</span>
+        </button>
+      ))}
     </div>
   )
 }

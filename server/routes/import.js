@@ -101,6 +101,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           image_data, image_caption, tags, user_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const insertArticle = db.prepare(
+        `INSERT OR IGNORE INTO articles (
+          id, title, excerpt, content, status, published_on, published_at,
+          cover_image_data, tags, event_id, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      const insertArticleComment = db.prepare(
+        `INSERT OR IGNORE INTO article_comments (
+          id, article_id, body, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      const insertArticleReaction = db.prepare(
+        `INSERT OR IGNORE INTO article_reactions (
+          article_id, user_id, reaction, created_at
+        ) VALUES (?, ?, 'like', ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
@@ -171,6 +187,72 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 req.user.id,
                 normalizeIsoDate(event.created_at) || now,
                 normalizeIsoDate(event.updated_at) || now
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'social_journal') {
+            const now = new Date().toISOString()
+            const articles = Array.isArray(jsonSpecial.articles) ? jsonSpecial.articles : []
+            const importedArticleIds = new Set()
+            for (const article of articles) {
+              const title = String(article.title || '').trim()
+              const content = String(article.content || '').trim()
+              if (!title || !content) continue
+              const id = article.id || uuidv4()
+              const status = article.status === 'published' ? 'published' : 'draft'
+              const eventId = article.event_id && db.prepare('SELECT 1 FROM historical_events WHERE id = ?').get(article.event_id)
+                ? article.event_id
+                : null
+              insertArticle.run(
+                id,
+                title,
+                article.excerpt || null,
+                content,
+                status,
+                normalizeDueDate(article.published_on) || now.slice(0, 10),
+                status === 'published' ? (normalizeIsoDate(article.published_at) || now) : null,
+                normalizeImage(article.cover_image_data),
+                normalizeJsonArray(article.tags),
+                eventId,
+                req.user.id,
+                normalizeIsoDate(article.created_at) || now,
+                normalizeIsoDate(article.updated_at) || now
+              )
+              importedArticleIds.add(id)
+              report.imported++
+            }
+
+            const comments = Array.isArray(jsonSpecial.comments) ? jsonSpecial.comments : []
+            for (const comment of comments) {
+              const body = String(comment.body || '').trim()
+              if (!comment.article_id || !body) continue
+              const articleExists = importedArticleIds.has(comment.article_id) ||
+                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(comment.article_id)
+              if (!articleExists) continue
+              insertArticleComment.run(
+                comment.id || uuidv4(),
+                comment.article_id,
+                body.slice(0, 2000),
+                req.user.id,
+                normalizeIsoDate(comment.created_at) || now,
+                normalizeIsoDate(comment.updated_at) || now
+              )
+              report.imported++
+            }
+
+            const reactions = Array.isArray(jsonSpecial.reactions) ? jsonSpecial.reactions : []
+            for (const reaction of reactions) {
+              if (!reaction.article_id) continue
+              const articleExists = importedArticleIds.has(reaction.article_id) ||
+                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(reaction.article_id)
+              if (!articleExists) continue
+              insertArticleReaction.run(
+                reaction.article_id,
+                req.user.id,
+                normalizeIsoDate(reaction.created_at) || now
               )
               report.imported++
             }

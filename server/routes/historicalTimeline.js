@@ -14,7 +14,28 @@ router.get('/', (req, res) => {
     LEFT JOIN users ON users.id = historical_events.user_id
     ORDER BY start_year ASC, COALESCE(start_month, 0) ASC, COALESCE(start_day, 0) ASC, historical_events.created_at ASC
   `).all(req.user.id)
-  res.json(rows)
+  const eventIds = rows.map(row => row.id)
+  const articlesByEvent = new Map(eventIds.map(id => [id, []]))
+  if (eventIds.length > 0) {
+    const placeholders = eventIds.map(() => '?').join(', ')
+    const articles = db.prepare(`
+      SELECT articles.id, articles.title, articles.excerpt, articles.published_on,
+        articles.event_id, users.username AS author_username
+      FROM articles
+      LEFT JOIN users ON users.id = articles.user_id
+      WHERE articles.status = 'published'
+        AND articles.event_id IN (${placeholders})
+      ORDER BY articles.published_on DESC, articles.published_at DESC
+    `).all(...eventIds)
+    for (const article of articles) {
+      const bucket = articlesByEvent.get(article.event_id)
+      if (bucket) bucket.push(article)
+    }
+  }
+  res.json(rows.map(row => ({
+    ...row,
+    linked_articles: articlesByEvent.get(row.id) || [],
+  })))
 })
 
 router.post('/', (req, res) => {
