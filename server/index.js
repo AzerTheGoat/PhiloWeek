@@ -54,6 +54,7 @@ app.use(express.urlencoded({ extended: true, limit: '12mb' }))
 // Routes d'auth : non protégées (ce sont les points d'entrée), montées
 // AVANT le garde requireAuth ci-dessous.
 app.use('/api/auth', require('./routes/auth'))
+app.use('/api/public/social-journal', require('./routes/publicSocialJournal'))
 
 // Tout le reste de /api/* exige une session valide.
 app.use('/api', requireAuth)

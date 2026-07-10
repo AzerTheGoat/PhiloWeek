@@ -1163,6 +1163,32 @@
   font-size: 12px;
 }
 
+.public-article-page {
+  min-height: var(--app-height, 100vh);
+  padding: 24px;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.public-article-shell {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.public-article-view {
+  min-height: auto;
+}
+
+.public-article-status {
+  width: min(560px, 100%);
+  min-height: auto;
+  margin: 12vh auto 0;
+}
+
+.public-article-meta span {
+  color: var(--text-2);
+}
+
 .article-form {
   display: flex;
   flex-direction: column;

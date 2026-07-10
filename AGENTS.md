@@ -263,6 +263,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les articles sont stockes dans `articles` avec un statut `draft` ou `published`; seuls les articles publies sont lisibles par tous les comptes.
 - Un brouillon reste visible seulement par son auteur dans l'onglet `Mes articles`.
 - Chaque article affiche son auteur (`users.username`), sa date de journal (`published_on`), ses tags, son accroche, son contenu Markdown et une image de couverture optionnelle.
+- Chaque article publie dispose d'un lien public `/articles/:id` copiable depuis l'interface; ce lien est lisible sans compte mais ne permet aucune action (pas de like, commentaire, edition ou suppression) et ne donne jamais acces aux brouillons.
 - Un article peut etre lie a une carte de la frise via `articles.event_id`; la frise affiche alors les articles publies associes au repere et permet de les ouvrir dans le journal public.
 - Le journal public propose un onglet `Aujourd hui` pour l'article du jour, un `Fil` commun et `Mes articles` pour retrouver ses publications et brouillons.
 - Les interactions sociales sont stockees dans `article_reactions` (like par utilisateur) et `article_comments`; un auteur peut supprimer les commentaires sous ses articles, et chaque utilisateur peut supprimer ses propres commentaires.

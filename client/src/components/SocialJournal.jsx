@@ -141,6 +141,16 @@ export default function SocialJournal() {
     }
   }
 
+  const copyPublicLink = async (article) => {
+    const url = `${window.location.origin}/articles/${encodeURIComponent(article.id)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast('Lien public copie')
+    } catch (_) {
+      window.prompt('Lien public de l article', url)
+    }
+  }
+
   const toggleLike = async (article) => {
     try {
       const summary = await api.toggleArticleReaction(article.id)
@@ -265,6 +275,7 @@ export default function SocialJournal() {
               article={selected}
               onEdit={() => startEdit(selected)}
               onDelete={() => removeArticle(selected)}
+              onCopyLink={() => copyPublicLink(selected)}
               onLike={() => toggleLike(selected)}
               comment={comment}
               setComment={setComment}
@@ -284,7 +295,7 @@ export default function SocialJournal() {
   )
 }
 
-function ArticleView({ article, onEdit, onDelete, onLike, comment, setComment, onComment, onRemoveComment }) {
+function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, setComment, onComment, onRemoveComment }) {
   const html = useMemo(() => sanitizeHtml(marked(article.content || '')), [article.content])
   return (
     <article className="article-view">
@@ -295,10 +306,11 @@ function ArticleView({ article, onEdit, onDelete, onLike, comment, setComment, o
           <h2>{article.title}</h2>
           <p>publie par {article.author_username || 'Compte supprime'}</p>
         </div>
-        {article.can_edit && (
+        {(article.status === 'published' || article.can_edit) && (
           <div className="article-owner-actions">
-            <button type="button" className="btn-ghost" onClick={onEdit}>Modifier</button>
-            <button type="button" className="btn-ghost danger" onClick={onDelete}>Supprimer</button>
+            {article.status === 'published' && <button type="button" className="btn-ghost" onClick={onCopyLink}>Copier le lien</button>}
+            {article.can_edit && <button type="button" className="btn-ghost" onClick={onEdit}>Modifier</button>}
+            {article.can_edit && <button type="button" className="btn-ghost danger" onClick={onDelete}>Supprimer</button>}
           </div>
         )}
       </div>

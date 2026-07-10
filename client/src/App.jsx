@@ -15,6 +15,7 @@ import TodoReminder from './components/TodoReminder'
 import KnowledgeGraph from './components/KnowledgeGraph'
 import HistoricalTimeline from './components/HistoricalTimeline'
 import SocialJournal from './components/SocialJournal'
+import PublicArticle from './components/PublicArticle'
 import Tutorial from './components/Tutorial'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
@@ -39,11 +40,18 @@ export default function App() {
 // le client prétend sur son identité, seulement au cookie de session.
 function AuthGate() {
   const { currentUser, authChecked, checkSession } = useApp()
+  const publicArticleId = getPublicArticleId()
 
   useEffect(() => { checkSession() }, [])
 
+  if (publicArticleId) return <PublicArticle articleId={publicArticleId} />
   if (!authChecked) return null
   return currentUser ? <AppShell /> : <AuthScreen />
+}
+
+function getPublicArticleId() {
+  const match = window.location.pathname.match(/^\/articles\/([^/?#]+)/)
+  return match ? decodeURIComponent(match[1]) : null
 }
 
 function AppShell() {

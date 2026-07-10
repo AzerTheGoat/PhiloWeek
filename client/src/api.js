@@ -123,6 +123,7 @@ export const updateHistoricalEvent = (id, data) => req('PUT', `/historical-timel
 export const deleteHistoricalEvent = id => req('DELETE', `/historical-timeline/${id}`)
 
 // Social journal
+export const getPublicArticle = id => req('GET', `/public/social-journal/articles/${encodeURIComponent(id)}`)
 export const getArticles = ({ scope = 'feed', q = '', date = '' } = {}) => {
   const p = new URLSearchParams()
   p.set('scope', scope)
