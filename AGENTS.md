@@ -255,6 +255,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'interface affiche une frise horizontale zoomable avec navigation par focus, mini-carte et placement automatique en lignes pour gerer les periodes qui se superposent.
 - A fort zoom, l'axe affiche une granularite mensuelle; les evenements proches sont empiles a faible zoom et se depilent automatiquement quand le zoom les espace assez.
 - Les photos sont compressees cote client avant stockage pour rester exportables avec le reste des donnees.
+- La frise peut importer un JSON de reperes depuis l'interface : le fichier peut etre un tableau ou un objet avec `events`, `historical_events` ou `timeline`; `image_data` venant du JSON est ignore, puis chaque repere passe par une interface de confirmation ou l'utilisateur peut corriger les champs, decocher un repere et ajouter une image avant creation.
+- La frise propose aussi un bouton de copie de prompt JSON; le prompt doit demander tous les champs utiles (`title`, `start`, `end`, `category`, `color`, `description`, `image_caption`, `tags`) sans texte long, et jamais `image_data`.
 - L'export Obsidian ajoute `_Opuscule/HistoricalTimeline.json` avec `philoweek_type: historical_timeline`; l'import recree les reperes.
 
 ## Journal public et articles sociaux

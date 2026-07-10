@@ -6,6 +6,20 @@ import * as api from '../api'
 const COLORS = ['#6ba3e8', '#7c64f0', '#4caf7d', '#e0a84f', '#e05555', '#59b6a9']
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTH_LABELS_SHORT = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+const IMPORT_PROMPT = `Cree un JSON pour importer des reperes dans une frise historique Opuscule.
+Retourne uniquement du JSON valide, sans markdown, sous cette forme:
+{"events":[{"title":"","start":"","end":"","category":"","color":"#6ba3e8","description":"","image_caption":"","tags":[]}]}
+
+Regles:
+- start est obligatoire au format annee, annee-MM ou annee-MM-JJ; les annees negatives sont acceptees.
+- end est vide sauf pour une periode.
+- title est court et precis.
+- category est un theme court.
+- color est un hex parmi #6ba3e8, #7c64f0, #4caf7d, #e0a84f, #e05555, #59b6a9.
+- description fait 1 ou 2 phrases utiles maximum, jamais de long texte.
+- image_caption est une suggestion courte d'image a ajouter plus tard, sans image_data.
+- tags contient 2 a 5 tags courts.
+- Ne mets jamais de champ image_data.`
 
 const EMPTY_FORM = {
   title: '',
@@ -33,8 +47,12 @@ export default function HistoricalTimeline() {
   const [zoom, setZoom] = useState(72)
   const [query, setQuery] = useState('')
   const [activeTags, setActiveTags] = useState([])
+  const [importQueue, setImportQueue] = useState([])
+  const [importSourceName, setImportSourceName] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
   const railRef = useRef(null)
   const dragRef = useRef(null)
+  const importInputRef = useRef(null)
 
   const loadEvents = useCallback(async () => {
     setLoading(true)
@@ -191,6 +209,91 @@ export default function HistoricalTimeline() {
     }
   }
 
+  const copyJsonPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(IMPORT_PROMPT)
+      toast('Prompt JSON copie')
+    } catch (_) {
+      window.prompt('Prompt JSON pour la frise', IMPORT_PROMPT)
+    }
+  }
+
+  const openImportPicker = () => {
+    importInputRef.current?.click()
+  }
+
+  const handleImportFile = async (file) => {
+    if (!file) return
+    try {
+      const text = await file.text()
+      const items = parseImportJson(text)
+      setImportQueue(items)
+      setImportSourceName(file.name)
+      toast(`${items.length} repere${items.length > 1 ? 's' : ''} a confirmer`)
+    } catch (err) {
+      toast(err.message || 'JSON impossible a lire', 'error')
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  const updateImportItem = (id, patch) => {
+    setImportQueue(items => items.map(item => item.client_id === id ? { ...item, ...patch } : item))
+  }
+
+  const toggleImportItem = (id) => {
+    setImportQueue(items => items.map(item => item.client_id === id ? { ...item, selected: !item.selected } : item))
+  }
+
+  const removeImportItem = (id) => {
+    setImportQueue(items => items.filter(item => item.client_id !== id))
+  }
+
+  const handleImportImage = async (id, file) => {
+    if (!file) return
+    try {
+      const imageData = await fileToWebpDataUrl(file)
+      updateImportItem(id, { image_data: imageData })
+    } catch (_) {
+      toast('Image impossible a lire', 'error')
+    }
+  }
+
+  const confirmImport = async () => {
+    const selected = importQueue.filter(item => item.selected)
+    if (!selected.length) {
+      toast('Aucun repere selectionne', 'error')
+      return
+    }
+    const invalid = selected.find(item => !item.title.trim() || !item.start_year.trim())
+    if (invalid) {
+      toast('Chaque repere selectionne doit avoir un titre et une annee de debut.', 'error')
+      return
+    }
+    setImportBusy(true)
+    try {
+      let lastId = null
+      for (const item of selected) {
+        const saved = await api.createHistoricalEvent(importItemToPayload(item))
+        lastId = saved?.id || lastId
+      }
+      await loadEvents()
+      if (lastId) setFocusId(lastId)
+      closeImportReview()
+      toast(`${selected.length} repere${selected.length > 1 ? 's' : ''} ajoute${selected.length > 1 ? 's' : ''}`)
+    } catch (err) {
+      toast(err.message || 'Import impossible', 'error')
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  const closeImportReview = () => {
+    if (importBusy) return
+    setImportQueue([])
+    setImportSourceName('')
+  }
+
   const beginPan = (event) => {
     if (!railRef.current) return
     dragRef.current = {
@@ -231,6 +334,19 @@ export default function HistoricalTimeline() {
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder="Rechercher une date, un theme..."
+          />
+          <button type="button" className="btn-ghost" onClick={copyJsonPrompt}>
+            <Icon name="copy" size={16} /> Prompt JSON
+          </button>
+          <button type="button" className="btn-primary" onClick={openImportPicker}>
+            <Icon name="upload" size={16} /> Import JSON
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={event => handleImportFile(event.target.files?.[0])}
           />
         </div>
       </header>
@@ -442,8 +558,216 @@ export default function HistoricalTimeline() {
           </div>
         </aside>
       </div>
+
+      {importQueue.length > 0 && (
+        <TimelineImportReview
+          items={importQueue}
+          sourceName={importSourceName}
+          busy={importBusy}
+          onUpdate={updateImportItem}
+          onToggle={toggleImportItem}
+          onRemove={removeImportItem}
+          onImage={handleImportImage}
+          onClose={closeImportReview}
+          onConfirm={confirmImport}
+        />
+      )}
     </div>
   )
+}
+
+function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onRemove, onImage, onClose, onConfirm }) {
+  const selectedCount = items.filter(item => item.selected).length
+  return (
+    <div className="timeline-import-overlay" role="dialog" aria-modal="true">
+      <section className="timeline-import-panel">
+        <header className="timeline-import-head">
+          <div>
+            <span>Import JSON</span>
+            <h2>Confirmer les reperes</h2>
+            {sourceName && <p>{sourceName}</p>}
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} disabled={busy}>
+            <Icon name="close" size={16} />
+          </button>
+        </header>
+
+        <div className="timeline-import-list">
+          {items.map((item, index) => (
+            <article key={item.client_id} className={`timeline-import-card ${item.selected ? '' : 'muted'}`}>
+              <div className="timeline-import-card-head">
+                <label>
+                  <input type="checkbox" checked={item.selected} onChange={() => onToggle(item.client_id)} />
+                  Repere {index + 1}
+                </label>
+                <button type="button" className="btn-ghost danger" onClick={() => onRemove(item.client_id)} disabled={busy}>
+                  Retirer
+                </button>
+              </div>
+
+              <input value={item.title} onChange={event => onUpdate(item.client_id, { title: event.target.value })} placeholder="Titre" />
+              <div className="timeline-import-dates">
+                <div className="timeline-date-fields">
+                  <span>Debut</span>
+                  <input value={item.start_year} onChange={event => onUpdate(item.client_id, { start_year: event.target.value })} placeholder="Annee" inputMode="numeric" />
+                  <select value={item.start_month} onChange={event => onUpdate(item.client_id, { start_month: event.target.value, start_day: event.target.value ? item.start_day : '' })}>
+                    <option value="">Mois</option>
+                    {MONTH_LABELS.map((month, monthIndex) => <option key={month} value={String(monthIndex + 1).padStart(2, '0')}>{month}</option>)}
+                  </select>
+                  <input value={item.start_day} onChange={event => onUpdate(item.client_id, { start_day: event.target.value })} placeholder="Jour" inputMode="numeric" disabled={!item.start_month} />
+                </div>
+                <div className="timeline-date-fields">
+                  <span>Fin</span>
+                  <input value={item.end_year} onChange={event => onUpdate(item.client_id, { end_year: event.target.value })} placeholder="Annee" inputMode="numeric" />
+                  <select value={item.end_month} onChange={event => onUpdate(item.client_id, { end_month: event.target.value, end_day: event.target.value ? item.end_day : '' })} disabled={!item.end_year.trim()}>
+                    <option value="">Mois</option>
+                    {MONTH_LABELS.map((month, monthIndex) => <option key={month} value={String(monthIndex + 1).padStart(2, '0')}>{month}</option>)}
+                  </select>
+                  <input value={item.end_day} onChange={event => onUpdate(item.client_id, { end_day: event.target.value })} placeholder="Jour" inputMode="numeric" disabled={!item.end_month} />
+                </div>
+              </div>
+              <input value={item.category} onChange={event => onUpdate(item.client_id, { category: event.target.value })} placeholder="Theme" />
+              <textarea value={item.description} onChange={event => onUpdate(item.client_id, { description: event.target.value })} placeholder="Description courte" />
+              <input value={item.tags} onChange={event => onUpdate(item.client_id, { tags: event.target.value })} placeholder="Tags separes par virgules" />
+              <div className="timeline-colors">
+                {COLORS.map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={item.color === color ? 'active' : ''}
+                    style={{ background: color }}
+                    onClick={() => onUpdate(item.client_id, { color })}
+                    title={color}
+                  />
+                ))}
+              </div>
+              <label className="timeline-image-picker">
+                <Icon name="upload" size={16} />
+                Ajouter une photo
+                <input type="file" accept="image/*" hidden onChange={event => onImage(item.client_id, event.target.files?.[0])} />
+              </label>
+              {item.image_data && (
+                <div className="timeline-image-preview">
+                  <img src={item.image_data} alt="" />
+                  <button type="button" className="icon-btn" onClick={() => onUpdate(item.client_id, { image_data: '' })}>
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+              )}
+              <input value={item.image_caption} onChange={event => onUpdate(item.client_id, { image_caption: event.target.value })} placeholder="Legende photo" />
+            </article>
+          ))}
+        </div>
+
+        <footer className="timeline-import-footer">
+          <span>{selectedCount} sur {items.length} selectionne{items.length > 1 ? 's' : ''}</span>
+          <div>
+            <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Annuler</button>
+            <button type="button" className="btn-primary" onClick={onConfirm} disabled={busy || selectedCount === 0}>
+              {busy ? 'Import...' : 'Ajouter a la frise'}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+function parseImportJson(text) {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (_) {
+    throw new Error('JSON invalide.')
+  }
+
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.events)
+      ? parsed.events
+      : Array.isArray(parsed?.historical_events)
+        ? parsed.historical_events
+        : Array.isArray(parsed?.timeline)
+          ? parsed.timeline
+          : null
+
+  if (!rows?.length) throw new Error('Le JSON doit contenir un tableau de reperes.')
+  return rows.map(normalizeImportItem).filter(Boolean)
+}
+
+function normalizeImportItem(row, index) {
+  const start = splitImportDate(row.start || row.start_label || partsToDate(row.start_year, row.start_month, row.start_day))
+  const end = splitImportDate(row.end || row.end_label || partsToDate(row.end_year, row.end_month, row.end_day))
+  const title = String(row.title || row.name || '').trim()
+
+  return {
+    client_id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+    selected: Boolean(title && start.year),
+    title,
+    start_year: start.year,
+    start_month: start.month,
+    start_day: start.day,
+    end_year: end.year,
+    end_month: end.month,
+    end_day: end.day,
+    category: String(row.category || row.theme || '').trim(),
+    color: COLORS.includes(String(row.color || '').trim()) ? String(row.color).trim() : COLORS[index % COLORS.length],
+    description: String(row.description || '').trim().slice(0, 700),
+    image_data: '',
+    image_caption: String(row.image_caption || row.image || '').trim().slice(0, 180),
+    tags: normalizeImportTags(row.tags),
+  }
+}
+
+function importItemToPayload(item) {
+  return {
+    title: item.title,
+    start: joinDateParts(item.start_year, item.start_month, item.start_day),
+    end: joinDateParts(item.end_year, item.end_month, item.end_day),
+    category: item.category,
+    color: item.color,
+    description: item.description,
+    image_data: item.image_data,
+    image_caption: item.image_caption,
+    tags: item.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+  }
+}
+
+function normalizeImportTags(value) {
+  if (Array.isArray(value)) return value.map(tag => String(tag).trim()).filter(Boolean).join(', ')
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed.map(tag => String(tag).trim()).filter(Boolean).join(', ')
+    } catch (_) {}
+    return value.split(',').map(tag => tag.trim()).filter(Boolean).join(', ')
+  }
+  return ''
+}
+
+function splitImportDate(value) {
+  const parts = String(value || '').trim().match(/^(-?\d{1,6})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/)
+  if (!parts) return { year: '', month: '', day: '' }
+  return {
+    year: parts[1] || '',
+    month: parts[2] ? parts[2].padStart(2, '0') : '',
+    day: parts[3] ? parts[3].padStart(2, '0') : '',
+  }
+}
+
+function partsToDate(year, month, day) {
+  const y = String(year || '').trim()
+  if (!y) return ''
+  const m = normalizeDatePart(month)
+  const d = normalizeDatePart(day)
+  if (!m) return y
+  return d ? `${y}-${m}-${d}` : `${y}-${m}`
+}
+
+function normalizeDatePart(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  return text.padStart(2, '0')
 }
 
 function LinkedArticles({ articles = [], compact = false, onOpen }) {

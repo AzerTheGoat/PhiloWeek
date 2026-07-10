@@ -13,6 +13,22 @@ export default function PublicArticle({ articleId }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', localStorage.getItem('pw-theme') || 'dark')
+    const root = document.documentElement
+    const syncViewport = () => {
+      const visual = window.visualViewport
+      const height = visual?.height || window.innerHeight
+      root.style.setProperty('--app-height', `${height}px`)
+    }
+
+    syncViewport()
+    window.addEventListener('resize', syncViewport)
+    window.visualViewport?.addEventListener('resize', syncViewport)
+    window.visualViewport?.addEventListener('scroll', syncViewport)
+    return () => {
+      window.removeEventListener('resize', syncViewport)
+      window.visualViewport?.removeEventListener('resize', syncViewport)
+      window.visualViewport?.removeEventListener('scroll', syncViewport)
+    }
   }, [])
 
   useEffect(() => {

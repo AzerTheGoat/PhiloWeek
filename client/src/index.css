@@ -192,6 +192,15 @@
   min-width: 0;
 }
 
+.timeline-actions .btn-primary,
+.timeline-actions .btn-ghost {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+}
+
 .timeline-search {
   width: min(320px, 34vw);
   min-width: 180px;
@@ -756,6 +765,133 @@
   color: var(--text);
 }
 
+.timeline-import-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.timeline-import-panel {
+  width: min(1120px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.timeline-import-head,
+.timeline-import-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline-import-head span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.timeline-import-head h2 {
+  margin: 3px 0 0;
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.timeline-import-head p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.timeline-import-list {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  overflow: auto;
+  padding: 14px;
+}
+
+.timeline-import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.timeline-import-card.muted {
+  opacity: 0.56;
+}
+
+.timeline-import-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.timeline-import-card-head label,
+.timeline-import-footer,
+.timeline-import-footer div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.timeline-import-card input,
+.timeline-import-card textarea,
+.timeline-import-card select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--bg-input);
+  font-size: 13px;
+}
+
+.timeline-import-card input[type="checkbox"] {
+  width: auto;
+}
+
+.timeline-import-card textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.timeline-import-dates {
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-import-footer {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.timeline-import-footer > span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
 .timeline-linked-articles {
   display: flex;
   flex-wrap: wrap;
@@ -1164,10 +1300,13 @@
 }
 
 .public-article-page {
-  min-height: var(--app-height, 100vh);
+  height: var(--app-height, 100dvh);
   padding: 24px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--bg);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .public-article-shell {
@@ -1187,6 +1326,12 @@
 
 .public-article-meta span {
   color: var(--text-2);
+}
+
+@media (max-width: 768px) {
+  .public-article-page {
+    padding: 14px 12px max(18px, env(safe-area-inset-bottom));
+  }
 }
 
 .article-form {
@@ -7348,6 +7493,16 @@ kbd {
     min-width: 0;
   }
 
+  .timeline-actions {
+    flex-wrap: wrap;
+  }
+
+  .timeline-actions .btn-primary,
+  .timeline-actions .btn-ghost {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+
   .timeline-focus {
     grid-template-columns: 36px minmax(0, 1fr) 36px;
     gap: 7px;
@@ -7414,6 +7569,30 @@ kbd {
 
   .timeline-date-fields span {
     grid-column: 1 / -1;
+  }
+
+  .timeline-import-overlay {
+    padding: 10px;
+  }
+
+  .timeline-import-panel {
+    border-radius: 8px;
+  }
+
+  .timeline-import-head,
+  .timeline-import-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .timeline-import-list {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .timeline-import-footer div {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .modal-overlay {
