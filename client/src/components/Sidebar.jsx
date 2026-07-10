@@ -94,6 +94,14 @@ export default function Sidebar() {
         <div className="sidebar-actions">
           <button
             type="button"
+            title="Journal public"
+            className={`feature-toggle icon-only ${view === 'social-journal' ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'social-journal' })}
+          >
+            <Icon name="newspaper" size={16} />
+          </button>
+          <button
+            type="button"
             title="Fonctionnalités"
             className={`feature-toggle ${featuresOpen ? 'active' : ''}`}
             onClick={() => setFeaturesOpen(prev => !prev)}

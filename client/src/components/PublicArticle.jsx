@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { useArticleReadTracker, getAnonReaderId } from '../utils/useArticleReadTracker'
 import * as api from '../api'
 import Icon from './Icons'
 
@@ -10,6 +11,23 @@ export default function PublicArticle({ articleId }) {
   const [article, setArticle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const pageRef = useRef(null)
+  const markedRef = useRef(false)
+
+  const markRead = () => {
+    if (markedRef.current || !article) return
+    markedRef.current = true
+    api.markPublicArticleRead(article.id, getAnonReaderId())
+      .then(summary => setArticle(cur => (cur ? { ...cur, ...summary } : cur)))
+      .catch(() => { markedRef.current = false })
+  }
+
+  useArticleReadTracker({
+    articleId: article?.id,
+    enabled: Boolean(article),
+    scrollElRef: pageRef,
+    onRead: markRead,
+  })
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', localStorage.getItem('pw-theme') || 'dark')
@@ -73,7 +91,7 @@ export default function PublicArticle({ articleId }) {
   }
 
   return (
-    <div className="public-article-page">
+    <div className="public-article-page" ref={pageRef}>
       <main className="public-article-shell">
         <PublicArticleView article={article} />
       </main>
@@ -87,7 +105,11 @@ function PublicArticleView({ article }) {
 
   return (
     <article className="article-view public-article-view">
-      {article.cover_image_data && <img className="article-cover" src={article.cover_image_data} alt="" />}
+      {article.cover_image_data && (
+        <div className="article-cover-frame">
+          <img className="article-cover" src={article.cover_image_data} alt="" />
+        </div>
+      )}
       <div className="article-view-head">
         <div>
           <span>{formatDate(article.published_on || article.created_at)}</span>
@@ -106,6 +128,7 @@ function PublicArticleView({ article }) {
       <TagLine tags={parseTags(article.tags)} />
       <div className="article-markdown markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
       <div className="article-social-row public-article-meta">
+        <span><Icon name="eye" size={16} /> {article.read_count || 0} lecteur{Number(article.read_count || 0) > 1 ? 's' : ''}</span>
         <span>{article.like_count || 0} j'aime</span>
         <span>{article.comment_count || 0} commentaire{Number(article.comment_count || 0) > 1 ? 's' : ''}</span>
       </div>

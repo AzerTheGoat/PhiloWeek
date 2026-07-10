@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { useArticleReadTracker } from '../utils/useArticleReadTracker'
+import { promptImageUrl } from '../utils/imageInput'
 import Icon from './Icons'
 import * as api from '../api'
 
@@ -20,7 +22,7 @@ const EMPTY_FORM = {
 
 export default function SocialJournal() {
   const { toast } = useApp()
-  const [scope, setScope] = useState('today')
+  const [scope, setScope] = useState('feed')
   const [query, setQuery] = useState('')
   const [articles, setArticles] = useState([])
   const [events, setEvents] = useState([])
@@ -74,10 +76,38 @@ export default function SocialJournal() {
     return () => window.removeEventListener('philoweek:open-article', handler)
   }, [])
 
-  const todayArticle = useMemo(
-    () => articles.find(article => article.published_on === localDate()) || articles[0] || null,
-    [articles]
-  )
+  const readerRef = useRef(null)
+  const markedReadRef = useRef(new Set())
+
+  // On ne compte pas l'auteur comme lecteur de son propre article.
+  const trackable = mode === 'read' && !!selected && !selected.can_edit
+
+  const applyReadSummary = useCallback((id, summary) => {
+    const patch = current => (current?.id === id ? { ...current, ...summary } : current)
+    setSelected(patch)
+    setArticles(rows => rows.map(row => (row.id === id ? { ...row, ...summary } : row)))
+  }, [])
+
+  const markSelectedRead = useCallback(async () => {
+    if (!selected) return
+    const id = selected.id
+    if (markedReadRef.current.has(id)) return
+    markedReadRef.current.add(id)
+    try {
+      const summary = await api.markArticleRead(id)
+      applyReadSummary(id, summary)
+    } catch (_) {
+      markedReadRef.current.delete(id)
+    }
+  }, [selected, applyReadSummary])
+
+  useArticleReadTracker({
+    articleId: selected?.id,
+    enabled: trackable,
+    alreadyRead: Boolean(selected?.read_by_me),
+    scrollElRef: readerRef,
+    onRead: markSelectedRead,
+  })
 
   const openArticle = async (id) => {
     try {
@@ -201,6 +231,15 @@ export default function SocialJournal() {
     }
   }
 
+  const handleCoverUrl = () => {
+    try {
+      const url = promptImageUrl()
+      if (url) setForm(current => ({ ...current, cover_image_data: url }))
+    } catch (err) {
+      toast(err.message || 'URL invalide', 'error')
+    }
+  }
+
   return (
     <div className="social-journal-page">
       <header className="social-journal-header">
@@ -216,7 +255,6 @@ export default function SocialJournal() {
       <section className="social-journal-toolbar">
         <div className="social-tabs">
           {[
-            ['today', 'Aujourd hui'],
             ['feed', 'Fil'],
             ['mine', 'Mes articles'],
           ].map(([key, label]) => (
@@ -230,36 +268,38 @@ export default function SocialJournal() {
 
       <div className="social-journal-layout">
         <aside className="article-feed">
-          {todayArticle && (
-            <button type="button" className="article-today" onClick={() => openArticle(todayArticle.id)}>
-              <span>Article du jour</span>
-              <strong>{todayArticle.title}</strong>
-              <small>par {todayArticle.author_username || 'Compte supprime'}</small>
-            </button>
-          )}
           {loading && <p className="article-empty">Chargement...</p>}
           {!loading && articles.length === 0 && <p className="article-empty">Aucun article pour le moment.</p>}
-          {articles.map(article => (
-            <article
-              key={article.id}
-              className={`article-feed-card ${selected?.id === article.id ? 'active' : ''}`}
-              onClick={() => openArticle(article.id)}
-            >
-              {article.cover_image_data && <img src={article.cover_image_data} alt="" />}
-              <div>
-                <span>{formatDate(article.published_on || article.created_at)}</span>
-                <h2>{article.title}</h2>
-                <p>{article.excerpt || stripMarkdown(article.content).slice(0, 150)}</p>
-                <small>
-                  {article.author_username || 'Compte supprime'} · {article.like_count || 0} j'aime · {article.comment_count || 0} commentaires
-                </small>
-                {article.status === 'draft' && <em>Brouillon</em>}
-              </div>
-            </article>
-          ))}
+          {articles.map(article => {
+            const unread = !article.can_edit && !article.read_by_me
+            return (
+              <article
+                key={article.id}
+                className={`article-feed-card ${selected?.id === article.id ? 'active' : ''} ${unread ? 'unread' : ''}`}
+                onClick={() => openArticle(article.id)}
+              >
+                <ArticleMedia src={article.cover_image_data} className="article-card-media" />
+                <div>
+                  <span className="article-card-line">
+                    {unread && <i className="article-unread-dot" title="Non lu" />}
+                    {formatDate(article.published_on || article.created_at)}
+                    {!unread && !article.can_edit && (
+                      <em className="article-read-flag"><Icon name="check" size={12} /> Lu</em>
+                    )}
+                  </span>
+                  <h2>{article.title}</h2>
+                  <p>{article.excerpt || stripMarkdown(article.content).slice(0, 150)}</p>
+                  <small>
+                    {article.author_username || 'Compte supprime'} · <Icon name="eye" size={12} /> {article.read_count || 0} · {article.like_count || 0} j'aime · {article.comment_count || 0} comm.
+                  </small>
+                  {article.status === 'draft' && <em>Brouillon</em>}
+                </div>
+              </article>
+            )
+          })}
         </aside>
 
-        <main className="article-reader">
+        <main className="article-reader" ref={readerRef}>
           {mode === 'write' ? (
             <ArticleForm
               form={form}
@@ -269,6 +309,7 @@ export default function SocialJournal() {
               onSubmit={saveArticle}
               onCancel={() => setMode('read')}
               onCover={handleCover}
+              onCoverUrl={handleCoverUrl}
             />
           ) : selected ? (
             <ArticleView
@@ -299,7 +340,11 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
   const html = useMemo(() => sanitizeHtml(marked(article.content || '')), [article.content])
   return (
     <article className="article-view">
-      {article.cover_image_data && <img className="article-cover" src={article.cover_image_data} alt="" />}
+      {article.cover_image_data && (
+        <div className="article-cover-frame">
+          <img className="article-cover" src={article.cover_image_data} alt="" />
+        </div>
+      )}
       <div className="article-view-head">
         <div>
           <span>{formatDate(article.published_on || article.created_at)}</span>
@@ -328,6 +373,7 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
         <button type="button" className={article.liked_by_me ? 'active' : ''} onClick={onLike}>
           <Icon name="heart" size={16} /> {article.like_count || 0}
         </button>
+        <span><Icon name="eye" size={16} /> {article.read_count || 0} lecteur{Number(article.read_count || 0) > 1 ? 's' : ''}</span>
         <span>{article.comment_count || 0} commentaire{Number(article.comment_count || 0) > 1 ? 's' : ''}</span>
       </div>
       <section className="article-comments">
@@ -351,7 +397,7 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
   )
 }
 
-function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onCover }) {
+function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onCover, onCoverUrl }) {
   const preview = useMemo(() => sanitizeHtml(marked(form.content || '')), [form.content])
   return (
     <form className="article-form" onSubmit={onSubmit}>
@@ -392,11 +438,16 @@ function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onC
         </label>
       </div>
       <input value={form.tags} onChange={event => setForm({ ...form, tags: event.target.value })} placeholder="Tags separes par virgules" />
-      <label className="article-cover-picker">
-        <Icon name="upload" size={16} />
-        Image de couverture
-        <input type="file" accept="image/*" hidden onChange={event => onCover(event.target.files?.[0])} />
-      </label>
+      <div className="article-cover-actions">
+        <label className="article-cover-picker">
+          <Icon name="upload" size={16} />
+          Image de couverture
+          <input type="file" accept="image/*" hidden onChange={event => onCover(event.target.files?.[0])} />
+        </label>
+        <button type="button" className="btn-ghost" onClick={onCoverUrl}>
+          <Icon name="link" size={16} /> Coller un lien
+        </button>
+      </div>
       {form.cover_image_data && (
         <div className="article-cover-preview">
           <img src={form.cover_image_data} alt="" />
@@ -414,6 +465,18 @@ function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onC
 function TagLine({ tags }) {
   if (!tags.length) return null
   return <div className="article-tags">{tags.map(tag => <span key={tag}>#{tag}</span>)}</div>
+}
+
+// Média d'un article : cadre au format constant (object-fit: cover) quand une
+// image existe, sinon un placeholder neutre pour garder des cartes alignées.
+function ArticleMedia({ src, className = '' }) {
+  return (
+    <div className={`${className} ${src ? 'has-image' : 'no-image'}`}>
+      {src
+        ? <img src={src} alt="" loading="lazy" />
+        : <Icon name="newspaper" size={22} />}
+    </div>
+  )
 }
 
 function parseTags(value) {

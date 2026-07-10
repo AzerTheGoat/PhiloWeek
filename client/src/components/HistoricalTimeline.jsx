@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
+import { promptImageUrl } from '../utils/imageInput'
 import Icon from './Icons'
 import * as api from '../api'
 
@@ -50,6 +51,8 @@ export default function HistoricalTimeline() {
   const [importQueue, setImportQueue] = useState([])
   const [importSourceName, setImportSourceName] = useState('')
   const [importBusy, setImportBusy] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
   const railRef = useRef(null)
   const dragRef = useRef(null)
   const importInputRef = useRef(null)
@@ -209,6 +212,15 @@ export default function HistoricalTimeline() {
     }
   }
 
+  const handleImageUrl = () => {
+    try {
+      const url = promptImageUrl()
+      if (url) setForm(current => ({ ...current, image_data: url }))
+    } catch (err) {
+      toast(err.message || 'URL invalide', 'error')
+    }
+  }
+
   const copyJsonPrompt = async () => {
     try {
       await navigator.clipboard.writeText(IMPORT_PROMPT)
@@ -222,18 +234,32 @@ export default function HistoricalTimeline() {
     importInputRef.current?.click()
   }
 
+  const loadImportItems = (text, sourceName) => {
+    const items = parseImportJson(text)
+    setImportQueue(items)
+    setImportSourceName(sourceName)
+    toast(`${items.length} repere${items.length > 1 ? 's' : ''} a confirmer`)
+  }
+
   const handleImportFile = async (file) => {
     if (!file) return
     try {
       const text = await file.text()
-      const items = parseImportJson(text)
-      setImportQueue(items)
-      setImportSourceName(file.name)
-      toast(`${items.length} repere${items.length > 1 ? 's' : ''} a confirmer`)
+      loadImportItems(text, file.name)
     } catch (err) {
       toast(err.message || 'JSON impossible a lire', 'error')
     } finally {
       if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  const submitPastedJson = () => {
+    try {
+      loadImportItems(pasteText, 'JSON colle')
+      setPasteOpen(false)
+      setPasteText('')
+    } catch (err) {
+      toast(err.message || 'JSON impossible a lire', 'error')
     }
   }
 
@@ -256,6 +282,15 @@ export default function HistoricalTimeline() {
       updateImportItem(id, { image_data: imageData })
     } catch (_) {
       toast('Image impossible a lire', 'error')
+    }
+  }
+
+  const handleImportImageUrl = (id) => {
+    try {
+      const url = promptImageUrl()
+      if (url) updateImportItem(id, { image_data: url })
+    } catch (err) {
+      toast(err.message || 'URL invalide', 'error')
     }
   }
 
@@ -337,6 +372,9 @@ export default function HistoricalTimeline() {
           />
           <button type="button" className="btn-ghost" onClick={copyJsonPrompt}>
             <Icon name="copy" size={16} /> Prompt JSON
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => { setPasteText(''); setPasteOpen(true) }}>
+            <Icon name="edit" size={16} /> Coller JSON
           </button>
           <button type="button" className="btn-primary" onClick={openImportPicker}>
             <Icon name="upload" size={16} /> Import JSON
@@ -516,11 +554,16 @@ export default function HistoricalTimeline() {
                 />
               ))}
             </div>
-            <label className="timeline-image-picker">
-              <Icon name="upload" size={16} />
-              Ajouter une photo
-              <input type="file" accept="image/*" hidden onChange={event => handleImage(event.target.files?.[0])} />
-            </label>
+            <div className="timeline-image-actions">
+              <label className="timeline-image-picker">
+                <Icon name="upload" size={16} />
+                Ajouter une photo
+                <input type="file" accept="image/*" hidden onChange={event => handleImage(event.target.files?.[0])} />
+              </label>
+              <button type="button" className="btn-ghost" onClick={handleImageUrl}>
+                <Icon name="link" size={16} /> Coller un lien
+              </button>
+            </div>
             {form.image_data && (
               <div className="timeline-image-preview">
                 <img src={form.image_data} alt="" />
@@ -568,15 +611,50 @@ export default function HistoricalTimeline() {
           onToggle={toggleImportItem}
           onRemove={removeImportItem}
           onImage={handleImportImage}
+          onImageUrl={handleImportImageUrl}
           onClose={closeImportReview}
           onConfirm={confirmImport}
         />
+      )}
+
+      {pasteOpen && (
+        <div className="timeline-import-overlay" role="dialog" aria-modal="true">
+          <section className="timeline-import-panel timeline-paste-panel">
+            <header className="timeline-import-head">
+              <div>
+                <h2>Coller un JSON</h2>
+                <p>Colle ici le JSON des reperes (meme format que l'import fichier).</p>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setPasteOpen(false)}>
+                <Icon name="close" size={16} />
+              </button>
+            </header>
+            <textarea
+              className="timeline-paste-textarea"
+              value={pasteText}
+              onChange={event => setPasteText(event.target.value)}
+              placeholder='[{"title": "...", "start_year": -44, ...}]'
+              autoFocus
+            />
+            <footer className="timeline-import-footer">
+              <button type="button" className="btn-ghost" onClick={copyJsonPrompt}>
+                <Icon name="copy" size={16} /> Prompt JSON
+              </button>
+              <div className="timeline-paste-footer-right">
+                <button type="button" className="btn-ghost" onClick={() => setPasteOpen(false)}>Annuler</button>
+                <button type="button" className="btn-primary" onClick={submitPastedJson} disabled={!pasteText.trim()}>
+                  Analyser
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   )
 }
 
-function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onRemove, onImage, onClose, onConfirm }) {
+function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onRemove, onImage, onImageUrl, onClose, onConfirm }) {
   const selectedCount = items.filter(item => item.selected).length
   return (
     <div className="timeline-import-overlay" role="dialog" aria-modal="true">
@@ -641,11 +719,16 @@ function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onR
                   />
                 ))}
               </div>
-              <label className="timeline-image-picker">
-                <Icon name="upload" size={16} />
-                Ajouter une photo
-                <input type="file" accept="image/*" hidden onChange={event => onImage(item.client_id, event.target.files?.[0])} />
-              </label>
+              <div className="timeline-image-actions">
+                <label className="timeline-image-picker">
+                  <Icon name="upload" size={16} />
+                  Ajouter une photo
+                  <input type="file" accept="image/*" hidden onChange={event => onImage(item.client_id, event.target.files?.[0])} />
+                </label>
+                <button type="button" className="btn-ghost" onClick={() => onImageUrl(item.client_id)}>
+                  <Icon name="link" size={16} /> Coller un lien
+                </button>
+              </div>
               {item.image_data && (
                 <div className="timeline-image-preview">
                   <img src={item.image_data} alt="" />

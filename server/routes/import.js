@@ -117,6 +117,11 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           article_id, user_id, reaction, created_at
         ) VALUES (?, ?, 'like', ?)`
       )
+      const insertArticleRead = db.prepare(
+        `INSERT OR IGNORE INTO article_reads (
+          id, article_id, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?)`
+      )
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
@@ -253,6 +258,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 reaction.article_id,
                 req.user.id,
                 normalizeIsoDate(reaction.created_at) || now
+              )
+              report.imported++
+            }
+
+            const reads = Array.isArray(jsonSpecial.reads) ? jsonSpecial.reads : []
+            for (const read of reads) {
+              if (!read.article_id) continue
+              const articleExists = importedArticleIds.has(read.article_id) ||
+                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(read.article_id)
+              if (!articleExists) continue
+              insertArticleRead.run(
+                read.id || uuidv4(),
+                read.article_id,
+                req.user.id,
+                normalizeIsoDate(read.created_at) || now,
+                normalizeIsoDate(read.updated_at) || now
               )
               report.imported++
             }
@@ -577,7 +598,11 @@ function normalizeColor(value) {
 
 function normalizeImage(value) {
   const text = String(value || '').trim()
-  return /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text) ? text : null
+  if (!text) return null
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
+  // Autorise aussi une URL http(s) directe (image distante).
+  if (/^https?:\/\/\S+$/i.test(text) && text.length <= 2048) return text
+  return null
 }
 
 function normalizeJsonArray(value) {

@@ -164,13 +164,19 @@ router.get('/obsidian', async (req, res) => {
     WHERE user_id = ?
     ORDER BY created_at ASC
   `).all(req.user.id)
-  if (articles.length > 0 || articleComments.length > 0 || articleReactions.length > 0) {
+  const articleReads = db.prepare(`
+    SELECT * FROM article_reads
+    WHERE user_id = ?
+    ORDER BY created_at ASC
+  `).all(req.user.id)
+  if (articles.length > 0 || articleComments.length > 0 || articleReactions.length > 0 || articleReads.length > 0) {
     zip.file('_Opuscule/SocialJournal.json', JSON.stringify({
       philoweek_type: 'social_journal',
       exported: new Date().toISOString(),
       articles,
       comments: articleComments,
       reactions: articleReactions,
+      reads: articleReads,
     }, null, 2))
   }
 

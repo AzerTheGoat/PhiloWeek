@@ -124,6 +124,7 @@ export const deleteHistoricalEvent = id => req('DELETE', `/historical-timeline/$
 
 // Social journal
 export const getPublicArticle = id => req('GET', `/public/social-journal/articles/${encodeURIComponent(id)}`)
+export const markPublicArticleRead = (id, anonId) => req('POST', `/public/social-journal/articles/${encodeURIComponent(id)}/read`, { anon_id: anonId })
 export const getArticles = ({ scope = 'feed', q = '', date = '' } = {}) => {
   const p = new URLSearchParams()
   p.set('scope', scope)
@@ -136,6 +137,7 @@ export const createArticle = data => req('POST', '/social-journal/articles', dat
 export const updateArticle = (id, data) => req('PUT', `/social-journal/articles/${id}`, data)
 export const deleteArticle = id => req('DELETE', `/social-journal/articles/${id}`)
 export const toggleArticleReaction = id => req('POST', `/social-journal/articles/${id}/reaction`)
+export const markArticleRead = id => req('POST', `/social-journal/articles/${id}/read`)
 export const getArticleComments = id => req('GET', `/social-journal/articles/${id}/comments`)
 export const createArticleComment = (id, body) => req('POST', `/social-journal/articles/${id}/comments`, { body })
 export const deleteArticleComment = id => req('DELETE', `/social-journal/comments/${id}`)

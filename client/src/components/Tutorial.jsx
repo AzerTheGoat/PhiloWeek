@@ -157,6 +157,46 @@ const SECTIONS = [
     ],
   },
   {
+    title: 'Frise historique',
+    items: [
+      {
+        icon: 'timeline',
+        title: 'Repères sur une frise',
+        text: "Place des dates et périodes sur une frise pannable. Filtre par thème (#tags), zoome, et relie un repère à un article du journal public.",
+      },
+      {
+        icon: 'upload',
+        title: 'Importer un JSON',
+        text: "Ajoute des repères en masse depuis un JSON : « Import JSON » depuis un fichier, ou « Coller JSON » pour coller le texte directement (ex : sortie d'un LLM via le bouton Prompt JSON). Tu confirmes chaque repère avant l'ajout.",
+      },
+      {
+        icon: 'link',
+        title: 'Image : fichier ou lien',
+        text: "Pour l'image d'un repère (comme pour la couverture d'un article), choisis un fichier local OU « Coller un lien » pour utiliser directement l'URL d'une image trouvée sur internet.",
+      },
+    ],
+  },
+  {
+    title: 'Journal public',
+    items: [
+      {
+        icon: 'newspaper',
+        title: 'Accès rapide',
+        text: "Le journal public rassemble les articles publiés par tous les comptes. Ouvre-le d'un clic via l'icône journal en haut de la barre latérale, ou dans Fonctions › Vues.",
+      },
+      {
+        icon: 'edit',
+        title: 'Écrire un article',
+        text: "Rédige en Markdown, ajoute une accroche, des tags, une image de couverture et un lien vers une carte de la frise. Publie-le ou garde-le en brouillon. « Copier le lien » génère une URL publique, lisible même sans compte.",
+      },
+      {
+        icon: 'eye',
+        title: 'Lu / non lu & lecteurs',
+        text: "Un point bleu marque les articles que tu n'as pas encore lus, un « Lu » ceux que tu as parcourus. Chaque article affiche son nombre de lecteurs uniques — une lecture est comptée après un vrai temps de lecture (pas un simple clic), y compris les visiteurs anonymes du lien public.",
+      },
+    ],
+  },
+  {
     title: 'Partage & sauvegarde',
     items: [
       {

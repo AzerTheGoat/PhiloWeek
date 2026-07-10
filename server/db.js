@@ -354,6 +354,30 @@ const MIGRATIONS = [
         ON article_reactions(user_id, created_at);
     `)
   },
+  // v9 -> v10 : suivi des lectures d'articles (lu/pas lu + lecteurs uniques,
+  // y compris les visiteurs anonymes qui ouvrent le lien public).
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS article_reads (
+        id TEXT PRIMARY KEY,
+        article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        anon_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Un lecteur = une ligne : dédup par compte (user_id) OU par appareil
+      -- anonyme (anon_id). Les index uniques partiels garantissent l'unicité
+      -- sans bloquer l'autre cas (l'un des deux est toujours NULL).
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_reads_user
+        ON article_reads(article_id, user_id) WHERE user_id IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_article_reads_anon
+        ON article_reads(article_id, anon_id) WHERE anon_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_article_reads_article
+        ON article_reads(article_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

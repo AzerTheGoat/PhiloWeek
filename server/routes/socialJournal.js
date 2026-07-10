@@ -153,6 +153,17 @@ router.post('/articles/:id/reaction', (req, res) => {
   res.json(reactionSummary(db, req.params.id, req.user.id))
 })
 
+router.post('/articles/:id/read', (req, res) => {
+  const db = getDb()
+  const article = readableArticle(db, req.params.id, req.user.id)
+  if (!article) return res.status(404).json({ error: 'Article introuvable.' })
+  recordUserRead(db, req.params.id, req.user.id)
+  res.json({
+    read_count: readCount(db, req.params.id),
+    read_by_me: true,
+  })
+})
+
 router.get('/articles/:id/comments', (req, res) => {
   const db = getDb()
   const article = readableArticle(db, req.params.id, req.user.id)
@@ -208,12 +219,18 @@ function articleSelectSql(where, orderBy) {
       CASE WHEN articles.user_id = @userId THEN 1 ELSE 0 END AS can_edit,
       (SELECT COUNT(*) FROM article_comments WHERE article_comments.article_id = articles.id) AS comment_count,
       (SELECT COUNT(*) FROM article_reactions WHERE article_reactions.article_id = articles.id AND reaction = 'like') AS like_count,
+      (SELECT COUNT(*) FROM article_reads WHERE article_reads.article_id = articles.id) AS read_count,
       EXISTS (
         SELECT 1 FROM article_reactions
         WHERE article_reactions.article_id = articles.id
           AND article_reactions.user_id = @userId
           AND article_reactions.reaction = 'like'
-      ) AS liked_by_me
+      ) AS liked_by_me,
+      EXISTS (
+        SELECT 1 FROM article_reads
+        WHERE article_reads.article_id = articles.id
+          AND article_reads.user_id = @userId
+      ) AS read_by_me
     FROM articles
     LEFT JOIN users ON users.id = articles.user_id
     LEFT JOIN historical_events ON historical_events.id = articles.event_id
@@ -250,6 +267,26 @@ function reactionSummary(db, articleId, userId) {
   }
 }
 
+function readCount(db, articleId) {
+  return db.prepare('SELECT COUNT(*) AS count FROM article_reads WHERE article_id = ?').get(articleId).count
+}
+
+// Enregistre (ou rafraîchit) la lecture d'un article par un compte connecté.
+// Dédup : une seule ligne par (article, user) grâce à l'index unique partiel.
+function recordUserRead(db, articleId, userId) {
+  const now = new Date().toISOString()
+  const existing = db.prepare(
+    'SELECT id FROM article_reads WHERE article_id = ? AND user_id = ?'
+  ).get(articleId, userId)
+  if (existing) {
+    db.prepare('UPDATE article_reads SET updated_at = ? WHERE id = ?').run(now, existing.id)
+  } else {
+    db.prepare(
+      'INSERT INTO article_reads (id, article_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(uuidv4(), articleId, userId, now, now)
+  }
+}
+
 function getComments(db, articleId, userId) {
   return db.prepare(`
     SELECT article_comments.*, users.username AS author_username,
@@ -281,8 +318,10 @@ function normalizeArticleRow(row) {
     ...row,
     can_edit: Boolean(row.can_edit),
     liked_by_me: Boolean(row.liked_by_me),
+    read_by_me: Boolean(row.read_by_me),
     comment_count: Number(row.comment_count || 0),
     like_count: Number(row.like_count || 0),
+    read_count: Number(row.read_count || 0),
   }
 }
 
@@ -298,7 +337,10 @@ function normalizeDate(value) {
 function normalizeImage(value) {
   const text = String(value || '').trim()
   if (!text) return null
-  return /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text) ? text : null
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
+  // Autorise aussi une URL http(s) directe (image distante).
+  if (/^https?:\/\/\S+$/i.test(text) && text.length <= 2048) return text
+  return null
 }
 
 function normalizeTags(value) {
