@@ -21,15 +21,19 @@ function LoginForm({ onSwitch }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (submitting) return
+    setError('')
     setSubmitting(true)
     try {
       await login(username.trim(), password)
     } catch (err) {
-      toast(err.message || 'Connexion impossible', 'error')
+      const message = err.message || 'Connexion impossible'
+      setError(message)
+      toast(message, 'error')
       setSubmitting(false)
     }
   }
@@ -53,6 +57,7 @@ function LoginForm({ onSwitch }) {
         className="modal-input"
         autoComplete="current-password"
       />
+      {error && <p className="auth-error" role="alert">{error}</p>}
       <div className="modal-actions">
         <button type="submit" className="btn-primary" disabled={!username.trim() || !password || submitting}>
           {submitting ? 'Connexion…' : 'Se connecter'}
@@ -71,17 +76,21 @@ function RegisterForm({ onSwitch }) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (submitting) return
-    if (password !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return }
-    if (password.length < 10) { toast('Minimum 10 caractères', 'error'); return }
+    setError('')
+    if (password !== confirm) { const message = 'Les mots de passe ne correspondent pas'; setError(message); toast(message, 'error'); return }
+    if (password.length < 10) { const message = 'Minimum 10 caracteres'; setError(message); toast(message, 'error'); return }
     setSubmitting(true)
     try {
       await register(username.trim(), password)
     } catch (err) {
-      toast(err.message || 'Inscription impossible', 'error')
+      const message = err.message || 'Inscription impossible'
+      setError(message)
+      toast(message, 'error')
       setSubmitting(false)
     }
   }
@@ -113,6 +122,7 @@ function RegisterForm({ onSwitch }) {
         className="modal-input"
         autoComplete="new-password"
       />
+      {error && <p className="auth-error" role="alert">{error}</p>}
       <div className="modal-actions">
         <button type="submit" className="btn-primary" disabled={!username.trim() || !password || !confirm || submitting}>
           {submitting ? 'Création…' : 'Créer mon compte'}

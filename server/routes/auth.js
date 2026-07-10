@@ -23,9 +23,8 @@ const DUMMY_HASH = hashPassword('dummy-timing-safety-not-a-real-account')
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false })
 const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false })
 
-function validatePassword(password, username) {
+function validatePassword(password) {
   if (typeof password !== 'string' || password.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères'
-  if (password.toLowerCase().includes(String(username).toLowerCase())) return "Le mot de passe ne doit pas contenir le nom d'utilisateur"
   return null
 }
 

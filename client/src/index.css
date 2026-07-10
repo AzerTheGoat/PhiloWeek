@@ -2312,6 +2312,17 @@ a { color: var(--link) }
   font-size: 13px;
 }
 
+.auth-error {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(224, 85, 85, 0.42);
+  border-radius: var(--radius);
+  color: var(--danger);
+  background: rgba(224, 85, 85, 0.1);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 kbd {
   display: inline-block;
   padding: 2px 6px;

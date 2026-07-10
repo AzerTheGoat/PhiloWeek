@@ -46,7 +46,12 @@ function AuthGate() {
 
   if (publicArticleId) return <PublicArticle articleId={publicArticleId} />
   if (!authChecked) return null
-  return currentUser ? <AppShell /> : <AuthScreen />
+  return currentUser ? <AppShell /> : (
+    <>
+      <AuthScreen />
+      <Toast />
+    </>
+  )
 }
 
 function getPublicArticleId() {
