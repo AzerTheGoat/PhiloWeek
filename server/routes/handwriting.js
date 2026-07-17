@@ -84,7 +84,7 @@ router.post('/recognize', recognitionLimiter, async (req, res) => {
     try { result = raw ? JSON.parse(raw) : null } catch (_) {}
 
     if (!response.ok) {
-      return sendProviderError(res, response.status, result)
+      return sendProviderError(res, response.status, result, raw)
     }
 
     const text = extractRecognizedText(result)
@@ -185,23 +185,49 @@ function extractCandidates(result) {
     }))
 }
 
-function sendProviderError(res, status, payload) {
+function sendProviderError(res, status, payload, raw = '') {
   const providerCode = String(payload?.code || payload?.error || '')
+  const providerMessage = String(payload?.message || payload?.error_description || payload?.details || '').trim()
+  const providerHint = providerMessage || providerCode || String(raw || '').trim().slice(0, 240)
+
+  console.warn('MyScript handwriting error:', {
+    status,
+    code: providerCode || null,
+    message: providerMessage || null,
+  })
+
   if (status === 401) {
     return res.status(502).json({
-      error: 'Les identifiants MyScript configurés sont invalides.',
+      error: 'Les identifiants MyScript configures sont invalides.',
       code: 'handwriting_bad_credentials',
+      provider_status: status,
+      provider_code: providerCode || null,
+    })
+  }
+  if (status === 403 && /access\.not\.granted|access denied|forbidden/i.test(`${providerCode} ${providerMessage}`)) {
+    return res.status(502).json({
+      error: 'MyScript refuse l acces : verifie que la cle HMAC correspond bien a cette application, que la cle n est pas revoquee, et que HMAC est active pour cette cle.',
+      code: 'handwriting_access_denied',
+      provider_status: status,
+      provider_code: providerCode || null,
+      provider_message: providerHint || null,
     })
   }
   if (status === 403 && /counter|quota|threshold|empty/i.test(providerCode)) {
     return res.status(429).json({
-      error: 'Le quota gratuit MyScript est épuisé.',
+      error: 'Le quota gratuit MyScript est epuise.',
       code: 'handwriting_quota_exhausted',
+      provider_status: status,
+      provider_code: providerCode || null,
     })
   }
   return res.status(502).json({
-    error: 'Le moteur manuscrit a refusé la reconnaissance demandée.',
+    error: providerHint
+      ? `MyScript a refuse la reconnaissance: ${providerHint}`
+      : 'Le moteur manuscrit a refuse la reconnaissance demandee.',
     code: 'handwriting_provider_error',
+    provider_status: status,
+    provider_code: providerCode || null,
   })
 }
 
