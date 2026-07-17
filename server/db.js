@@ -260,7 +260,7 @@ const MIGRATIONS = [
         ON agenda_checks(user_id, entry_date);
     `)
   },
-  // v6 -> v7 : historique global restaure par Ctrl+Z
+  // v6 -> v7 : ancienne table conservee pour compatibilite des bases existantes
   (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS app_snapshots (
@@ -378,7 +378,7 @@ const MIGRATIONS = [
         ON article_reads(article_id);
     `)
   },
-  // v10 -> v11 : piles separees pour annuler et retablir les actions
+  // v10 -> v11 : ancien champ conserve pour compatibilite des bases existantes
   (db) => {
     addColumnIfMissing(db, 'app_snapshots', 'stack', "TEXT NOT NULL DEFAULT 'undo' CHECK(stack IN ('undo', 'redo'))")
     db.exec(`

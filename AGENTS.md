@@ -60,7 +60,6 @@ todos        — id, title, notes, status (open/done), due_at, user_id, created_
 agenda_practices — id, title, color, active, user_id, created_at, updated_at, archived_at
 agenda_checks — practice_id, entry_date, done, user_id, updated_at
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
-app_snapshots — id, user_id, created_at, reason, data_json, stack (undo/redo)
 historical_events — id, title, start_label/year/month/day, end_label/year/month/day, description, category, color, image_data, image_caption, tags, user_id
 articles     — id, title, excerpt, content, status (draft/published), published_on, published_at, cover_image_data, tags, event_id, user_id, created_at, updated_at
 article_comments — id, article_id, body, user_id, created_at, updated_at
@@ -145,15 +144,6 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Ne pas ajouter de nouveau panneau IA, appel fournisseur, estimation de cout ou generation automatique sans demande explicite.
 - Le recap de semaine/periode passe par le panneau `Copier`, qui met un preprompt dans le presse-papier sans appeler de fournisseur IA.
 
-## Ecriture manuscrite
-
-- En mode `Editer`, le bouton `Stylo` ouvre une surface tactile compatible stylet, doigt et souris, avec pression, rejet de la paume apres detection d'un stylet, gomme, annulation, retablissement et effacement.
-- Les boutons `Francais`, `English` et `العربية` changent reellement le modele MyScript utilise (`fr_FR`, `en_US`, `ar`); le dernier choix est memorise dans le navigateur.
-- `Transformer en texte` envoie uniquement les coordonnees des traits au endpoint serveur `/api/handwriting/recognize`; le contenu de la note et les secrets MyScript ne sont jamais envoyes par le client.
-- Le serveur signe la requete MyScript avec `MYSCRIPT_APPLICATION_KEY` et `MYSCRIPT_HMAC_KEY`, qui doivent rester dans le fichier `.env` local et dans les variables Railway.
-- Le texte reconnu remplace visuellement les traits avec une animation, reste modifiable avant validation, puis s'insere a la position du curseur dans la note Markdown.
-- MyScript reconnait l'ecriture cursive mais necessite une connexion au cloud. Son offre gratuite est limitee a 2 000 requetes; lorsque le quota est atteint, la reconnaissance est suspendue sans facturation automatique.
-
 ## Déplacement des fichiers et dossiers
 
 - Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.
@@ -235,16 +225,6 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les definitions passent dans le moteur de revision existant : le mot devient la question, la definition la correction, et l'exemple l'explication.
 - Dans le panneau global `Reviser`, selectionner directement un fichier Definitions lance la revision de ses mots; les resultats sont stockes dans `questionnaire_results` comme les quiz.
 - L'export/import Obsidian inclut les fichiers Definitions tels quels, puisqu'ils restent des fichiers `.json` standards.
-
-## Retour en arriere global
-
-- L'application capture des instantanes globaux dans `app_snapshots` pour l'utilisateur connecte.
-- La retention garde chaque action sur les 5 dernieres minutes, puis un instantane par minute jusqu'a 1 heure, puis un par tranche de 5 minutes jusqu'a 24 heures.
-- Dans un champ de saisie, `Ctrl+Z` annule d'abord la saisie locale et `Ctrl+Maj+Z` / `Ctrl+Y` la retablit; hors saisie, ces raccourcis utilisent les piles globales `POST /api/history/undo` et `POST /api/history/redo`.
-- Chaque mutation reussie qui modifie effectivement les donnees cree un instantane `undo`; annuler place l'etat courant dans la pile `redo`, et une nouvelle action apres annulation vide cette pile `redo`.
-- Si le rollback restaure un fichier supprime ou change l'emplacement d'un fichier/dossier, l'interface demande confirmation; les simples modifications de contenu s'appliquent directement et ouvrent le fichier concerne.
-- La restauration remplace les donnees de contenu de l'utilisateur connecte dans une transaction SQLite, sans restaurer les comptes ni les sessions.
-- L'export Obsidian ajoute `_Opuscule/History.json` avec `philoweek_type: history`; l'import recree les instantanes disponibles.
 
 ## Onglets de fichiers
 

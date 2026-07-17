@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
 import * as api from './api'
@@ -60,8 +60,7 @@ function getPublicArticleId() {
 }
 
 function AppShell() {
-  const { theme, sidebarOpen, view, currentFile, loadTree, openFile, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, toast } = useApp()
-  const historyBusyRef = useRef(false)
+  const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
 
   useEffect(() => { loadTree() }, [])
 
@@ -96,71 +95,6 @@ function AppShell() {
     document.addEventListener('click', handler, { once: true })
     return () => document.removeEventListener('click', handler)
   }, [contextMenu, hideContextMenu])
-
-  useEffect(() => {
-    const restoreHistory = async (direction, confirm = false) => {
-      const result = direction === 'redo'
-        ? await api.redoHistory(confirm)
-        : await api.undoHistory(confirm)
-      await loadTree()
-      if (result.focus_file_id) {
-        await openFile(result.focus_file_id)
-      } else {
-        window.setTimeout(() => window.location.reload(), 250)
-      }
-      toast(direction === 'redo' ? 'Action retablie.' : 'Action annulee.')
-    }
-
-    const runHistory = async (direction, event) => {
-      event?.preventDefault?.()
-      event?.stopPropagation?.()
-      if (historyBusyRef.current) return
-      historyBusyRef.current = true
-      try {
-        await restoreHistory(direction, false)
-      } catch (err) {
-        if (err.status === 409) {
-          const label = direction === 'redo' ? 'retablissement' : 'annulation'
-          const ok = window.confirm(`Cette ${label} va restaurer ou deplacer un fichier. Continuer ?`)
-          if (ok) {
-            try {
-              await restoreHistory(direction, true)
-            } catch (confirmErr) {
-              toast(confirmErr.message || 'Historique indisponible.', 'error')
-            }
-          }
-        } else {
-          toast(err.message || 'Historique indisponible.', 'error')
-        }
-      } finally {
-        historyBusyRef.current = false
-      }
-    }
-
-    const keyHandler = async (event) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
-      if (isEditableHistoryTarget(event.target) || isLocalHistorySurface(event.target)) return
-
-      const key = (event.key || '').toLowerCase()
-      if (key === 'z') {
-        await runHistory(event.shiftKey ? 'redo' : 'undo', event)
-      } else if (key === 'y' && !event.shiftKey) {
-        await runHistory('redo', event)
-      }
-    }
-
-    const commandHandler = async (event) => {
-      const direction = event.detail?.direction === 'redo' ? 'redo' : 'undo'
-      await runHistory(direction)
-    }
-
-    window.addEventListener('keydown', keyHandler, { capture: true })
-    window.addEventListener('app-history-command', commandHandler)
-    return () => {
-      window.removeEventListener('keydown', keyHandler, { capture: true })
-      window.removeEventListener('app-history-command', commandHandler)
-    }
-  }, [loadTree, openFile, toast])
 
   return (
     <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -207,19 +141,6 @@ function AppShell() {
       <ContextMenu />
       <Modals />
     </div>
-  )
-}
-
-function isEditableHistoryTarget(target) {
-  if (!(target instanceof Element)) return false
-  return Boolean(target.closest('input, textarea, [contenteditable="true"]'))
-}
-
-function isLocalHistorySurface(target) {
-  const active = document.activeElement
-  return Boolean(
-    target instanceof Element && target.closest('[data-local-history]') ||
-    active instanceof Element && active.closest('[data-local-history]')
   )
 }
 

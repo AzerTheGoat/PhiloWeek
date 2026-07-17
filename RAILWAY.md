@@ -103,18 +103,3 @@ Au prochain déploiement : sauvegarde auto → migration v1→v2 → données
 conservées. Rien à faire manuellement.
 
 ---
-
-## Reconnaissance de l'écriture manuscrite
-
-La conversion des traits manuscrits utilise MyScript. Ajoute ces deux variables
-dans **Railway > Variables** :
-
-```text
-MYSCRIPT_APPLICATION_KEY=...
-MYSCRIPT_HMAC_KEY=...
-```
-
-En local, place les mêmes variables dans le fichier `.env` à la racine du
-projet. Ne mets jamais leurs valeurs dans Git : elles sont lues uniquement par
-le serveur. Sans ces variables, le canvas reste utilisable mais le bouton de
-conversion est désactivé avec une explication dans l'interface.

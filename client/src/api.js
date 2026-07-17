@@ -64,8 +64,6 @@ export const uploadVoice = (file_id, audioBlob, duration, title) => {
 export const deleteVoice = id => req('DELETE', `/voice/${id}`)
 
 // Reconnaissance manuscrite
-export const getHandwritingStatus = () => req('GET', '/handwriting/status')
-export const recognizeHandwriting = data => req('POST', '/handwriting/recognize', data)
 
 // Inbox — Resources
 export const getResources = (status, type) => {
@@ -146,12 +144,6 @@ export const markArticleRead = id => req('POST', `/social-journal/articles/${id}
 export const getArticleComments = id => req('GET', `/social-journal/articles/${id}/comments`)
 export const createArticleComment = (id, body) => req('POST', `/social-journal/articles/${id}/comments`, { body })
 export const deleteArticleComment = id => req('DELETE', `/social-journal/comments/${id}`)
-
-// History
-export const undoHistory = (confirm = false) => req('POST', '/history/undo', { confirm })
-export const redoHistory = (confirm = false) => req('POST', '/history/redo', { confirm })
-// Kept for older callers while the new undo/redo API rolls out.
-export const rollbackHistory = undoHistory
 
 // Timer
 export const getTimerSessions = file_id =>

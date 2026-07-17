@@ -7,7 +7,6 @@ const cookieParser = require('cookie-parser')
 const { initDb } = require('./db')
 const { requireAuth } = require('./auth/middleware')
 const { pruneExpiredSessions } = require('./auth/session')
-const { historyCaptureMiddleware } = require('./history')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -58,14 +57,11 @@ app.use('/api/public/social-journal', require('./routes/publicSocialJournal'))
 
 // Tout le reste de /api/* exige une session valide.
 app.use('/api', requireAuth)
-app.use('/api', historyCaptureMiddleware)
 
-app.use('/api/history', require('./routes/history'))
 app.use('/api/files', require('./routes/files'))
 app.use('/api/export', require('./routes/export'))
 app.use('/api/import', require('./routes/import'))
 app.use('/api/voice', require('./routes/voice'))
-app.use('/api/handwriting', require('./routes/handwriting'))
 app.use('/api/timer', require('./routes/timer'))
 app.use('/api/inbox', require('./routes/inbox'))
 app.use('/api/life', require('./routes/life'))

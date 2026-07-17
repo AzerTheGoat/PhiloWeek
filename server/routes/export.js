@@ -180,20 +180,6 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
-  const historySnapshots = db.prepare(`
-    SELECT id, created_at, reason, data_json, stack
-    FROM app_snapshots
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-  `).all(req.user.id)
-  if (historySnapshots.length > 0) {
-    zip.file('_Opuscule/History.json', JSON.stringify({
-      philoweek_type: 'history',
-      exported: new Date().toISOString(),
-      snapshots: historySnapshots,
-    }, null, 2))
-  }
-
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
   const date = new Date().toISOString().slice(0, 10)
   res.setHeader('Content-Type', 'application/zip')

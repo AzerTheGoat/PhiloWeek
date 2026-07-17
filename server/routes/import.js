@@ -90,10 +90,6 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           question_text, answer_text, expected_answer, correct, score, response_ms, user_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      const insertHistorySnapshot = db.prepare(
-        `INSERT OR IGNORE INTO app_snapshots (id, user_id, created_at, reason, data_json, stack)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      )
       const insertHistoricalEvent = db.prepare(
         `INSERT OR IGNORE INTO historical_events (
           id, title, start_label, start_year, start_month, start_day,
@@ -145,23 +141,6 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
                 req.user.id,
                 result.created_at || new Date().toISOString()
-              )
-              report.imported++
-            }
-            continue
-          }
-
-          if (jsonSpecial?.philoweek_type === 'history') {
-            const snapshots = Array.isArray(jsonSpecial.snapshots) ? jsonSpecial.snapshots : []
-            for (const snapshot of snapshots) {
-              if (!snapshot?.data_json || !isValidJson(snapshot.data_json)) continue
-              insertHistorySnapshot.run(
-                snapshot.id || uuidv4(),
-                req.user.id,
-                normalizeIsoDate(snapshot.created_at) || new Date().toISOString(),
-                snapshot.reason || 'import',
-                snapshot.data_json,
-                snapshot.stack === 'redo' ? 'redo' : 'undo'
               )
               report.imported++
             }
@@ -498,11 +477,6 @@ function safeMatter(rawContent) {
 function safeJson(rawContent) {
   try { return JSON.parse(String(rawContent || '').replace(/^\uFEFF/, '')) }
   catch (_) { return null }
-}
-
-function isValidJson(rawContent) {
-  try { JSON.parse(String(rawContent || '')); return true }
-  catch (_) { return false }
 }
 
 function parseQuotesExport(content) {
