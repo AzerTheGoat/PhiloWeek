@@ -5,6 +5,7 @@ import Preview from './Preview'
 import GraphEditor from './GraphEditor'
 import QuestionnaireEditor from './QuestionnaireEditor'
 import DefinitionsEditor from './DefinitionsEditor'
+import HandwritingPanel from './HandwritingPanel'
 import Icon from './Icons'
 import { isGraphFile } from '../utils/graphFile'
 import { isQuestionnaireFile } from '../utils/questionnaireFile'
@@ -26,12 +27,14 @@ export default function Editor() {
   const [mode, setMode] = useState(initialMode)
   const [wordCount, setWordCount] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [handwritingOpen, setHandwritingOpen] = useState(false)
   const [wikiQuery, setWikiQuery] = useState(null)
   // Debounced content for Preview — avoids re-rendering preview on every keystroke
   const [previewContent, setPreviewContent] = useState(currentFile?.content || '')
 
   const textareaRef = useRef(null)
   const saveTimerRef = useRef(null)
+  const handwritingAnchorRef = useRef(0)
   const previewTimerRef = useRef(null)
   const wordCountTimerRef = useRef(null)
 
@@ -243,6 +246,34 @@ export default function Editor() {
     ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
     : []
 
+  const openHandwriting = useCallback(() => {
+    const textarea = textareaRef.current
+    const cursorIsActive = textarea && document.activeElement === textarea
+    handwritingAnchorRef.current = cursorIsActive ? textarea.selectionStart : contentRef.current.length
+    setHandwritingOpen(true)
+  }, [])
+
+  const insertHandwriting = useCallback((text) => {
+    const cur = contentRef.current
+    const position = Math.min(handwritingAnchorRef.current, cur.length)
+    const before = cur.slice(0, position)
+    const after = cur.slice(position)
+    const prefix = before && !/[\s\n]$/.test(before) ? ' ' : ''
+    const suffix = after && !/^[\s\n.,;:!?)]/.test(after) ? ' ' : ''
+    const inserted = `${prefix}${text.trim()}${suffix}`
+    const newContent = before + inserted + after
+    const nextPosition = position + inserted.length
+    setContent(newContent)
+    setIsDirty(true)
+    triggerSave(newContent)
+    setHandwritingOpen(false)
+    setTimeout(() => {
+      const textarea = textareaRef.current
+      textarea?.setSelectionRange(nextPosition, nextPosition)
+      textarea?.focus()
+    }, 0)
+  }, [triggerSave])
+
   if (!currentFile) return null
   if (isGraphFile(currentFile)) return <GraphEditor />
   if (isDefinitionsFile(currentFile)) return <DefinitionsEditor />
@@ -266,7 +297,13 @@ export default function Editor() {
         </div>
       </div>
 
-      {mode !== 'preview' && <EditorToolbar format={format} />}
+      {mode !== 'preview' && (
+        <EditorToolbar
+          format={format}
+          onHandwriting={openHandwriting}
+          handwritingOpen={handwritingOpen}
+        />
+      )}
 
       <div className={`editor-body mode-${mode}`}>
         {mode !== 'preview' && (
@@ -304,6 +341,12 @@ export default function Editor() {
           </div>
         )}
       </div>
+      {handwritingOpen && (
+        <HandwritingPanel
+          onClose={() => setHandwritingOpen(false)}
+          onInsert={insertHandwriting}
+        />
+      )}
     </div>
   )
 }

@@ -30,6 +30,11 @@ const SECTIONS = [
     title: "Éditeur de note",
     items: [
       {
+        icon: 'pen',
+        title: 'Écrire au stylo',
+        text: "En mode Éditer, ouvre Stylo pour écrire au stylet ou au doigt. Tu peux gommer, annuler, faire reconnaître le français localement puis corriger le texte avant de l'insérer à l'emplacement du curseur. Le moteur est gratuit, privé et ne contacte aucune API.",
+      },
+      {
         icon: 'edit',
         title: 'Trois vues : Éditer / Split / Aperçu',
         text: "Bascule entre écriture pure, vue partagée, ou aperçu Markdown rendu. Le mode par défaut à l'ouverture est l'Aperçu.",

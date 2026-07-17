@@ -145,6 +145,13 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Ne pas ajouter de nouveau panneau IA, appel fournisseur, estimation de cout ou generation automatique sans demande explicite.
 - Le recap de semaine/periode passe par le panneau `Copier`, qui met un preprompt dans le presse-papier sans appeler de fournisseur IA.
 
+## Ecriture manuscrite
+
+- En mode `Editer`, le bouton `Stylo` ouvre une surface tactile compatible stylet, doigt et souris, avec pression, rejet de la paume apres detection d'un stylet, gomme, annulation, retablissement et effacement.
+- `Transformer en texte` utilise Tesseract.js et le modele francais livres avec le client : la reconnaissance reste gratuite, locale et sans cle API.
+- Le texte reconnu remplace visuellement les traits avec une animation, reste modifiable avant validation, puis s'insere a la position du curseur dans la note Markdown.
+- La reconnaissance est chargee uniquement au premier usage; ses fichiers statiques sont servis depuis `client/public/tesseract/` et inclus dans le build de production.
+
 ## Déplacement des fichiers et dossiers
 
 - Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.

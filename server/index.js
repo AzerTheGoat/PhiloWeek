@@ -30,7 +30,10 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      // Tesseract.js compile son moteur OCR WebAssembly localement. Cette
+      // source autorise uniquement WASM, sans rouvrir eval() pour JavaScript.
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      workerSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:', 'http:', 'blob:'],
       mediaSrc: ["'self'", 'blob:'],
