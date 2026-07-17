@@ -148,9 +148,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Ecriture manuscrite
 
 - En mode `Editer`, le bouton `Stylo` ouvre une surface tactile compatible stylet, doigt et souris, avec pression, rejet de la paume apres detection d'un stylet, gomme, annulation, retablissement et effacement.
-- `Transformer en texte` utilise Tesseract.js et le modele francais livres avec le client : la reconnaissance reste gratuite, locale et sans cle API.
+- Les boutons `Francais`, `English` et `العربية` changent reellement le modele MyScript utilise (`fr_FR`, `en_US`, `ar`); le dernier choix est memorise dans le navigateur.
+- `Transformer en texte` envoie uniquement les coordonnees des traits au endpoint serveur `/api/handwriting/recognize`; le contenu de la note et les secrets MyScript ne sont jamais envoyes par le client.
+- Le serveur signe la requete MyScript avec `MYSCRIPT_APPLICATION_KEY` et `MYSCRIPT_HMAC_KEY`, qui doivent rester dans le fichier `.env` local et dans les variables Railway.
 - Le texte reconnu remplace visuellement les traits avec une animation, reste modifiable avant validation, puis s'insere a la position du curseur dans la note Markdown.
-- La reconnaissance est chargee uniquement au premier usage; ses fichiers statiques sont servis depuis `client/public/tesseract/` et inclus dans le build de production.
+- MyScript reconnait l'ecriture cursive mais necessite une connexion au cloud. Son offre gratuite est limitee a 2 000 requetes; lorsque le quota est atteint, la reconnaissance est suspendue sans facturation automatique.
 
 ## Déplacement des fichiers et dossiers
 

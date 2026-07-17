@@ -1,20 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from './Icons'
-import { recognizeHandwriting } from '../utils/handwritingOcr'
+import * as api from '../api'
 
 const PEN_SIZE = 6
 const ERASER_SIZE = 28
+const LANGUAGE_STORAGE_KEY = 'pw-handwriting-language'
+const LANGUAGES = [
+  { id: 'fr', label: 'Français', model: 'fr_FR', direction: 'ltr' },
+  { id: 'en', label: 'English', model: 'en_US', direction: 'ltr' },
+  { id: 'ar', label: 'العربية', model: 'ar', direction: 'rtl' },
+]
 
 export default function HandwritingPanel({ onClose, onInsert }) {
   const canvasRef = useRef(null)
   const strokesRef = useRef([])
   const currentStrokeRef = useRef(null)
+  const eraserSnapshotRef = useRef(null)
   const activePointerRef = useRef(null)
   const activePointerTypeRef = useRef(null)
   const pastRef = useRef([])
   const futureRef = useRef([])
   const penDetectedRef = useRef(false)
   const mountedRef = useRef(true)
+  const progressTimerRef = useRef(null)
   const [tool, setTool] = useState('pen')
   const [strokeCount, setStrokeCount] = useState(0)
   const [historyState, setHistoryState] = useState({ past: 0, future: 0 })
@@ -22,6 +30,12 @@ export default function HandwritingPanel({ onClose, onInsert }) {
   const [recognizedText, setRecognizedText] = useState('')
   const [progress, setProgress] = useState({ label: '', progress: 0 })
   const [error, setError] = useState('')
+  const [serviceStatus, setServiceStatus] = useState('checking')
+  const [languageId, setLanguageId] = useState(() => {
+    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+    return LANGUAGES.some(language => language.id === saved) ? saved : 'fr'
+  })
+  const language = LANGUAGES.find(item => item.id === languageId) || LANGUAGES[0]
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current
@@ -38,7 +52,7 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     const context = canvas.getContext('2d')
     context.clearRect(0, 0, width, height)
     drawStrokes(context, strokesRef.current, width, height)
-    if (currentStrokeRef.current) drawStroke(context, currentStrokeRef.current, width, height)
+    if (currentStrokeRef.current?.tool === 'pen') drawStroke(context, currentStrokeRef.current, width, height)
   }, [])
 
   useEffect(() => {
@@ -48,9 +62,17 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     const observer = new ResizeObserver(redraw)
     observer.observe(canvas)
     redraw()
+    api.getHandwritingStatus()
+      .then(status => {
+        if (mountedRef.current) setServiceStatus(status.configured ? 'ready' : 'missing')
+      })
+      .catch(() => {
+        if (mountedRef.current) setServiceStatus('unavailable')
+      })
     return () => {
       mountedRef.current = false
       observer.disconnect()
+      clearInterval(progressTimerRef.current)
     }
   }, [redraw])
 
@@ -65,7 +87,7 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, redraw])
+  })
 
   const syncHistoryState = () => {
     setHistoryState({ past: pastRef.current.length, future: futureRef.current.length })
@@ -120,10 +142,15 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     try { event.currentTarget.setPointerCapture(event.pointerId) } catch (_) {}
     setPhase('draw')
     setError('')
-    currentStrokeRef.current = {
+    const stroke = {
       tool,
       size: tool === 'eraser' ? ERASER_SIZE : PEN_SIZE,
       points: [pointFromEvent(event, event.currentTarget)],
+    }
+    currentStrokeRef.current = stroke
+    if (tool === 'eraser') {
+      eraserSnapshotRef.current = strokesRef.current
+      eraseTouchedStrokes(stroke.points, event.currentTarget)
     }
     redraw()
   }
@@ -132,9 +159,8 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     if (!currentStrokeRef.current || activePointerRef.current !== event.pointerId) return
     event.preventDefault()
     const events = event.getCoalescedEvents?.() || [event]
-    for (const pointerEvent of events) {
-      currentStrokeRef.current.points.push(pointFromEvent(pointerEvent, event.currentTarget))
-    }
+    for (const pointerEvent of events) currentStrokeRef.current.points.push(pointFromEvent(pointerEvent, event.currentTarget))
+    if (currentStrokeRef.current.tool === 'eraser') eraseTouchedStrokes(currentStrokeRef.current.points, event.currentTarget)
     redraw()
   }
 
@@ -147,15 +173,39 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     activePointerTypeRef.current = null
     const finalPoint = pointFromEvent(event, event.currentTarget)
     const previousPoint = stroke.points[stroke.points.length - 1]
-    if (Math.abs(finalPoint.x - previousPoint.x) > 0.0001 || Math.abs(finalPoint.y - previousPoint.y) > 0.0001) {
-      stroke.points.push(finalPoint)
+    if (Math.abs(finalPoint.x - previousPoint.x) > 0.0001 || Math.abs(finalPoint.y - previousPoint.y) > 0.0001) stroke.points.push(finalPoint)
+
+    if (stroke.tool === 'eraser') {
+      eraseTouchedStrokes(stroke.points, event.currentTarget)
+      const original = eraserSnapshotRef.current || []
+      eraserSnapshotRef.current = null
+      if (original.length !== strokesRef.current.length) {
+        pastRef.current.push(original)
+        futureRef.current = []
+      }
+      syncHistoryState()
+      redraw()
+      return
     }
+
     if (stroke.points.length === 1) {
       const point = stroke.points[0]
-      stroke.points.push({ ...point, x: point.x + 0.0001 })
+      stroke.points.push({ ...point, x: point.x + 0.0001, t: point.t + 1 })
     }
     commit([...strokesRef.current, stroke])
     redraw()
+  }
+
+  const eraseTouchedStrokes = (eraserPoints, canvas) => {
+    const original = eraserSnapshotRef.current || strokesRef.current
+    const rect = canvas.getBoundingClientRect()
+    const radius = ERASER_SIZE * Math.min(rect.width, rect.height) / 620 / 2
+    strokesRef.current = original.filter(stroke => !stroke.points.some(point => eraserPoints.some(eraserPoint => {
+      const dx = (point.x - eraserPoint.x) * rect.width
+      const dy = (point.y - eraserPoint.y) * rect.height
+      return dx * dx + dy * dy <= radius * radius
+    })))
+    setStrokeCount(strokesRef.current.length)
   }
 
   const clearCanvas = () => {
@@ -167,36 +217,45 @@ export default function HandwritingPanel({ onClose, onInsert }) {
     requestAnimationFrame(redraw)
   }
 
+  const selectLanguage = nextLanguage => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage.id)
+    setLanguageId(nextLanguage.id)
+    setPhase('draw')
+    setRecognizedText('')
+    setError('')
+    requestAnimationFrame(redraw)
+  }
+
   const recognize = async () => {
-    if (!strokesRef.current.length || phase === 'recognizing') return
+    if (!strokesRef.current.length || phase === 'recognizing' || serviceStatus !== 'ready') return
+    const rect = canvasRef.current.getBoundingClientRect()
     setPhase('recognizing')
     setError('')
-    setProgress({ label: 'Pr\u00e9paration de l\u2019\u00e9criture', progress: 0.04 })
+    setProgress({ label: `Analyse cursive en ${language.label}`, progress: 0.08 })
+    clearInterval(progressTimerRef.current)
+    progressTimerRef.current = setInterval(() => {
+      setProgress(current => ({ ...current, progress: Math.min(0.86, current.progress + (0.86 - current.progress) * 0.12) }))
+    }, 180)
     try {
-      const image = exportInk(canvasRef.current, strokesRef.current)
-      const text = await recognizeHandwriting(image, update => {
-        if (mountedRef.current) setProgress(update)
+      const result = await api.recognizeHandwriting({
+        language: language.id,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        strokes: serializeStrokes(strokesRef.current, rect.width, rect.height),
       })
       if (!mountedRef.current) return
-      if (!text) {
-        setPhase('draw')
-        setError('Aucun texte reconnu. Essaie d\u2019\u00e9crire plus grand et de bien s\u00e9parer les mots.')
-        return
-      }
-      setRecognizedText(text)
+      clearInterval(progressTimerRef.current)
+      setProgress({ label: 'Texte reconnu', progress: 1 })
+      setRecognizedText(result.text)
       setPhase('review')
     } catch (recognitionError) {
       console.error('handwriting recognition:', recognitionError)
       if (!mountedRef.current) return
+      clearInterval(progressTimerRef.current)
       setPhase('draw')
-      setError('La reconnaissance locale n\u2019a pas pu d\u00e9marrer. Recharge la page puis r\u00e9essaie.')
+      setError(recognitionError.message || 'La reconnaissance manuscrite a échoué. Réessaie.')
+      if (recognitionError.code === 'handwriting_not_configured') setServiceStatus('missing')
     }
-  }
-
-  const insert = () => {
-    const text = recognizedText.trim()
-    if (!text) return
-    onInsert(text)
   }
 
   const selectTool = nextTool => {
@@ -207,6 +266,7 @@ export default function HandwritingPanel({ onClose, onInsert }) {
   }
 
   const morphWords = recognizedText.split(/(\s+)/).filter(Boolean)
+  const unavailable = serviceStatus !== 'ready'
 
   return (
     <div className="handwriting-backdrop" role="presentation" onMouseDown={event => {
@@ -218,51 +278,51 @@ export default function HandwritingPanel({ onClose, onInsert }) {
             <span className="handwriting-heading-icon"><Icon name="pen" size={19} /></span>
             <div>
               <h3 id="handwriting-title">Écriture au stylo</h3>
-              <p>Reconnaissance locale, gratuite et privée</p>
+              <p>Reconnaissance cursive MyScript · modèle {language.model}</p>
             </div>
           </div>
-          <button type="button" className="icon-btn handwriting-close" onClick={onClose} aria-label="Fermer">
-            <Icon name="close" size={19} />
-          </button>
+          <button type="button" className="icon-btn handwriting-close" onClick={onClose} aria-label="Fermer"><Icon name="close" size={19} /></button>
         </header>
 
-        <div className="handwriting-tools" aria-label="Outils de dessin">
-          <div className="handwriting-tool-group">
-            <button type="button" className={tool === 'pen' ? 'active' : ''} onClick={() => selectTool('pen')}>
-              <Icon name="pen" size={17} /> Stylo
-            </button>
-            <button type="button" className={tool === 'eraser' ? 'active' : ''} onClick={() => selectTool('eraser')}>
-              <Icon name="eraser" size={17} /> Gomme
-            </button>
-          </div>
-          <div className="handwriting-tool-group handwriting-history-tools">
-            <button type="button" onClick={undo} disabled={!historyState.past} title="Annuler (Ctrl+Z)">
-              <Icon name="undo" size={17} /> <span>Annuler</span>
-            </button>
-            <button type="button" onClick={redo} disabled={!historyState.future} title="Rétablir (Ctrl+Maj+Z)">
-              <Icon name="redo" size={17} /> <span>Rétablir</span>
-            </button>
-            <button type="button" onClick={clearCanvas} disabled={!strokeCount} className="handwriting-clear">
-              Tout effacer
-            </button>
+        <div className="handwriting-language-bar" aria-label="Langue de reconnaissance">
+          <span>J’écris en</span>
+          <div className="handwriting-languages">
+            {LANGUAGES.map(item => (
+              <button type="button" key={item.id} className={item.id === language.id ? 'active' : ''} aria-pressed={item.id === language.id} onClick={() => selectLanguage(item)} dir={item.direction}>
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className={`handwriting-paper ${phase === 'review' ? 'is-transforming' : ''}`}>
-          <canvas
-            ref={canvasRef}
-            className="handwriting-canvas"
-            onPointerDown={beginStroke}
-            onPointerMove={continueStroke}
-            onPointerUp={endStroke}
-            onPointerCancel={endStroke}
-            aria-label="Zone d’écriture manuscrite"
-          />
+        {serviceStatus === 'missing' && (
+          <div className="handwriting-setup" role="status">
+            <Icon name="ai" size={17} />
+            <span>Ajoute <code>MYSCRIPT_APPLICATION_KEY</code> et <code>MYSCRIPT_HMAC_KEY</code> dans le fichier <code>.env</code> du serveur pour activer la reconnaissance.</span>
+          </div>
+        )}
+        {serviceStatus === 'unavailable' && (
+          <div className="handwriting-setup is-error" role="alert"><Icon name="ai" size={17} /><span>Impossible de vérifier le service manuscrit. Vérifie la connexion au serveur.</span></div>
+        )}
+
+        <div className="handwriting-tools" aria-label="Outils de dessin">
+          <div className="handwriting-tool-group">
+            <button type="button" className={tool === 'pen' ? 'active' : ''} onClick={() => selectTool('pen')}><Icon name="pen" size={17} /> Stylo</button>
+            <button type="button" className={tool === 'eraser' ? 'active' : ''} onClick={() => selectTool('eraser')}><Icon name="eraser" size={17} /> Gomme</button>
+          </div>
+          <div className="handwriting-tool-group handwriting-history-tools">
+            <button type="button" onClick={undo} disabled={!historyState.past} title="Annuler (Ctrl+Z)"><Icon name="undo" size={17} /> <span>Annuler</span></button>
+            <button type="button" onClick={redo} disabled={!historyState.future} title="Rétablir (Ctrl+Maj+Z)"><Icon name="redo" size={17} /> <span>Rétablir</span></button>
+            <button type="button" onClick={clearCanvas} disabled={!strokeCount} className="handwriting-clear">Tout effacer</button>
+          </div>
+        </div>
+
+        <div className={`handwriting-paper ${phase === 'review' ? 'is-transforming' : ''} ${language.direction === 'rtl' ? 'is-rtl' : ''}`}>
+          <canvas ref={canvasRef} className="handwriting-canvas" onPointerDown={beginStroke} onPointerMove={continueStroke} onPointerUp={endStroke} onPointerCancel={endStroke} aria-label={`Zone d’écriture manuscrite en ${language.label}`} />
 
           {phase === 'recognizing' && (
             <div className="handwriting-recognizing" aria-live="polite">
-              <span className="handwriting-scan-line" />
-              <span className="handwriting-loader"><Icon name="ai" size={22} /></span>
+              <span className="handwriting-scan-line" /><span className="handwriting-loader"><Icon name="ai" size={22} /></span>
               <strong>{progress.label}</strong>
               <div className="handwriting-progress"><span style={{ width: `${Math.max(4, progress.progress * 100)}%` }} /></div>
               <small>{Math.round(progress.progress * 100)} %</small>
@@ -270,18 +330,16 @@ export default function HandwritingPanel({ onClose, onInsert }) {
           )}
 
           {phase === 'review' && (
-            <div className="handwriting-morph-text" aria-hidden="true">
-              {morphWords.map((word, index) => (
-                <span key={`${word}-${index}`} style={{ animationDelay: `${280 + Math.min(index, 18) * 34}ms` }}>{word}</span>
-              ))}
+            <div className="handwriting-morph-text" dir={language.direction} aria-hidden="true">
+              {morphWords.map((word, index) => <span key={`${word}-${index}`} style={{ animationDelay: `${280 + Math.min(index, 18) * 34}ms` }}>{word}</span>)}
             </div>
           )}
 
           {phase === 'draw' && !strokeCount && (
-            <div className="handwriting-empty" aria-hidden="true">
+            <div className="handwriting-empty" aria-hidden="true" dir={language.direction}>
               <Icon name="pen" size={25} />
-              <strong>Écris naturellement ici</strong>
-              <span>Une ou deux lignes à la fois donnent le meilleur résultat.</span>
+              <strong>{language.id === 'ar' ? 'اكتب بشكل طبيعي هنا' : 'Écris naturellement ici'}</strong>
+              <span>{language.id === 'ar' ? 'سطر أو سطران في كل مرة يعطيان نتيجة أفضل.' : 'Une ou deux lignes à la fois donnent le meilleur résultat.'}</span>
             </div>
           )}
         </div>
@@ -290,36 +348,21 @@ export default function HandwritingPanel({ onClose, onInsert }) {
 
         {phase === 'review' && (
           <div className="handwriting-result">
-            <div className="handwriting-result-head">
-              <label htmlFor="handwriting-result-text">Texte reconnu</label>
-              <span>Tu peux le corriger avant de l’insérer.</span>
-            </div>
-            <textarea
-              id="handwriting-result-text"
-              value={recognizedText}
-              onChange={event => setRecognizedText(event.target.value)}
-              autoFocus
-              spellCheck
-            />
+            <div className="handwriting-result-head"><label htmlFor="handwriting-result-text">Texte reconnu</label><span>Tu peux le corriger avant de l’insérer.</span></div>
+            <textarea id="handwriting-result-text" value={recognizedText} onChange={event => setRecognizedText(event.target.value)} autoFocus spellCheck dir={language.direction} />
           </div>
         )}
 
         <footer className="handwriting-footer">
-          <span className="handwriting-tip">
-            <Icon name="check" size={15} /> Traits foncés, lettres assez grandes, peu de lignes
-          </span>
+          <span className="handwriting-tip"><Icon name="ai" size={15} /> Les traits sont envoyés à MyScript ; le contenu de la note ne l’est pas.</span>
           <div className="handwriting-actions">
-            {phase === 'review' && (
-              <button type="button" className="btn-ghost" onClick={() => setPhase('draw')}>Reprendre le stylo</button>
-            )}
+            {phase === 'review' && <button type="button" className="btn-ghost" onClick={() => setPhase('draw')}>Reprendre le stylo</button>}
             {phase !== 'review' ? (
-              <button type="button" className="btn-primary handwriting-convert" onClick={recognize} disabled={!strokeCount || phase === 'recognizing'}>
-                <Icon name="ai" size={17} /> {phase === 'recognizing' ? 'Conversion\u2026' : 'Transformer en texte'}
+              <button type="button" className="btn-primary handwriting-convert" onClick={recognize} disabled={!strokeCount || phase === 'recognizing' || unavailable}>
+                <Icon name="ai" size={17} /> {phase === 'recognizing' ? 'Conversion…' : serviceStatus === 'checking' ? 'Vérification…' : 'Transformer en texte'}
               </button>
             ) : (
-              <button type="button" className="btn-primary handwriting-insert" onClick={insert} disabled={!recognizedText.trim()}>
-                <Icon name="check" size={17} /> Insérer dans la note
-              </button>
+              <button type="button" className="btn-primary handwriting-insert" onClick={() => recognizedText.trim() && onInsert(recognizedText.trim())} disabled={!recognizedText.trim()}><Icon name="check" size={17} /> Insérer dans la note</button>
             )}
           </div>
         </footer>
@@ -334,7 +377,22 @@ function pointFromEvent(event, element) {
     x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
     y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
     pressure: event.pressure > 0 ? event.pressure : 0.5,
+    t: Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now(),
   }
+}
+
+function serializeStrokes(strokes, width, height) {
+  const firstTime = Math.min(...strokes.flatMap(stroke => stroke.points.map(point => point.t)))
+  return strokes.map(stroke => ({
+    x: stroke.points.map(point => roundCoordinate(point.x * width, width)),
+    y: stroke.points.map(point => roundCoordinate(point.y * height, height)),
+    t: stroke.points.map(point => Math.max(0, Math.round(point.t - firstTime))),
+    p: stroke.points.map(point => Math.min(0.99, Math.max(0.01, Number(point.pressure) || 0.5))),
+  }))
+}
+
+function roundCoordinate(value, maximum) {
+  return Math.min(maximum, Math.max(0, Math.round(value * 100) / 100))
 }
 
 function drawStrokes(context, strokes, width, height) {
@@ -346,7 +404,6 @@ function drawStroke(context, stroke, width, height) {
   if (!points?.length) return
   const scale = Math.min(width, height) / 620
   context.save()
-  context.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over'
   context.strokeStyle = '#172033'
   context.fillStyle = '#172033'
   context.lineCap = 'round'
@@ -354,7 +411,7 @@ function drawStroke(context, stroke, width, height) {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1]
     const current = points[index]
-    const pressure = stroke.tool === 'eraser' ? 1 : Math.max(0.72, (previous.pressure + current.pressure) / 2)
+    const pressure = Math.max(0.72, (previous.pressure + current.pressure) / 2)
     context.lineWidth = stroke.size * scale * pressure
     context.beginPath()
     context.moveTo(previous.x * width, previous.y * height)
@@ -362,61 +419,4 @@ function drawStroke(context, stroke, width, height) {
     context.stroke()
   }
   context.restore()
-}
-
-function exportInk(canvas, strokes) {
-  const rect = canvas.getBoundingClientRect()
-  const width = Math.round(Math.min(2200, Math.max(1200, rect.width * 2.4)))
-  const height = Math.round(width * (rect.height / Math.max(rect.width, 1)))
-  const inkCanvas = document.createElement('canvas')
-  inkCanvas.width = width
-  inkCanvas.height = height
-  const inkContext = inkCanvas.getContext('2d', { willReadFrequently: true })
-  inkContext.clearRect(0, 0, width, height)
-  drawStrokes(inkContext, strokes, width, height)
-
-  const pixels = inkContext.getImageData(0, 0, width, height).data
-  let minX = width
-  let minY = height
-  let maxX = 0
-  let maxY = 0
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (pixels[(y * width + x) * 4 + 3] > 24) {
-        if (x < minX) minX = x
-        if (x > maxX) maxX = x
-        if (y < minY) minY = y
-        if (y > maxY) maxY = y
-      }
-    }
-  }
-  if (minX > maxX || minY > maxY) throw new Error('empty handwriting')
-
-  const padding = 56
-  const cropWidth = maxX - minX + 1
-  const cropHeight = maxY - minY + 1
-  const output = document.createElement('canvas')
-  output.width = cropWidth + padding * 2
-  output.height = cropHeight + padding * 2
-  const outputContext = output.getContext('2d')
-  outputContext.fillStyle = '#ffffff'
-  outputContext.fillRect(0, 0, output.width, output.height)
-  // Les traits de stylet peuvent etre tres fins. Quelques decalages opaques
-  // les epaississent uniquement pour l'OCR, sans modifier le dessin affiche.
-  for (let offsetY = -2; offsetY <= 2; offsetY += 1) {
-    for (let offsetX = -2; offsetX <= 2; offsetX += 1) {
-      outputContext.drawImage(
-        inkCanvas,
-        minX,
-        minY,
-        cropWidth,
-        cropHeight,
-        padding + offsetX,
-        padding + offsetY,
-        cropWidth,
-        cropHeight,
-      )
-    }
-  }
-  return output.toDataURL('image/png')
 }

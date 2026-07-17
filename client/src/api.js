@@ -13,6 +13,7 @@ async function req(method, path, body, isFormData = false) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     const e = new Error(err.error || res.statusText)
     e.status = res.status
+    e.code = err.code || null
     throw e
   }
   return res.json()
@@ -61,6 +62,10 @@ export const uploadVoice = (file_id, audioBlob, duration, title) => {
   return req('POST', '/voice', fd, true)
 }
 export const deleteVoice = id => req('DELETE', `/voice/${id}`)
+
+// Reconnaissance manuscrite
+export const getHandwritingStatus = () => req('GET', '/handwriting/status')
+export const recognizeHandwriting = data => req('POST', '/handwriting/recognize', data)
 
 // Inbox — Resources
 export const getResources = (status, type) => {

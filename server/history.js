@@ -105,6 +105,7 @@ function shouldCaptureRequest(req) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return false
   if (req.path.startsWith('/history')) return false
   if (req.path.startsWith('/auth')) return false
+  if (req.path.startsWith('/handwriting')) return false
   return true
 }
 

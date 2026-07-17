@@ -32,7 +32,7 @@ const SECTIONS = [
       {
         icon: 'pen',
         title: 'Écrire au stylo',
-        text: "En mode Éditer, ouvre Stylo pour écrire au stylet ou au doigt. Tu peux gommer, annuler, faire reconnaître le français localement puis corriger le texte avant de l'insérer à l'emplacement du curseur. Le moteur est gratuit, privé et ne contacte aucune API.",
+        text: "En mode Éditer, ouvre Stylo pour écrire au stylet ou au doigt. Choisis Français, English ou العربية : ce bouton change le modèle de reconnaissance cursive MyScript. Tu peux gommer, annuler, corriger le résultat puis l'insérer au curseur. Les traits sont envoyés à MyScript, jamais le contenu de ta note. L'offre gratuite couvre 2 000 reconnaissances.",
       },
       {
         icon: 'edit',
