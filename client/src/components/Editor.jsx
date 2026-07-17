@@ -13,6 +13,8 @@ import { isDefinitionsFile } from '../utils/definitionsFile'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
+const LOCAL_HISTORY_LIMIT = 250
+const TYPING_GROUP_DELAY = 700
 
 function initialMode() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'preview'
@@ -37,6 +39,10 @@ export default function Editor() {
   const handwritingAnchorRef = useRef(0)
   const previewTimerRef = useRef(null)
   const wordCountTimerRef = useRef(null)
+  const undoStackRef = useRef([])
+  const redoStackRef = useRef([])
+  const historyGroupRef = useRef({ type: null, at: 0 })
+  const selectionRef = useRef({ start: 0, end: 0 })
 
   // Always-fresh refs — safe to use inside useCallback without deps
   const contentRef = useRef(content)
@@ -91,6 +97,10 @@ export default function Editor() {
     setContent(newContent)
     setPreviewContent(newContent)
     setIsDirty(false)
+    undoStackRef.current = []
+    redoStackRef.current = []
+    historyGroupRef.current = { type: null, at: 0 }
+    selectionRef.current = { start: 0, end: 0 }
     // Annule tout autosave en attente : évite qu'une frappe non sauvegardée
     // ré-écrase le contenu qu'on vient de restaurer.
     clearTimeout(saveTimerRef.current)
@@ -113,30 +123,85 @@ export default function Editor() {
     return () => clearTimeout(previewTimerRef.current)
   }, [content])
 
-  // Wire up "Insert into note" for AI panel
+  const rememberLocalChange = useCallback((groupType = null) => {
+    const now = Date.now()
+    const previousGroup = historyGroupRef.current
+    const grouped = groupType && previousGroup.type === groupType && now - previousGroup.at <= TYPING_GROUP_DELAY
+
+    if (!grouped) {
+      undoStackRef.current.push({
+        content: contentRef.current,
+        start: selectionRef.current.start,
+        end: selectionRef.current.end,
+      })
+      if (undoStackRef.current.length > LOCAL_HISTORY_LIMIT) undoStackRef.current.shift()
+    }
+    redoStackRef.current = []
+    historyGroupRef.current = { type: groupType, at: now }
+  }, [])
+
+  const applyLocalHistory = useCallback((direction) => {
+    const source = direction === 'redo' ? redoStackRef.current : undoStackRef.current
+    const destination = direction === 'redo' ? undoStackRef.current : redoStackRef.current
+    const target = source.pop()
+    if (!target) return false
+
+    destination.push({
+      content: contentRef.current,
+      start: textareaRef.current?.selectionStart ?? selectionRef.current.start,
+      end: textareaRef.current?.selectionEnd ?? selectionRef.current.end,
+    })
+    if (destination.length > LOCAL_HISTORY_LIMIT) destination.shift()
+
+    historyGroupRef.current = { type: null, at: 0 }
+    contentRef.current = target.content
+    selectionRef.current = { start: target.start, end: target.end }
+    setContent(target.content)
+    setIsDirty(true)
+    triggerSave(target.content)
+    setTimeout(() => {
+      const textarea = textareaRef.current
+      textarea?.setSelectionRange(target.start, target.end)
+      textarea?.focus()
+    }, 0)
+    return true
+  }, [triggerSave])
+
+  const requestHistory = useCallback((direction) => {
+    if (applyLocalHistory(direction)) return
+    window.dispatchEvent(new CustomEvent('app-history-command', { detail: { direction } }))
+  }, [applyLocalHistory])
+
   useEffect(() => {
     insertRef.current = (text) => {
-      const ta = textareaRef.current
-      if (!ta) return
-      const pos = ta.selectionStart
-      setContent(prev => {
-        const newContent = prev.slice(0, pos) + '\n\n' + text + '\n\n' + prev.slice(pos)
-        triggerSave(newContent)
-        return newContent
-      })
+      const textarea = textareaRef.current
+      if (!textarea) return
+      const position = textarea.selectionStart
+      const current = contentRef.current
+      const next = current.slice(0, position) + '\n\n' + text + '\n\n' + current.slice(position)
+      rememberLocalChange()
+      contentRef.current = next
+      setContent(next)
       setIsDirty(true)
-      ta.focus()
+      triggerSave(next)
+      textarea.focus()
     }
     return () => { insertRef.current = null }
-  }, [insertRef, triggerSave])
+  }, [insertRef, rememberLocalChange, triggerSave])
 
   const handleChange = useCallback((e) => {
     const value = e.target.value
+    if (value === contentRef.current) return
+    const inputType = e.nativeEvent?.inputType || ''
+    const typing = inputType.startsWith('insertText') || inputType.startsWith('deleteContent') || inputType === 'insertCompositionText'
+    rememberLocalChange(typing ? 'typing' : null)
+    selectionRef.current = { start: e.target.selectionStart, end: e.target.selectionEnd }
+    contentRef.current = value
     setContent(value)
     setIsDirty(true)
     triggerSave(value)
     checkWikiLink(e.target)
-  }, [triggerSave])
+  }, [rememberLocalChange, triggerSave])
 
   function checkWikiLink(ta) {
     const pos = ta.selectionStart
@@ -162,6 +227,8 @@ export default function Editor() {
     const cur = contentRef.current
     const name = fileName.replace(/\.md$/i, '')
     const newValue = cur.slice(0, wq.openPos) + `[[${name}]]` + cur.slice(pos)
+    rememberLocalChange()
+    contentRef.current = newValue
     setContent(newValue)
     setIsDirty(true)
     triggerSave(newValue)
@@ -182,6 +249,8 @@ export default function Editor() {
     const end = ta.selectionEnd
     const sel = cur.slice(start, end)
     const newContent = cur.slice(0, start) + before + sel + after + cur.slice(end)
+    rememberLocalChange()
+    contentRef.current = newContent
     setContent(newContent)
     setIsDirty(true)
     triggerSave(newContent)
@@ -189,7 +258,7 @@ export default function Editor() {
       ta.setSelectionRange(start + before.length, start + before.length + sel.length)
       ta.focus()
     }, 0)
-  }, [triggerSave])
+  }, [rememberLocalChange, triggerSave])
 
   // Image paste → WebP base64
   const handlePaste = useCallback(async (e) => {
@@ -211,13 +280,28 @@ export default function Editor() {
     const pos = ta.selectionStart
     const cur = contentRef.current
     const newContent = cur.slice(0, pos) + imgMarkdown + cur.slice(pos)
+    rememberLocalChange()
+    contentRef.current = newContent
     setContent(newContent)
     setIsDirty(true)
     triggerSave(newContent)
-  }, [triggerSave])
+  }, [rememberLocalChange, triggerSave])
 
   // Key shortcuts — stable, reads from refs (no stale closures)
   const handleKeyDown = useCallback((e) => {
+    const key = (e.key || '').toLowerCase()
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      if (key === 'z') {
+        e.preventDefault()
+        requestHistory(e.shiftKey ? 'redo' : 'undo')
+        return
+      }
+      if (key === 'y' && !e.shiftKey) {
+        e.preventDefault()
+        requestHistory('redo')
+        return
+      }
+    }
     if (e.key === 'Escape' && wikiQueryRef.current) {
       setWikiQuery(null)
       return
@@ -228,6 +312,8 @@ export default function Editor() {
       const start = ta.selectionStart
       const cur = contentRef.current
       const newContent = cur.slice(0, start) + '  ' + cur.slice(start)
+      rememberLocalChange()
+      contentRef.current = newContent
       setContent(newContent)
       setIsDirty(true)
       triggerSave(newContent)
@@ -240,7 +326,7 @@ export default function Editor() {
       fn(fid, contentRef.current)
       setIsDirty(false)
     }
-  }, [triggerSave])
+  }, [rememberLocalChange, requestHistory, triggerSave])
 
   const filteredFiles = wikiQuery
     ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
@@ -263,6 +349,8 @@ export default function Editor() {
     const inserted = `${prefix}${text.trim()}${suffix}`
     const newContent = before + inserted + after
     const nextPosition = position + inserted.length
+    rememberLocalChange()
+    contentRef.current = newContent
     setContent(newContent)
     setIsDirty(true)
     triggerSave(newContent)
@@ -272,7 +360,7 @@ export default function Editor() {
       textarea?.setSelectionRange(nextPosition, nextPosition)
       textarea?.focus()
     }, 0)
-  }, [triggerSave])
+  }, [rememberLocalChange, triggerSave])
 
   if (!currentFile) return null
   if (isGraphFile(currentFile)) return <GraphEditor />
@@ -302,6 +390,8 @@ export default function Editor() {
           format={format}
           onHandwriting={openHandwriting}
           handwritingOpen={handwritingOpen}
+          onUndo={() => requestHistory('undo')}
+          onRedo={() => requestHistory('redo')}
         />
       )}
 
@@ -315,6 +405,12 @@ export default function Editor() {
               onChange={handleChange}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
+              onSelect={event => {
+                selectionRef.current = {
+                  start: event.currentTarget.selectionStart,
+                  end: event.currentTarget.selectionEnd,
+                }
+              }}
               spellCheck
               autoComplete="off"
               placeholder="Commence à écrire… (supporte Markdown et [[liens]])"

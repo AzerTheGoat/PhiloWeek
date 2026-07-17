@@ -269,7 +269,7 @@ export default function HandwritingPanel({ onClose, onInsert }) {
   const unavailable = serviceStatus !== 'ready'
 
   return (
-    <div className="handwriting-backdrop" role="presentation" onMouseDown={event => {
+    <div className="handwriting-backdrop" data-local-history role="presentation" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose()
     }}>
       <section className="handwriting-panel" role="dialog" aria-modal="true" aria-labelledby="handwriting-title">

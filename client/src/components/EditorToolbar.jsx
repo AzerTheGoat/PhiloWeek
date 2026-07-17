@@ -1,6 +1,6 @@
 import Icon from './Icons'
 
-export default function EditorToolbar({ format, onHandwriting, handwritingOpen = false }) {
+export default function EditorToolbar({ format, onHandwriting, handwritingOpen = false, onUndo, onRedo }) {
   const btn = (label, before, after = before, title) => (
     <button
       key={label}
@@ -14,6 +14,15 @@ export default function EditorToolbar({ format, onHandwriting, handwritingOpen =
 
   return (
     <div className="editor-toolbar">
+      <div className="toolbar-group">
+        <button type="button" className="toolbar-btn" title="Annuler (Ctrl+Z)" onMouseDown={event => { event.preventDefault(); onUndo?.() }}>
+          <Icon name="undo" size={16} />
+        </button>
+        <button type="button" className="toolbar-btn" title="Retablir (Ctrl+Maj+Z)" onMouseDown={event => { event.preventDefault(); onRedo?.() }}>
+          <Icon name="redo" size={16} />
+        </button>
+      </div>
+      <div className="toolbar-sep" />
       <div className="toolbar-group">
         <button
           type="button"

@@ -378,6 +378,14 @@ const MIGRATIONS = [
         ON article_reads(article_id);
     `)
   },
+  // v10 -> v11 : piles separees pour annuler et retablir les actions
+  (db) => {
+    addColumnIfMissing(db, 'app_snapshots', 'stack', "TEXT NOT NULL DEFAULT 'undo' CHECK(stack IN ('undo', 'redo'))")
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_app_snapshots_user_stack_created
+        ON app_snapshots(user_id, stack, created_at);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

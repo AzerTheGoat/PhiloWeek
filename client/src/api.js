@@ -148,7 +148,10 @@ export const createArticleComment = (id, body) => req('POST', `/social-journal/a
 export const deleteArticleComment = id => req('DELETE', `/social-journal/comments/${id}`)
 
 // History
-export const rollbackHistory = (confirm = false) => req('POST', '/history/rollback', { confirm })
+export const undoHistory = (confirm = false) => req('POST', '/history/undo', { confirm })
+export const redoHistory = (confirm = false) => req('POST', '/history/redo', { confirm })
+// Kept for older callers while the new undo/redo API rolls out.
+export const rollbackHistory = undoHistory
 
 // Timer
 export const getTimerSessions = file_id =>

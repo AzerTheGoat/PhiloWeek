@@ -2,10 +2,6 @@ const { v4: uuidv4 } = require('uuid')
 const { getDb, updateAllLinks } = require('./db')
 
 const ONE_SECOND = 1000
-// Intervalle minimum entre deux snapshots d'un même utilisateur (dédoublonne
-// les rafales d'autosave). Gardé à 1 s : au-delà, plusieurs actions distinctes
-// fusionnent dans un seul snapshot et l'undo « saute » trop loin.
-const MIN_SNAPSHOT_INTERVAL = ONE_SECOND
 const ONE_MINUTE = 60 * ONE_SECOND
 const FIVE_MINUTES = 5 * ONE_MINUTE
 const ONE_HOUR = 60 * ONE_MINUTE
@@ -28,6 +24,7 @@ const USER_TABLES = [
   'articles',
   'article_comments',
   'article_reactions',
+  'article_reads',
 ]
 
 const RELATION_TABLES = [
@@ -56,6 +53,7 @@ const DELETE_ORDER = [
   'timer_sessions',
   'questionnaire_results',
   'historical_events',
+  'article_reads',
   'article_reactions',
   'article_comments',
   'articles',
@@ -89,15 +87,30 @@ const INSERT_ORDER = [
   'articles',
   'article_comments',
   'article_reactions',
+  'article_reads',
 ]
 
 function historyCaptureMiddleware(req, res, next) {
   if (!req.user?.id || !shouldCaptureRequest(req)) return next()
+  const db = getDb()
+  const userId = req.user.id
+  const reason = `${req.method} ${req.originalUrl}`
+  let before
   try {
-    maybeCreateSnapshot(getDb(), req.user.id, `${req.method} ${req.originalUrl}`)
+    before = collectSnapshot(db, userId)
   } catch (err) {
     console.error('History snapshot failed:', err.message)
+    return next()
   }
+
+  res.once('finish', () => {
+    if (res.statusCode < 200 || res.statusCode >= 400) return
+    try {
+      recordMutationSnapshot(db, userId, reason, before)
+    } catch (err) {
+      console.error('History snapshot failed:', err.message)
+    }
+  })
   next()
 }
 
@@ -110,35 +123,46 @@ function shouldCaptureRequest(req) {
 }
 
 function maybeCreateSnapshot(db, userId, reason = 'mutation') {
-  const now = Date.now()
-  const latest = db.prepare(`
-    SELECT created_at FROM app_snapshots
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-    LIMIT 1
-  `).get(userId)
-  if (latest && now - Date.parse(latest.created_at) < MIN_SNAPSHOT_INTERVAL) return null
-
   const data = collectSnapshot(db, userId)
+  return insertSnapshot(db, userId, reason, data, 'undo', { clearRedo: true })
+}
+
+function recordMutationSnapshot(db, userId, reason, before) {
+  const current = collectSnapshot(db, userId)
+  if (stableJson(current) === stableJson(before)) return null
+  return insertSnapshot(db, userId, reason, before, 'undo', { clearRedo: true })
+}
+
+function insertSnapshot(db, userId, reason, data, stack, { clearRedo = false } = {}) {
+  const now = Date.now()
   const id = uuidv4()
   const createdAt = new Date(now).toISOString()
+  if (clearRedo) {
+    db.prepare("DELETE FROM app_snapshots WHERE user_id = ? AND stack = 'redo'").run(userId)
+  }
   db.prepare(`
-    INSERT INTO app_snapshots (id, user_id, created_at, reason, data_json)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, userId, createdAt, reason, JSON.stringify(data))
+    INSERT INTO app_snapshots (id, user_id, created_at, reason, data_json, stack)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, userId, createdAt, reason, JSON.stringify(data), stack)
   pruneSnapshots(db, userId, now)
   return { id, created_at: createdAt }
 }
 
-function rollbackLatestSnapshot(db, userId, { confirm = false } = {}) {
+function restoreLatestSnapshot(db, userId, direction, { confirm = false } = {}) {
+  const sourceStack = direction === 'redo' ? 'redo' : 'undo'
+  const destinationStack = direction === 'redo' ? 'undo' : 'redo'
   const row = db.prepare(`
     SELECT * FROM app_snapshots
-    WHERE user_id = ?
-    ORDER BY created_at DESC
+    WHERE user_id = ? AND stack = ?
+    ORDER BY created_at DESC, rowid DESC
     LIMIT 1
-  `).get(userId)
+  `).get(userId, sourceStack)
   if (!row) {
-    return { ok: false, status: 404, error: 'Aucun retour en arriere disponible.' }
+    return {
+      ok: false,
+      status: 404,
+      error: direction === 'redo' ? 'Aucune action a retablir.' : 'Aucune action a annuler.',
+    }
   }
 
   const target = parseSnapshot(row.data_json)
@@ -156,18 +180,28 @@ function rollbackLatestSnapshot(db, userId, { confirm = false } = {}) {
   }
 
   const tx = db.transaction(() => {
+    insertSnapshot(db, userId, row.reason || direction, current, destinationStack)
     restoreSnapshot(db, userId, target)
-    db.prepare('DELETE FROM app_snapshots WHERE user_id = ? AND created_at >= ?').run(userId, row.created_at)
+    db.prepare('DELETE FROM app_snapshots WHERE id = ? AND user_id = ?').run(row.id, userId)
   })
   tx()
 
   return {
     ok: true,
+    direction,
     restored_at: row.created_at,
     files_changed: fileChange.changed,
     focus_file_id: fileChange.focusFileId,
     requires_confirmation: fileChange.requiresConfirmation,
   }
+}
+
+function rollbackLatestSnapshot(db, userId, options = {}) {
+  return restoreLatestSnapshot(db, userId, 'undo', options)
+}
+
+function redoLatestSnapshot(db, userId, options = {}) {
+  return restoreLatestSnapshot(db, userId, 'redo', options)
 }
 
 function collectSnapshot(db, userId) {
@@ -345,5 +379,6 @@ module.exports = {
   historyCaptureMiddleware,
   maybeCreateSnapshot,
   rollbackLatestSnapshot,
+  redoLatestSnapshot,
   collectSnapshot,
 }

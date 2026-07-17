@@ -91,8 +91,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       const insertHistorySnapshot = db.prepare(
-        `INSERT OR IGNORE INTO app_snapshots (id, user_id, created_at, reason, data_json)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT OR IGNORE INTO app_snapshots (id, user_id, created_at, reason, data_json, stack)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
       const insertHistoricalEvent = db.prepare(
         `INSERT OR IGNORE INTO historical_events (
@@ -160,7 +160,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 req.user.id,
                 normalizeIsoDate(snapshot.created_at) || new Date().toISOString(),
                 snapshot.reason || 'import',
-                snapshot.data_json
+                snapshot.data_json,
+                snapshot.stack === 'redo' ? 'redo' : 'undo'
               )
               report.imported++
             }

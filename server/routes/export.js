@@ -181,7 +181,7 @@ router.get('/obsidian', async (req, res) => {
   }
 
   const historySnapshots = db.prepare(`
-    SELECT id, created_at, reason, data_json
+    SELECT id, created_at, reason, data_json, stack
     FROM app_snapshots
     WHERE user_id = ?
     ORDER BY created_at DESC
