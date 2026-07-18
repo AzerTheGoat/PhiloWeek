@@ -77,7 +77,7 @@ export default function Trash() {
               <article className="trash-item" key={item.id}>
                 <span className="trash-item-icon"><Icon name={item.type === 'file' ? 'file' : 'folder'} size={19} /></span>
                 <div className="trash-item-info">
-                  <strong>{item.name.replace(/\.(md|json)$/i, '')}</strong>
+                  <strong>{item.name.replace(/\.(md|json|xlsx)$/i, '')}</strong>
                   <span>
                     Supprimé {formatDeletedDate(item.deleted_at)} · encore {remainingDays(item.deleted_at)} jour(s)
                     {count > 0 ? ` · ${count} élément(s) à l’intérieur` : ''}

@@ -131,6 +131,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           canEdit && !isLocked && { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '?', label: 'Nouveau questionnaire ici', action: () => showModal('new-questionnaire', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: 'abc', label: 'Nouvelles definitions ici', action: () => showModal('new-definitions', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: '▦', label: 'Nouveau tableur Excel ici', action: () => showModal('new-spreadsheet', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
           canEdit && !isLocked && isOwner && { separator: true },
           isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
@@ -145,6 +146,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           isOwner && { icon: 'graph', label: 'Nouveau graphe a cote', action: () => showModal('new-graph', { parent_id: node.parent_id || null }) },
           isOwner && { icon: '?', label: 'Nouveau questionnaire a cote', action: () => showModal('new-questionnaire', { parent_id: node.parent_id || null }) },
           isOwner && { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
+          isOwner && { icon: '▦', label: 'Nouveau tableur Excel a cote', action: () => showModal('new-spreadsheet', { parent_id: node.parent_id || null }) },
           isOwner && { separator: true },
           isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
           isOwner && { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
@@ -193,7 +195,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     setPassword('')
   }, [node.id, password, loadTree, toast])
 
-  const icon = isLocked ? '🔒' : isFolder ? (expanded ? '▾' : '▸') : '📄'
+  const icon = isLocked ? '🔒' : isFolder ? (expanded ? '▾' : '▸') : /\.xlsx$/i.test(node.name || '') ? '▦' : '📄'
 
   return (
     <li className={`file-node ${isActive ? 'active' : ''}`}>
@@ -226,7 +228,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           title={node.name}
         >
           <span className="file-icon">{icon}</span>
-          <span className="file-name">{node.name.replace(/\.(md|json)$/i, '')}</span>
+          <span className="file-name">{node.name.replace(/\.(md|json|xlsx)$/i, '')}</span>
           {node.shared_root && <span className="file-shared-badge" title={`Partagé par ${node.owner_username}`}>☁</span>}
         </div>
       )}

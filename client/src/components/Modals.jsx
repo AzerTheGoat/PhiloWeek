@@ -3,8 +3,10 @@ import { useApp } from '../context/useApp'
 import { createGraphMarkdown } from '../utils/graphFile'
 import { createQuestionnaireJson } from '../utils/questionnaireFile'
 import { createDefinitionsJson } from '../utils/definitionsFile'
+import { createSpreadsheetJson } from '../utils/spreadsheetFile'
 import * as api from '../api'
 import ShareModal from './ShareModal'
+import Icon from './Icons'
 
 function shouldAutoFocus() {
   return true
@@ -31,10 +33,85 @@ export default function Modals() {
       {modal.type === 'new-graph' && <NewGraphModal {...props} />}
       {modal.type === 'new-questionnaire' && <NewQuestionnaireModal {...props} />}
       {modal.type === 'new-definitions' && <NewDefinitionsModal {...props} />}
+      {modal.type === 'new-spreadsheet' && <NewSpreadsheetModal {...props} />}
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
       {modal.type === 'account' && <AccountModal {...props} />}
       {modal.type === 'share-file' && <ShareModal {...props} />}
+    </div>
+  )
+}
+
+function NewSpreadsheetModal({ modal, hideModal }) {
+  const { loadTree, openFile, toast } = useApp()
+  const [name, setName] = useState('')
+  const [importFile, setImportFile] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if ((!name.trim() && !importFile) || submitting) return
+    setSubmitting(true)
+    try {
+      let file
+      if (importFile) {
+        file = await api.importSpreadsheet(importFile, modal.data?.parent_id || null)
+      } else {
+        const baseName = name.trim().replace(/\.xlsx$/i, '')
+        file = await api.createFile({
+          parent_id: modal.data?.parent_id || null,
+          name: `${baseName}.xlsx`,
+          type: 'file',
+          content: createSpreadsheetJson(baseName),
+        })
+      }
+      await loadTree()
+      await openFile(file.id)
+      hideModal()
+      toast(importFile ? `Classeur « ${file.name} » importé` : `Classeur « ${file.name} » créé`)
+    } catch (err) {
+      toast(err.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal spreadsheet-create-modal">
+      <div className="modal-header">
+        <h3>Nouveau tableur Excel</h3>
+        <button className="icon-btn" onClick={hideModal}>×</button>
+      </div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <input
+          ref={inputRef}
+          autoFocus={shouldAutoFocus()}
+          type="text"
+          placeholder="Nom du classeur"
+          value={name}
+          onChange={event => setName(event.target.value)}
+          className="modal-input"
+          disabled={Boolean(importFile)}
+        />
+        <div className="spreadsheet-import-divider"><span>ou</span></div>
+        <label className="spreadsheet-import-picker">
+          <Icon name="upload" size={18} />
+          <span>{importFile ? importFile.name : 'Importer un classeur .xlsx existant'}</span>
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={event => setImportFile(event.target.files?.[0] || null)}
+          />
+        </label>
+        {importFile && <button type="button" className="btn-ghost" onClick={() => setImportFile(null)}>Retirer le fichier</button>}
+        <p className="modal-hint">Le tableur prend en charge plusieurs feuilles, les formules, la mise en forme, l’historique et le partage cloud.</p>
+        <div className="modal-actions">
+          <button type="submit" className="btn-primary" disabled={(!name.trim() && !importFile) || submitting}>
+            {submitting ? 'Préparation…' : importFile ? 'Importer' : 'Créer'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
+        </div>
+      </form>
     </div>
   )
 }

@@ -107,7 +107,7 @@ export default function Timer() {
 
       {currentFile && (
         <div className="timer-context">
-          Fichier actif : <strong>{currentFile.name.replace(/\.md$/i, '')}</strong>
+          Fichier actif : <strong>{currentFile.name.replace(/\.(md|json|xlsx)$/i, '')}</strong>
         </div>
       )}
 

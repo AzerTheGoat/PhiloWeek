@@ -76,7 +76,7 @@ router.post('/copy', (req, res) => {
   const parts = ordered.map(file => {
     const parsed = parseFile(file)
     const body = parsed.body.trim()
-    const title = parsed.title || file.name.replace(/\.(md|json)$/i, '')
+    const title = parsed.title || file.name.replace(/\.(md|json|xlsx)$/i, '')
     const path = paths[file.id] || file.name
     const modDate = new Date(file.updated_at || file.created_at).toLocaleDateString('fr-FR', {
       day: 'numeric',
@@ -262,6 +262,18 @@ function buildPaths(db, userId) {
 
 function parseFile(file) {
   const content = file.content || ''
+  if (/\.xlsx$/i.test(file.name || '')) {
+    try {
+      const spreadsheet = JSON.parse(content)
+      return {
+        title: spreadsheet.title || file.name.replace(/\.xlsx$/i, ''),
+        tags: [],
+        body: formatSpreadsheetBody(spreadsheet),
+      }
+    } catch (_) {
+      return { title: file.name.replace(/\.xlsx$/i, ''), tags: [], body: '' }
+    }
+  }
   if (/\.json$/i.test(file.name || '')) {
     const q = parseQuestionnaire(content)
     return {
@@ -288,6 +300,7 @@ function parseFile(file) {
 }
 
 function getFileKind(file, parsed) {
+  if (/\.xlsx$/i.test(file.name || '')) return 'spreadsheet'
   if (/\.json$/i.test(file.name || '')) return 'questionnaire'
   try {
     const data = matter(file.content || '').data
@@ -295,6 +308,16 @@ function getFileKind(file, parsed) {
   } catch (_) {}
   if ((parsed.tags || []).includes('journal') || /^\d{4}-\d{2}-\d{2}\.md$/i.test(file.name || '')) return 'journal'
   return 'note'
+}
+
+function formatSpreadsheetBody(spreadsheet) {
+  const sections = []
+  for (const sheet of Array.isArray(spreadsheet?.sheets) ? spreadsheet.sheets : []) {
+    const entries = Object.entries(sheet.cells || {}).filter(([, cell]) => cell?.input !== '' && cell?.input !== null && cell?.input !== undefined).slice(0, 300)
+    if (!entries.length) continue
+    sections.push(`## ${sheet.name || 'Feuille'}\n${entries.map(([address, cell]) => `${address}: ${String(cell.input)}`).join('\n')}`)
+  }
+  return sections.join('\n\n')
 }
 
 function parseQuestionnaire(content) {

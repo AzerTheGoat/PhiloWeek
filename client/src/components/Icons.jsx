@@ -39,6 +39,27 @@ const PATHS = {
       <path d="M5 11.5v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
     </>
   ),
+  spreadsheet: (
+    <>
+      <rect x="3.5" y="4" width="17" height="16" rx="2" />
+      <path d="M3.5 9h17M9 4v16M15 9v11M3.5 14h17" />
+    </>
+  ),
+  'align-left': (
+    <><path d="M4 6h13M4 10h16M4 14h11M4 18h15" /></>
+  ),
+  'align-center': (
+    <><path d="M6 6h12M4 10h16M7 14h10M5 18h14" /></>
+  ),
+  'align-right': (
+    <><path d="M7 6h13M4 10h16M9 14h11M5 18h15" /></>
+  ),
+  paint: (
+    <>
+      <path d="m5 14 8.5-8.5 5 5L10 19H5Z" />
+      <path d="m12 7 5 5M4 21h16" />
+    </>
+  ),
   listCheck: (
     <>
       <path d="m4 7 1.5 1.5L8.5 5" />

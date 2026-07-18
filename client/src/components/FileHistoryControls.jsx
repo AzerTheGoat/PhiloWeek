@@ -2,20 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
-export function useFileHistoryActions({ flushPending, applyContent, hasPending = false }) {
+export function useFileHistoryActions({ flushPending, applyContent, hasPending = false, disabled = false }) {
   const { openFileId, fileHistory, undoFile, redoFile, toast } = useApp()
   const [busy, setBusy] = useState(false)
   const latestRef = useRef({ flushPending, applyContent, openFileId, busy, availability: {} })
   const storedAvailability = fileHistory[openFileId] || { canUndo: false, canRedo: false }
   const availability = {
-    canUndo: storedAvailability.canUndo || hasPending,
-    canRedo: storedAvailability.canRedo && !hasPending,
+    canUndo: !disabled && (storedAvailability.canUndo || hasPending),
+    canRedo: !disabled && storedAvailability.canRedo && !hasPending,
   }
   latestRef.current = { flushPending, applyContent, openFileId, busy, availability }
 
   const step = useCallback(async (direction) => {
     const latest = latestRef.current
-    if (!latest.openFileId || latest.busy) return
+    if (disabled || !latest.openFileId || latest.busy) return
     const allowed = direction === 'undo' ? latest.availability.canUndo : latest.availability.canRedo
     setBusy(true)
     try {
@@ -30,10 +30,11 @@ export function useFileHistoryActions({ flushPending, applyContent, hasPending =
     } finally {
       setBusy(false)
     }
-  }, [redoFile, toast, undoFile])
+  }, [disabled, redoFile, toast, undoFile])
 
   useEffect(() => {
     const onKeyDown = (event) => {
+      if (disabled) return
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return
       const key = event.key.toLowerCase()
       const direction = key === 'y' || (key === 'z' && event.shiftKey) ? 'redo' : key === 'z' ? 'undo' : null
@@ -43,7 +44,7 @@ export function useFileHistoryActions({ flushPending, applyContent, hasPending =
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [step])
+  }, [disabled, step])
 
   return {
     busy,

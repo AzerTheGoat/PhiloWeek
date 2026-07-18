@@ -5,6 +5,7 @@ const JSZip = require('jszip')
 const matter = require('gray-matter')
 const { getDb, updateTags } = require('../db')
 const { v4: uuidv4 } = require('uuid')
+const { xlsxBufferToSpreadsheetContent } = require('../spreadsheetXlsx')
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } })
 
@@ -23,7 +24,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     zip.forEach((relativePath, entry) => {
       if (
         !entry.dir &&
-        /\.(md|json)$/i.test(relativePath) &&
+        /\.(md|json|xlsx)$/i.test(relativePath) &&
         !relativePath.startsWith('__MACOSX')
       ) {
         importEntries.push({ relativePath, entry })
@@ -35,7 +36,9 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     const decompressed = []
     for (const { relativePath, entry } of importEntries) {
       try {
-        const rawContent = await entry.async('text')
+        const rawContent = /\.xlsx$/i.test(relativePath)
+          ? await xlsxBufferToSpreadsheetContent(await entry.async('nodebuffer'), relativePath.split('/').pop().replace(/\.xlsx$/i, ''))
+          : await entry.async('text')
         decompressed.push({ relativePath, rawContent })
       } catch (err) {
         report.errors.push(`${relativePath}: ${err.message}`)
@@ -433,7 +436,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
               updateFile.run(rawContent, req.user.id, existing.id)
               fileId = existing.id
             } else {
-              const newName = fileName.replace(/\.md$/i, '') + `-import-${Date.now()}.md`
+              const newName = addImportSuffix(fileName)
               fileId = uuidv4()
               insertFile.run(fileId, parentId, newName, rawContent, req.user.id, req.user.id)
             }
@@ -616,6 +619,12 @@ function safeMatter(rawContent) {
 function safeJson(rawContent) {
   try { return JSON.parse(String(rawContent || '').replace(/^\uFEFF/, '')) }
   catch (_) { return null }
+}
+
+function addImportSuffix(fileName) {
+  const match = String(fileName || '').match(/^(.*?)(\.[^.]+)$/)
+  const suffix = `-import-${Date.now()}`
+  return match ? `${match[1]}${suffix}${match[2]}` : `${fileName}${suffix}`
 }
 
 function parseQuotesExport(content) {

@@ -451,6 +451,12 @@ function tabFromFile(file) {
 }
 
 function getFileKind(file) {
+  if (/\.xlsx$/i.test(file.name || '')) {
+    if (typeof file.content !== 'string') return null
+    try {
+      return JSON.parse(file.content || '{}')?.philoweek_type === 'spreadsheet' ? 'spreadsheet' : null
+    } catch (_) { return null }
+  }
   if (/\.json$/i.test(file.name || '')) {
     if (typeof file.content === 'string') {
       try {

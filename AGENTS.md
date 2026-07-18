@@ -21,7 +21,8 @@ PhiloWeek/
 │   │   ├── export.js   ← Export ZIP Obsidian
 │   │   ├── import.js   ← Import ZIP Obsidian
 │   │   ├── voice.js    ← Notes vocales
-│   │   └── timer.js    ← Sessions de travail
+│   │   ├── timer.js    ← Sessions de travail
+│   │   └── spreadsheets.js ← Import/export XLSX
 │   ├── philoweek_v2.db ← Base SQLite
 │   ├── recordings/     ← Fichiers audio
 │   └── public/         ← Build React (généré par `npm run build` dans client/)
@@ -107,8 +108,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La sidebar garde l'arbre de fichiers comme surface principale.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
-- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
-- Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, questionnaire, definitions et dossier quand le contexte le permet.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
+- Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, questionnaire, definitions, tableur Excel et dossier quand le contexte le permet.
 - Les vues principales ne doivent pas afficher de bouton retour de page dans leur header; la navigation se fait par `Fonctions`, les onglets de fichiers et la navigation mobile.
 
 ## Graphes d'idees
@@ -232,7 +233,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - La zone principale affiche une barre d'onglets pour les fichiers ouverts.
 - Ouvrir un fichier depuis la sidebar, la recherche ou une autre vue ajoute/active un onglet, sans dupliquer l'onglet si le fichier est deja ouvert.
-- Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees et questionnaires JSON.
+- Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees, questionnaires JSON, definitions JSON et tableurs Excel.
 - Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
 - Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
 
@@ -274,7 +275,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Historique des fichiers et corbeille
 
-- Chaque fichier edite par l'application (note Markdown, graphe d'idees, questionnaire JSON et definitions JSON) garde un historique persistant de ses sauvegardes logiques.
+- Chaque fichier edite par l'application (note Markdown, graphe d'idees, questionnaire JSON, definitions JSON et tableur Excel) garde un historique persistant de ses sauvegardes logiques.
 - Les boutons Annuler/Retablir sont disponibles dans le header de chaque editeur; les raccourcis sont `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` et `Ctrl/Cmd+Y`.
 - Une nouvelle modification apres une annulation efface la branche de retablissement; les 100 versions les plus recentes sont conservees par fichier.
 - Verrouiller un dossier efface l'historique en clair de ses enfants afin de ne pas contourner le chiffrement; un nouvel historique commence apres deverrouillage.
@@ -293,3 +294,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Meme apres le choix de conserver la version locale, le serveur revérifie la version courante : une troisieme modification concurrente provoque un nouveau conflit au lieu d'etre ecrasee.
 - La presence collaborative est un heartbeat ephemere de 45 secondes; elle n'accorde aucun droit et ne remplace jamais les controles d'acces serveur.
 - L'export Obsidian ajoute `_Opuscule/Shares.json` avec les usernames et permissions. A l'import, seuls les comptes qui existent deja sur l'instance sont reconnectes.
+
+## Tableurs Excel
+
+- La sidebar et tous les menus contextuels permettent de creer un `Tableur Excel`; son nom visible se termine par `.xlsx`.
+- Dans SQLite et dans l'historique logique, le contenu reste un JSON texte avec `philoweek_type: spreadsheet`, `version`, `title`, `locale` et un tableau `sheets`. Chaque feuille garde ses dimensions, cellules, styles, largeurs et volets figes.
+- `SpreadsheetEditor.jsx` remplace l'editeur Markdown pour ces fichiers. Il gere plusieurs feuilles, la selection de plages, le copier-coller TSV, l'insertion/suppression de lignes et colonnes, les largeurs, le gras/italique/soulignement, l'alignement, les couleurs et les formats nombre/euro/pourcentage/date.
+- Le moteur de formules cote client est un parseur sans `eval`. Il prend en charge les references et plages, les references entre feuilles, les operateurs arithmetiques/comparaison et les fonctions `SUM/SOMME`, `AVERAGE/MOYENNE`, `MIN`, `MAX`, `COUNT/NB`, `COUNTA/NBVAL`, `IF/SI`, `AND/ET`, `OR/OU`, `NOT/NON`, `ROUND/ARRONDI`, `ABS` et `CONCAT`.
+- Les cycles et erreurs de references sont affiches comme erreurs de formule; une plage de formule est limitee a 10 000 cellules. Un classeur est limite a 20 feuilles, 2 000 lignes, 200 colonnes et 100 000 cellules renseignees cote serveur.
+- La creation peut importer un vrai fichier `.xlsx`. `server/routes/spreadsheets.js` convertit ce binaire vers le JSON interne avec une limite de 25 Mo et conserve les valeurs, formules, feuilles, largeurs et styles courants.
+- Le bouton `XLSX` reconvertit le JSON en classeur Office Open XML. L'export ZIP Obsidian place egalement un vrai binaire `.xlsx`; l'import ZIP le reconvertit avant de restaurer le fichier.
+- Les tableurs passent par le meme `saveFile`, `content_version`, historique undo/redo, partage view/edit, presence cloud, chiffrement de dossier et corbeille que les autres fichiers; aucune route tableur ne contourne `requireFileAccess`.

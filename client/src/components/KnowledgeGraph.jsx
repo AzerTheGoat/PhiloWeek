@@ -16,6 +16,7 @@ const KIND_LABELS = {
   questionnaire: 'Quiz',
   idea_graph: 'Graphe',
   journal: 'Journal',
+  spreadsheet: 'Tableur',
 }
 
 export default function KnowledgeGraph() {

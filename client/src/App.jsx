@@ -213,10 +213,11 @@ function FileTabs() {
 }
 
 function formatTabName(name) {
-  return String(name || 'Sans titre').replace(/\.(md|json)$/i, '')
+  return String(name || 'Sans titre').replace(/\.(md|json|xlsx)$/i, '')
 }
 
 function getTabIcon(tab) {
+  if (tab.kind === 'spreadsheet' || /\.xlsx$/i.test(tab.name || '')) return 'spreadsheet'
   if (tab.kind === 'graph') return 'graph'
   if (tab.kind === 'definitions') return 'book'
   if (tab.kind === 'questionnaire' || /\.json$/i.test(tab.name || '')) return 'question'

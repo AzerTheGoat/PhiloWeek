@@ -60,6 +60,7 @@ app.use('/api', requireAuth)
 
 app.use('/api/files', require('./routes/files'))
 app.use('/api/shares', require('./routes/shares'))
+app.use('/api/spreadsheets', require('./routes/spreadsheets'))
 app.use('/api/export', require('./routes/export'))
 app.use('/api/import', require('./routes/import'))
 app.use('/api/voice', require('./routes/voice'))

@@ -3,6 +3,7 @@ const router = express.Router()
 const JSZip = require('jszip')
 const matter = require('gray-matter')
 const { getDb } = require('../db')
+const { spreadsheetToXlsxBuffer } = require('../spreadsheetXlsx')
 
 router.get('/obsidian', async (req, res) => {
   try {
@@ -60,6 +61,8 @@ router.get('/obsidian', async (req, res) => {
         : rawContent
       const zipPath = originalPath.replace(/\.md$/i, '') + '.md'
       zip.file(zipPath, finalContent)
+    } else if (/\.xlsx$/i.test(file.name)) {
+      zip.file(originalPath, await spreadsheetToXlsxBuffer(rawContent))
     } else {
       zip.file(originalPath, rawContent)
     }

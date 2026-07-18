@@ -54,6 +54,17 @@ export const removeFileShare = (fileId, shareId) => req('DELETE', `/shares/${fil
 export const heartbeatFilePresence = id => req('POST', `/shares/presence/${id}`)
 export const leaveFilePresence = id => req('DELETE', `/shares/presence/${id}`)
 
+// Tableurs Excel
+export const exportSpreadsheet = id => {
+  window.location.href = BASE + `/spreadsheets/${id}/export`
+}
+export const importSpreadsheet = (file, parentId = null) => {
+  const fd = new FormData()
+  fd.append('workbook', file)
+  if (parentId) fd.append('parent_id', parentId)
+  return req('POST', '/spreadsheets/import', fd, true)
+}
+
 // Export / Import
 export const exportObsidian = () => {
   window.location.href = BASE + '/export/obsidian'

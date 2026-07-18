@@ -54,7 +54,7 @@ export default function ShareModal({ modal, hideModal }) {
     <div className="modal share-modal">
       <div className="modal-header">
         <div>
-          <h3>Partager « {String(file.name || '').replace(/\.(md|json)$/i, '')} »</h3>
+          <h3>Partager « {String(file.name || '').replace(/\.(md|json|xlsx)$/i, '')} »</h3>
           <span className="share-modal-subtitle">Le partage d’un dossier inclut automatiquement tout son contenu.</span>
         </div>
         <button className="icon-btn" onClick={hideModal} aria-label="Fermer"><Icon name="close" size={17} /></button>

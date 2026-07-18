@@ -5,11 +5,13 @@ import Preview from './Preview'
 import GraphEditor from './GraphEditor'
 import QuestionnaireEditor from './QuestionnaireEditor'
 import DefinitionsEditor from './DefinitionsEditor'
+import SpreadsheetEditor from './SpreadsheetEditor'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import Icon from './Icons'
 import { isGraphFile } from '../utils/graphFile'
 import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import { isDefinitionsFile } from '../utils/definitionsFile'
+import { isSpreadsheetFile } from '../utils/spreadsheetFile'
 import * as api from '../api'
 import CloudCollaborationBar from './CloudCollaborationBar'
 
@@ -22,7 +24,8 @@ function initialMode() {
 export default function Editor() {
   const { currentFile } = useApp()
   let editor
-  if (currentFile?.access?.can_edit === false) editor = <SharedFileViewer file={currentFile} />
+  if (isSpreadsheetFile(currentFile)) editor = <SpreadsheetEditor readOnly={currentFile?.access?.can_edit === false} />
+  else if (currentFile?.access?.can_edit === false) editor = <SharedFileViewer file={currentFile} />
   else if (isGraphFile(currentFile)) editor = <GraphEditor />
   else if (isDefinitionsFile(currentFile)) editor = <DefinitionsEditor />
   else if (isQuestionnaireFile(currentFile)) editor = <QuestionnaireEditor />
@@ -39,7 +42,7 @@ function SharedFileViewer({ file }) {
   return (
     <div className="shared-file-viewer">
       <div className="editor-titlebar">
-        <h2 className="editor-filename">{file.name.replace(/\.(md|json)$/i, '')}</h2>
+        <h2 className="editor-filename">{file.name.replace(/\.(md|json|xlsx)$/i, '')}</h2>
         <span className="shared-readonly-badge"><Icon name="eye" size={14} /> Lecture seule</span>
       </div>
       <div className="shared-file-viewer-body">

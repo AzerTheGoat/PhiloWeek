@@ -17,7 +17,7 @@ const SECTIONS = [
       {
         icon: 'plus',
         title: 'Clic droit = menu contextuel',
-        text: "Clic droit sur un dossier/fichier : nouveau fichier, graphe ou questionnaire ici, renommer, verrouiller, supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
+        text: "Clic droit sur un dossier/fichier : nouvelle note, graphe, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, verrouiller ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
       },
       {
         icon: 'close',
@@ -47,12 +47,37 @@ const SECTIONS = [
       {
         icon: 'undo',
         title: 'Annuler & rétablir',
-        text: "Les notes, graphes, questionnaires et définitions gardent un historique logique. Utilise les boutons du fichier, Ctrl+Z pour annuler et Ctrl+Shift+Z ou Ctrl+Y pour rétablir.",
+        text: "Les notes, graphes, questionnaires, définitions et tableurs gardent un historique logique. Utilise les boutons du fichier, Ctrl+Z pour annuler et Ctrl+Shift+Z ou Ctrl+Y pour rétablir.",
       },
       {
         icon: 'upload',
         title: 'Coller une image',
         text: 'Colle une image directement dans le texte (Ctrl+V) : elle est compressée en WebP et intégrée en base64 dans la note.',
+      },
+    ],
+  },
+  {
+    title: 'Tableur Excel',
+    items: [
+      {
+        icon: 'spreadsheet',
+        title: 'Créer ou importer un classeur',
+        text: "Depuis Fonctions > Créer ou le clic droit, crée un tableur vide ou importe un vrai fichier .xlsx. Le bouton XLSX de l’éditeur télécharge une version ouvrable dans Excel, LibreOffice ou Google Sheets.",
+      },
+      {
+        icon: 'spreadsheet',
+        title: 'Cellules, feuilles et mise en forme',
+        text: "Le classeur contient plusieurs feuilles. Sélectionne une plage pour appliquer gras, italique, alignement, couleurs et formats nombre, euro, pourcentage ou date. Double-clique une feuille pour la renommer.",
+      },
+      {
+        icon: 'edit',
+        title: 'Formules et navigation clavier',
+        text: "Saisis =A1+B1 ou =SOMME(A1:A10). Le moteur comprend aussi MOYENNE, MIN, MAX, NB, NBVAL, SI, ET, OU, NON, ARRONDI, ABS et CONCAT, avec références entre feuilles. Tab, Entrée et les flèches déplacent la sélection.",
+      },
+      {
+        icon: 'cloud',
+        title: 'Cloud, historique et conflits',
+        text: "Les tableurs utilisent le même autosave, la même corbeille de 30 jours, le même partage lecture/modification et la même protection contre les écrasements concurrents que les autres fichiers.",
       },
     ],
   },
