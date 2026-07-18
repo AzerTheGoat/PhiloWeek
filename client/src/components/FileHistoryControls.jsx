@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 
-export function useFileHistoryActions({ flushPending, applyContent, hasPending = false, disabled = false }) {
+export function useFileHistoryActions({ flushPending, applyContent, hasPending = false, disabled = false, keyboardDisabled = false }) {
   const { openFileId, fileHistory, undoFile, redoFile, toast } = useApp()
   const [busy, setBusy] = useState(false)
   const latestRef = useRef({ flushPending, applyContent, openFileId, busy, availability: {} })
@@ -34,7 +34,7 @@ export function useFileHistoryActions({ flushPending, applyContent, hasPending =
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (disabled) return
+      if (disabled || keyboardDisabled) return
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return
       const key = event.key.toLowerCase()
       const direction = key === 'y' || (key === 'z' && event.shiftKey) ? 'redo' : key === 'z' ? 'undo' : null
@@ -44,7 +44,7 @@ export function useFileHistoryActions({ flushPending, applyContent, hasPending =
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [disabled, step])
+  }, [disabled, keyboardDisabled, step])
 
   return {
     busy,

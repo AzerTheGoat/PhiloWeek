@@ -66,13 +66,23 @@ const SECTIONS = [
       },
       {
         icon: 'spreadsheet',
-        title: 'Cellules, feuilles et mise en forme',
-        text: "Le classeur contient plusieurs feuilles. Sélectionne une plage pour appliquer gras, italique, alignement, couleurs et formats nombre, euro, pourcentage ou date. Double-clique une feuille pour la renommer.",
+        title: 'Une grille proche de Google Sheets',
+        text: "Les menus Fichier, Édition, Affichage, Insertion, Format et Données regroupent les actions. Sélectionne une ligne, une colonne ou toute la feuille depuis les en-têtes; redimensionne par glisser-déposer et double-clique une lettre pour ajuster sa largeur.",
+      },
+      {
+        icon: 'edit',
+        title: 'Édition, données et présentation',
+        text: "Copie, coupe, colle les valeurs seules, recopie une plage, fusionne des cellules, ajoute notes et listes déroulantes. Tu peux trier, filtrer, rechercher/remplacer, appliquer des bordures, du renvoi à la ligne et des règles de couleur conditionnelles.",
+      },
+      {
+        icon: 'graph',
+        title: 'Graphiques, feuilles et CSV',
+        text: "Crée un graphique en barres, en courbes ou circulaire depuis une plage avec en-têtes. Les feuilles peuvent être ajoutées, renommées, dupliquées, supprimées ou réordonnées; chaque feuille s’importe et s’exporte aussi en CSV.",
       },
       {
         icon: 'edit',
         title: 'Formules et navigation clavier',
-        text: "Saisis =A1+B1 ou =SOMME(A1:A10). Le moteur comprend aussi MOYENNE, MIN, MAX, NB, NBVAL, SI, ET, OU, NON, ARRONDI, ABS et CONCAT, avec références entre feuilles. Tab, Entrée et les flèches déplacent la sélection.",
+        text: "Saisis =A1+B1, =SOMME(A1:A10), SI, NB.SI, SOMME.SI, texte, maths ou dates. Les références absolues avec $ et entre feuilles sont conservées lors des copies. Tab, Entrée, les flèches et Ctrl/Cmd+Z pilotent la grille.",
       },
       {
         icon: 'cloud',

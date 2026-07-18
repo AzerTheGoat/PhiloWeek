@@ -50,6 +50,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     let fileHistoryPayload = null
     let trashPayload = null
     let sharePayload = null
+    let spreadsheetMetadataPayload = null
 
     const importTx = db.transaction(() => {
       const insertFolder = db.prepare(
@@ -150,6 +151,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
           if (jsonSpecial?.philoweek_type === 'file_shares') {
             sharePayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'spreadsheet_metadata') {
+            spreadsheetMetadataPayload = jsonSpecial
             continue
           }
           if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
@@ -554,6 +559,19 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             normalizeIsoDate(share.updated_at) || new Date().toISOString()
           )
           report.imported++
+        }
+      }
+
+      if (spreadsheetMetadataPayload && Array.isArray(spreadsheetMetadataPayload.workbooks)) {
+        for (const item of spreadsheetMetadataPayload.workbooks) {
+          const fileId = pathToId[String(item.path || '')]
+          const content = String(item.content || '')
+          const parsed = safeJson(content)
+          if (!fileId || parsed?.philoweek_type !== 'spreadsheet') continue
+          db.prepare(`
+            UPDATE files SET content = ?, updated_at = datetime('now'), content_version = content_version + 1
+            WHERE id = ? AND user_id = ? AND name LIKE '%.xlsx'
+          `).run(content, fileId, req.user.id)
         }
       }
 

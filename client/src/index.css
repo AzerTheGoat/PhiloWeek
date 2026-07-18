@@ -1445,12 +1445,19 @@
   .spreadsheet-title span { display: none }
   .spreadsheet-title-actions .btn-ghost { font-size: 0 }
   .spreadsheet-title-actions .btn-ghost svg { width: 17px; height: 17px }
+  .spreadsheet-menubar { overflow-x: auto; scrollbar-width: none }
+  .spreadsheet-menubar::-webkit-scrollbar { display: none }
+  .spreadsheet-menu > button { min-width: max-content; height: 32px }
+  .spreadsheet-menu-popover { position: fixed; top: 116px; right: 8px; left: 8px; width: auto; max-height: min(60dvh, 480px); overflow-y: auto }
   .spreadsheet-toolbar { min-height: 45px; padding: 6px 8px }
   .spreadsheet-toolbar button,
   .spreadsheet-toolbar select,
   .spreadsheet-color-control { min-width: 38px; height: 34px }
   .spreadsheet-formula-bar { padding: 4px 7px }
   .spreadsheet-formula-bar strong { width: 42px }
+  .spreadsheet-findbar { flex-wrap: wrap }
+  .spreadsheet-findbar input { min-width: calc(50% - 6px) }
+  .spreadsheet-chart-panel { position: absolute; inset: 0; z-index: 30; width: 100%; min-width: 0 }
   .spreadsheet-status { display: none }
   .spreadsheet-sheet-tabs { width: 100% }
   .spreadsheet-sheet-tabs button { min-width: 96px }
@@ -2647,6 +2654,41 @@ kbd {
 .spreadsheet-title-actions { gap: 8px; flex-shrink: 0 }
 .spreadsheet-title-actions .btn-ghost { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px }
 
+.spreadsheet-menubar {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 2px 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+.spreadsheet-menu { position: relative }
+.spreadsheet-menu > button { height: 27px; padding: 0 9px; border-radius: 4px; color: var(--text-2); font-size: 12px }
+.spreadsheet-menu > button:hover,
+.spreadsheet-menu > button.active { background: var(--bg-hover); color: var(--text) }
+.spreadsheet-menu-popover {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 40;
+  width: 285px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+.spreadsheet-menu-popover button,
+.spreadsheet-menu-popover label { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 31px; padding: 5px 9px; border-radius: 4px; color: var(--text-2); font-size: 12px; text-align: left; cursor: pointer }
+.spreadsheet-menu-popover button:hover,
+.spreadsheet-menu-popover label:hover { background: var(--bg-hover); color: var(--text) }
+.spreadsheet-menu-popover button:disabled,
+.spreadsheet-menu-popover label.disabled { opacity: .42; pointer-events: none }
+.spreadsheet-menu-popover input[type="file"] { display: none }
+.spreadsheet-menu-popover hr { height: 1px; margin: 4px 5px; border: 0; background: var(--border) }
+.spreadsheet-menu-popover kbd { color: var(--text-3); font-family: inherit; font-size: 10px }
+
 .spreadsheet-toolbar {
   gap: 4px;
   min-height: 43px;
@@ -2679,6 +2721,7 @@ kbd {
 .spreadsheet-color-control:hover { border-color: var(--border); background: var(--bg-hover); color: var(--text) }
 .spreadsheet-toolbar button.active { border-color: color-mix(in srgb, #198754 55%, var(--border)); background: color-mix(in srgb, #198754 14%, var(--bg-elevated)) }
 .spreadsheet-toolbar select { min-width: 96px; border-color: var(--border); outline: none }
+.spreadsheet-toolbar select.spreadsheet-font-size { min-width: 54px; width: 54px }
 .spreadsheet-toolbar-separator { width: 1px; height: 22px; margin: 0 3px; background: var(--border); flex-shrink: 0 }
 .spreadsheet-color-control { position: relative; gap: 4px; cursor: pointer }
 .spreadsheet-color-control input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
@@ -2695,6 +2738,12 @@ kbd {
 }
 .spreadsheet-formula-help code { color: #2ca56a }
 
+.spreadsheet-findbar { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 5px 10px; border-bottom: 1px solid var(--border); background: var(--bg-elevated); flex-shrink: 0 }
+.spreadsheet-findbar input { min-width: 120px; height: 29px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 5px; outline: none; background: var(--bg); color: var(--text); flex: 1 }
+.spreadsheet-findbar input:focus { border-color: #198754 }
+.spreadsheet-findbar button { height: 29px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; color: var(--text-2); white-space: nowrap }
+.spreadsheet-findbar button:hover { background: var(--bg-hover); color: var(--text) }
+
 .spreadsheet-formula-bar {
   gap: 8px;
   min-height: 36px;
@@ -2708,6 +2757,7 @@ kbd {
 .spreadsheet-formula-bar input { min-width: 0; height: 27px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; outline: none; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 12px; flex: 1 }
 .spreadsheet-formula-bar input:focus { border-color: #198754; box-shadow: 0 0 0 2px color-mix(in srgb, #198754 16%, transparent) }
 
+.spreadsheet-workarea { display: flex; min-width: 0; min-height: 0; overflow: hidden; flex: 1 }
 .spreadsheet-grid {
   display: grid;
   min-width: 0;
@@ -2718,6 +2768,7 @@ kbd {
   background: var(--bg);
   flex: 1;
   user-select: none;
+  transform-origin: top left;
 }
 
 .spreadsheet-corner,
@@ -2740,8 +2791,19 @@ kbd {
 .spreadsheet-row-head { position: sticky; left: 0; z-index: 4 }
 .spreadsheet-column-head.selected,
 .spreadsheet-row-head.selected { background: color-mix(in srgb, #198754 16%, var(--bg-elevated)); color: #2ca56a }
+.spreadsheet-column-head { gap: 2px }
+.spreadsheet-column-head,
+.spreadsheet-row-head { position: sticky }
+.spreadsheet-resize-handle { position: absolute; z-index: 8; display: block }
+.spreadsheet-resize-handle.col { top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize }
+.spreadsheet-resize-handle.row { right: 0; bottom: -3px; width: 100%; height: 7px; cursor: row-resize }
+.spreadsheet-resize-handle:hover { background: color-mix(in srgb, #198754 45%, transparent) }
+.spreadsheet-column-head button { display: flex; align-items: center; justify-content: center; width: 16px; height: 18px; border-radius: 3px; color: var(--text-3); font-size: 10px }
+.spreadsheet-column-head button:hover,
+.spreadsheet-column-head button.active { background: color-mix(in srgb, #198754 18%, var(--bg)); color: #198754 }
 
 .spreadsheet-cell {
+  display: flex;
   position: relative;
   height: 26px;
   min-width: 0;
@@ -2754,11 +2816,24 @@ kbd {
   font-size: 12px;
   line-height: 25px;
 }
-.spreadsheet-cell > span { display: block; padding: 0 5px; overflow: hidden; text-overflow: clip; white-space: nowrap }
+.spreadsheet-cell > span { display: block; width: 100%; padding: 0 5px; overflow: hidden; text-overflow: clip; white-space: nowrap }
+.spreadsheet-cell > span.wrap { overflow: hidden; white-space: normal; line-height: 14px }
 .spreadsheet-cell.selected { background-color: color-mix(in srgb, #198754 7%, var(--bg)) !important }
 .spreadsheet-cell.active { z-index: 2; box-shadow: inset 0 0 0 2px #198754 }
 .spreadsheet-cell.formula-error { color: var(--danger) !important }
 .spreadsheet-cell input { position: absolute; top: 0; left: 0; z-index: 5; width: max(100%, 180px); height: 26px; padding: 0 5px; border: 2px solid #198754; outline: none; background: var(--bg); color: var(--text); font: inherit; line-height: 24px }
+.spreadsheet-cell-dropdown { width: 100%; height: 24px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit }
+.spreadsheet-note-mark { position: absolute; top: 0; right: 0; width: 0; height: 0; border-top: 7px solid #f9ab00; border-left: 7px solid transparent }
+.spreadsheet-grid.hide-gridlines .spreadsheet-cell { border-color: transparent }
+
+.spreadsheet-chart-panel { width: 360px; min-width: 300px; overflow-y: auto; border-left: 1px solid var(--border); background: var(--bg-sidebar); flex-shrink: 0 }
+.spreadsheet-chart-panel > header { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 12px; border-bottom: 1px solid var(--border) }
+.spreadsheet-chart-panel > p { padding: 16px; color: var(--text-3); font-size: 12px; line-height: 1.5 }
+.spreadsheet-chart-card { margin: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg) }
+.spreadsheet-chart-card > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px }
+.spreadsheet-chart-card svg { display: block; width: 100%; height: auto; margin-top: 7px; background: var(--bg); color: var(--text) }
+.spreadsheet-chart-card .chart-axis { stroke: var(--border); stroke-width: 1 }
+.spreadsheet-chart-empty { color: var(--text-3); font-size: 11px }
 
 .spreadsheet-footer {
   justify-content: space-between;

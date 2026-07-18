@@ -68,6 +68,15 @@ router.get('/obsidian', async (req, res) => {
     }
   }
 
+  const spreadsheetFiles = allFiles.filter(file => file.type === 'file' && /\.xlsx$/i.test(file.name || ''))
+  if (spreadsheetFiles.length > 0) {
+    zip.file('_Opuscule/SpreadsheetMetadata.json', JSON.stringify({
+      philoweek_type: 'spreadsheet_metadata',
+      exported: new Date().toISOString(),
+      workbooks: spreadsheetFiles.map(file => ({ path: pathMap[file.id] || file.name, content: file.content || '' })),
+    }, null, 2))
+  }
+
   const quotes = db.prepare('SELECT * FROM quotes WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
   if (quotes.length > 0) {
     const body = quotes.map(q => {

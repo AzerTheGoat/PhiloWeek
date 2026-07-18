@@ -37,6 +37,11 @@ export function createBlankSheet(name = 'Feuille') {
     frozenColumns: 1,
     columnWidths: {},
     rowHeights: {},
+    merges: [],
+    filters: null,
+    conditionalFormats: [],
+    charts: [],
+    gridlines: true,
     cells: {},
   }
 }
@@ -69,7 +74,14 @@ function normalizeSheet(sheet, index) {
     if (!point || point.row > rowCount || point.col > columnCount || !cell || typeof cell !== 'object') continue
     const input = normalizeInput(cell.input)
     const style = normalizeStyle(cell.style)
-    if (input !== '' || Object.keys(style).length) cells[toAddress(point.row, point.col)] = { input, ...(Object.keys(style).length ? { style } : {}) }
+    const note = String(cell.note || '').slice(0, 5000)
+    const validation = normalizeValidation(cell.validation)
+    if (input !== '' || Object.keys(style).length || note || validation) cells[toAddress(point.row, point.col)] = {
+      input,
+      ...(Object.keys(style).length ? { style } : {}),
+      ...(note ? { note } : {}),
+      ...(validation ? { validation } : {}),
+    }
   }
   const columnWidths = {}
   for (const [key, value] of Object.entries(sheet?.columnWidths || {})) {
@@ -86,6 +98,11 @@ function normalizeSheet(sheet, index) {
     frozenColumns: clampInt(sheet?.frozenColumns, 0, columnCount, 1),
     columnWidths,
     rowHeights: sheet?.rowHeights && typeof sheet.rowHeights === 'object' ? sheet.rowHeights : {},
+    merges: normalizeMerges(sheet?.merges, rowCount, columnCount),
+    filters: normalizeFilters(sheet?.filters, rowCount, columnCount),
+    conditionalFormats: normalizeConditionalFormats(sheet?.conditionalFormats, rowCount, columnCount),
+    charts: normalizeCharts(sheet?.charts, rowCount, columnCount),
+    gridlines: sheet?.gridlines !== false,
     cells,
   }
 }
@@ -102,11 +119,85 @@ function normalizeStyle(style) {
   if (style.bold) next.bold = true
   if (style.italic) next.italic = true
   if (style.underline) next.underline = true
+  if (style.strike) next.strike = true
+  if (style.wrap) next.wrap = true
+  if ([8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36].includes(Number(style.fontSize))) next.fontSize = Number(style.fontSize)
   if (['left', 'center', 'right'].includes(style.align)) next.align = style.align
+  if (['top', 'middle', 'bottom'].includes(style.valign)) next.valign = style.valign
+  if (['all', 'outer', 'bottom', 'none'].includes(style.border)) next.border = style.border
+  if (/^#[0-9a-f]{6}$/i.test(style.borderColor || '')) next.borderColor = style.borderColor
   if (/^#[0-9a-f]{6}$/i.test(style.fill || '')) next.fill = style.fill
   if (/^#[0-9a-f]{6}$/i.test(style.color || '')) next.color = style.color
   if (['general', 'number', 'currency', 'percent', 'date'].includes(style.numberFormat)) next.numberFormat = style.numberFormat
   return next
+}
+
+function normalizeValidation(validation) {
+  if (!validation || validation.type !== 'list') return null
+  const values = Array.isArray(validation.values)
+    ? validation.values.map(value => String(value).trim().slice(0, 200)).filter(Boolean).slice(0, 100)
+    : []
+  return values.length ? { type: 'list', values, rejectInvalid: validation.rejectInvalid !== false } : null
+}
+
+function normalizeMerges(merges, rowCount, columnCount) {
+  const result = []
+  for (const merge of Array.isArray(merges) ? merges : []) {
+    const normalized = normalizeSelection(
+      { row: clampInt(merge?.top, 1, rowCount, 1), col: clampInt(merge?.left, 1, columnCount, 1) },
+      { row: clampInt(merge?.bottom, 1, rowCount, 1), col: clampInt(merge?.right, 1, columnCount, 1) },
+    )
+    if (normalized.top === normalized.bottom && normalized.left === normalized.right) continue
+    if (result.some(item => rangesOverlap(item, normalized))) continue
+    result.push(normalized)
+  }
+  return result.slice(0, 500)
+}
+
+function normalizeFilters(filters, rowCount, columnCount) {
+  if (!filters || typeof filters !== 'object') return null
+  const range = normalizeSelection(
+    { row: clampInt(filters.range?.top, 1, rowCount, 1), col: clampInt(filters.range?.left, 1, columnCount, 1) },
+    { row: clampInt(filters.range?.bottom, 1, rowCount, rowCount), col: clampInt(filters.range?.right, 1, columnCount, columnCount) },
+  )
+  const rules = {}
+  for (const [key, rule] of Object.entries(filters.rules || {})) {
+    const col = Number(key)
+    if (!Number.isInteger(col) || col < range.left || col > range.right) continue
+    const operator = ['contains', 'equals', 'greater', 'less', 'notEmpty'].includes(rule?.operator) ? rule.operator : 'contains'
+    rules[col] = { operator, value: String(rule?.value || '').slice(0, 500) }
+  }
+  return { range, rules }
+}
+
+function normalizeConditionalFormats(rules, rowCount, columnCount) {
+  return (Array.isArray(rules) ? rules : []).slice(0, 100).map(rule => ({
+    id: String(rule?.id || makeId('cf')),
+    range: normalizeSelection(
+      { row: clampInt(rule?.range?.top, 1, rowCount, 1), col: clampInt(rule?.range?.left, 1, columnCount, 1) },
+      { row: clampInt(rule?.range?.bottom, 1, rowCount, 1), col: clampInt(rule?.range?.right, 1, columnCount, 1) },
+    ),
+    operator: ['contains', 'equals', 'greater', 'less', 'notEmpty'].includes(rule?.operator) ? rule.operator : 'contains',
+    value: String(rule?.value || '').slice(0, 500),
+    fill: /^#[0-9a-f]{6}$/i.test(rule?.fill || '') ? rule.fill : '#d9ead3',
+    color: /^#[0-9a-f]{6}$/i.test(rule?.color || '') ? rule.color : '#1f2937',
+  }))
+}
+
+function normalizeCharts(charts, rowCount, columnCount) {
+  return (Array.isArray(charts) ? charts : []).slice(0, 20).map(chart => ({
+    id: String(chart?.id || makeId('chart')),
+    type: ['bar', 'line', 'pie'].includes(chart?.type) ? chart.type : 'bar',
+    title: String(chart?.title || 'Graphique').slice(0, 160),
+    range: normalizeSelection(
+      { row: clampInt(chart?.range?.top, 1, rowCount, 1), col: clampInt(chart?.range?.left, 1, columnCount, 1) },
+      { row: clampInt(chart?.range?.bottom, 1, rowCount, 1), col: clampInt(chart?.range?.right, 1, columnCount, 1) },
+    ),
+  }))
+}
+
+function rangesOverlap(a, b) {
+  return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top
 }
 
 export function serializeSpreadsheet(workbook) {
@@ -429,8 +520,35 @@ function callFormula(name, args, unknown) {
     return Math.round(numeric(args[0]) * factor) / factor
   }
   if (name === 'ABS') return Math.abs(numeric(args[0]))
-  if (name === 'CONCAT') return flat.map(value => String(value ?? '')).join('')
+  if (name === 'CONCAT' || name === 'CONCATENER') return flat.map(value => String(value ?? '')).join('')
+  if (name === 'LOWER' || name === 'MINUSCULE') return String(scalar(args[0]) ?? '').toLowerCase()
+  if (name === 'UPPER' || name === 'MAJUSCULE') return String(scalar(args[0]) ?? '').toUpperCase()
+  if (name === 'TRIM' || name === 'SUPPRESPACE') return String(scalar(args[0]) ?? '').trim().replace(/\s+/g, ' ')
+  if (name === 'LEN' || name === 'NBCAR') return String(scalar(args[0]) ?? '').length
+  if (name === 'LEFT' || name === 'GAUCHE') return String(scalar(args[0]) ?? '').slice(0, Math.max(0, numeric(args[1] ?? 1)))
+  if (name === 'RIGHT' || name === 'DROITE') return String(scalar(args[0]) ?? '').slice(-Math.max(0, numeric(args[1] ?? 1)))
+  if (name === 'SQRT' || name === 'RACINE') return Math.sqrt(numeric(args[0]))
+  if (name === 'POWER' || name === 'PUISSANCE') return numeric(args[0]) ** numeric(args[1])
+  if (name === 'MOD') return numeric(args[0]) % numeric(args[1])
+  if (name === 'TODAY' || name === 'AUJOURDHUI') return new Date().toISOString().slice(0, 10)
+  if (name === 'COUNTIF' || name === 'NB.SI') return flat.slice(0, -1).filter(value => matchesCriterion(value, scalar(args.at(-1)))).length
+  if (name === 'SUMIF' || name === 'SOMME.SI') {
+    const criteria = scalar(args[1])
+    const source = Array.isArray(args[0]) ? args[0].flat(Infinity) : [args[0]]
+    const values = Array.isArray(args[2]) ? args[2].flat(Infinity) : source
+    return source.reduce((sum, value, index) => matchesCriterion(value, criteria) ? sum + Number(values[index] || 0) : sum, 0)
+  }
   return unknown()
+}
+
+function matchesCriterion(value, criterion) {
+  const text = String(criterion ?? '')
+  const match = text.match(/^(<=|>=|<>|=|<|>)(.*)$/)
+  if (!match) return String(value).toLowerCase() === text.toLowerCase()
+  const left = Number(value)
+  const right = Number(match[2])
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return match[1] === '<>' ? String(value) !== match[2] : String(value) === match[2]
+  return ({ '<': left < right, '>': left > right, '<=': left <= right, '>=': left >= right, '=': left === right, '<>': left !== right })[match[1]]
 }
 
 function scalar(value) {
