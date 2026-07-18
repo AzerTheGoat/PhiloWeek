@@ -39,11 +39,15 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
 
   const isFolder = node.type === 'folder' || node.type === 'locked_folder'
   const isLocked = node.type === 'locked_folder'
+  const isOwner = node.is_owner !== false
+  const canEdit = node.can_edit !== false
   const isActive = node.id === openFileId
   const children = node.children || []
   const isDragging = dragState?.id === node.id
   const canReceiveDrop = Boolean(
     dragState &&
+    isOwner &&
+    dragState.isOwner !== false &&
     isFolder &&
     !isLocked &&
     dragState.id !== node.id &&
@@ -54,7 +58,8 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
 
   const handleClick = useCallback(async () => {
     if (isLocked) {
-      setUnlocking(true)
+      if (isOwner) setUnlocking(true)
+      else toast('Ce dossier verrouillé doit être ouvert par son propriétaire', 'error')
       return
     }
     if (isFolder) {
@@ -62,10 +67,10 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     } else {
       openFile(node.id)
     }
-  }, [isFolder, isLocked, openFile, node.id])
+  }, [isFolder, isLocked, isOwner, openFile, node.id, toast])
 
   const handleDragStart = useCallback((e) => {
-    if (renaming || unlocking) {
+    if (!isOwner || renaming || unlocking) {
       e.preventDefault()
       return
     }
@@ -78,8 +83,9 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       type: node.type,
       name: node.name,
       descendantIds: collectDescendantIds(node),
+      isOwner,
     })
-  }, [node, renaming, setDragState, unlocking])
+  }, [isOwner, node, renaming, setDragState, unlocking])
 
   const handleDragEnd = useCallback(() => {
     setDragState(null)
@@ -121,39 +127,41 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     e.stopPropagation()
     const items = isFolder
       ? [
-          { icon: '📄', label: 'Nouveau fichier ici', action: () => showModal('new-file', { parent_id: node.id }) },
-          { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
-          { icon: '?', label: 'Nouveau questionnaire ici', action: () => showModal('new-questionnaire', { parent_id: node.id }) },
-          { icon: 'abc', label: 'Nouvelles definitions ici', action: () => showModal('new-definitions', { parent_id: node.id }) },
-          { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
-          { separator: true },
-          { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
-          !isLocked && { icon: '🔒', label: 'Verrouiller…', action: () => showModal('lock-folder', { id: node.id }) },
-          isLocked && { icon: '🔓', label: 'Déverrouiller…', action: () => setUnlocking(true) },
-          { separator: true },
-          { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
+          canEdit && !isLocked && { icon: '📄', label: 'Nouveau fichier ici', action: () => showModal('new-file', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: '?', label: 'Nouveau questionnaire ici', action: () => showModal('new-questionnaire', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: 'abc', label: 'Nouvelles definitions ici', action: () => showModal('new-definitions', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
+          canEdit && !isLocked && isOwner && { separator: true },
+          isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
+          isOwner && { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
+          isOwner && !isLocked && { icon: '🔒', label: 'Verrouiller…', action: () => showModal('lock-folder', { id: node.id }) },
+          isOwner && isLocked && { icon: '🔓', label: 'Déverrouiller…', action: () => setUnlocking(true) },
+          isOwner && { separator: true },
+          isOwner && { icon: '🗑', label: 'Mettre à la corbeille', danger: true, action: () => handleDelete() },
         ].filter(Boolean)
       : [
-          { icon: 'doc', label: 'Nouveau fichier a cote', action: () => showModal('new-file', { parent_id: node.parent_id || null }) },
-          { icon: 'graph', label: 'Nouveau graphe a cote', action: () => showModal('new-graph', { parent_id: node.parent_id || null }) },
-          { icon: '?', label: 'Nouveau questionnaire a cote', action: () => showModal('new-questionnaire', { parent_id: node.parent_id || null }) },
-          { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
-          { separator: true },
-          { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
-          { icon: '🗑', label: 'Supprimer', danger: true, action: () => handleDelete() },
-        ]
-    showContextMenu(e.clientX, e.clientY, items)
-  }, [isFolder, isLocked, node, showModal, showContextMenu])
+          isOwner && { icon: 'doc', label: 'Nouveau fichier a cote', action: () => showModal('new-file', { parent_id: node.parent_id || null }) },
+          isOwner && { icon: 'graph', label: 'Nouveau graphe a cote', action: () => showModal('new-graph', { parent_id: node.parent_id || null }) },
+          isOwner && { icon: '?', label: 'Nouveau questionnaire a cote', action: () => showModal('new-questionnaire', { parent_id: node.parent_id || null }) },
+          isOwner && { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
+          isOwner && { separator: true },
+          isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
+          isOwner && { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
+          isOwner && { icon: '🗑', label: 'Mettre à la corbeille', danger: true, action: () => handleDelete() },
+        ].filter(Boolean)
+    if (items.length) showContextMenu(e.clientX, e.clientY, items)
+  }, [canEdit, isFolder, isLocked, isOwner, node, showModal, showContextMenu])
 
   const handleDelete = useCallback(async () => {
     const descendantCount = isFolder ? collectDescendantIds(node).length : 0
     const message = isFolder && descendantCount > 0
-      ? `Supprimer le dossier "${node.name}" et ses ${descendantCount} élément(s) ?\n\nTous les fichiers et sous-dossiers dedans seront supprimés aussi.`
-      : `Supprimer "${node.name}" ?`
+      ? `Mettre le dossier "${node.name}" et ses ${descendantCount} élément(s) à la corbeille ?\n\nIls pourront être restaurés pendant 30 jours.`
+      : `Mettre "${node.name}" à la corbeille ?\n\nIl pourra être restauré pendant 30 jours.`
     if (!window.confirm(message)) return
     try {
       await deleteFile(node.id, { confirmChildren: isFolder && descendantCount > 0 })
-      toast(`"${node.name}" supprimé`)
+      toast(`"${node.name}" placé dans la corbeille`)
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -207,7 +215,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
         <div
           className={`file-row ${isFolder ? 'is-folder' : ''} ${isLocked ? 'is-locked' : ''} ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
-          draggable
+          draggable={isOwner}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
@@ -219,6 +227,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
         >
           <span className="file-icon">{icon}</span>
           <span className="file-name">{node.name.replace(/\.(md|json)$/i, '')}</span>
+          {node.shared_root && <span className="file-shared-badge" title={`Partagé par ${node.owner_username}`}>☁</span>}
         </div>
       )}
 

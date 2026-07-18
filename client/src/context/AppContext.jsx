@@ -18,6 +18,8 @@ const init = {
   contextMenu: null,
   modal: null,
   fileNames: [],
+  fileHistory: {},
+  fileConflicts: {},
   showFilePicker: false,
   showQuizLauncher: false,
   currentUser: null,
@@ -40,6 +42,26 @@ function reducer(state, action) {
       return next
     }
     case 'SET_FILE_NAMES': return { ...state, fileNames: action.payload }
+    case 'SET_FILE_HISTORY': return {
+      ...state,
+      fileHistory: {
+        ...state.fileHistory,
+        [action.payload.id]: {
+          canUndo: Boolean(action.payload.can_undo),
+          canRedo: Boolean(action.payload.can_redo),
+          contentVersion: Number(action.payload.content_version || 0),
+        },
+      },
+    }
+    case 'SET_FILE_CONFLICT': return {
+      ...state,
+      fileConflicts: { ...state.fileConflicts, [action.payload.id]: action.payload },
+    }
+    case 'CLEAR_FILE_CONFLICT': {
+      const fileConflicts = { ...state.fileConflicts }
+      delete fileConflicts[action.payload]
+      return { ...state, fileConflicts }
+    }
     case 'OPEN_FILE': {
       const tab = tabFromFile(action.payload)
       const tabs = tab
@@ -47,8 +69,19 @@ function reducer(state, action) {
           ? state.tabs.map(existing => existing.id === tab.id ? { ...existing, ...tab } : existing)
           : [...state.tabs, tab]
         : state.tabs
+      const fileConflicts = { ...state.fileConflicts }
+      if (action.payload?.id) delete fileConflicts[action.payload.id]
       return {
         ...state,
+        fileConflicts,
+        fileHistory: action.payload?.id ? {
+          ...state.fileHistory,
+          [action.payload.id]: {
+            canUndo: Boolean(action.payload.can_undo),
+            canRedo: Boolean(action.payload.can_redo),
+            contentVersion: Number(action.payload.content_version || 0),
+          },
+        } : state.fileHistory,
         tabs,
         openFile: action.payload,
         openFileId: action.payload?.id || null,
@@ -154,6 +187,11 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, init)
   const insertRef = useRef(null)
   const openRequestRef = useRef(0)
+  const fileVersionRef = useRef({})
+
+  if (state.openFile?.id && fileVersionRef.current[state.openFile.id] === undefined) {
+    fileVersionRef.current[state.openFile.id] = Number(state.openFile.content_version || 0)
+  }
 
   const loadTree = useCallback(async () => {
     try {
@@ -179,6 +217,7 @@ export function AppProvider({ children }) {
     try {
       const file = await api.getFile(id)
       if (requestId !== openRequestRef.current) return
+      fileVersionRef.current[id] = Number(file.content_version || 0)
       dispatch({ type: 'OPEN_FILE', payload: file })
     } catch (err) {
       if (requestId === openRequestRef.current) {
@@ -191,15 +230,79 @@ export function AppProvider({ children }) {
 
   const saveFile = useCallback(async (id, content) => {
     try {
-      await api.updateFile(id, { content })
+      const updated = await api.updateFile(id, {
+        content,
+        base_version: Number(fileVersionRef.current[id] ?? 0),
+      })
+      fileVersionRef.current[id] = Number(updated.content_version || 0)
+      dispatch({ type: 'SET_FILE_HISTORY', payload: { id, ...updated } })
+      return updated
     } catch (err) {
+      if (err.code === 'FILE_VERSION_CONFLICT' && err.details?.current_file) {
+        dispatch({
+          type: 'SET_FILE_CONFLICT',
+          payload: { id, local_content: content, current_file: err.details.current_file },
+        })
+        toast('Conflit détecté : le fichier a été modifié ailleurs', 'error')
+        err.alreadyToasted = true
+        throw err
+      }
       if (/not found/i.test(err.message || '')) {
         dispatch({ type: 'CLEAR_OPEN_FILE' })
         await loadTree()
       }
       toast(err.message || 'Erreur lors de la sauvegarde', 'error')
+      err.alreadyToasted = true
+      throw err
     }
   }, [loadTree, toast])
+
+  const stepFileHistory = useCallback(async (id, direction) => {
+    try {
+      const version = Number(fileVersionRef.current[id] ?? 0)
+      const updated = direction === 'undo' ? await api.undoFile(id, version) : await api.redoFile(id, version)
+      fileVersionRef.current[id] = Number(updated.content_version || 0)
+      dispatch({ type: 'SET_FILE_HISTORY', payload: { id, ...updated } })
+      return updated
+    } catch (err) {
+      if (err.code === 'FILE_VERSION_CONFLICT' && err.details?.current_file) {
+        dispatch({ type: 'SET_FILE_CONFLICT', payload: { id, local_content: null, current_file: err.details.current_file } })
+      }
+      throw err
+    }
+  }, [])
+
+  const resolveFileConflict = useCallback(async (id, resolution) => {
+    const conflict = state.fileConflicts[id]
+    if (!conflict?.current_file) return null
+    if (resolution === 'cloud') {
+      fileVersionRef.current[id] = Number(conflict.current_file.content_version || 0)
+      dispatch({ type: 'OPEN_FILE', payload: conflict.current_file })
+      toast('Version cloud chargée')
+      return conflict.current_file
+    }
+    try {
+      const updated = await api.updateFile(id, {
+        content: conflict.local_content || '',
+        base_version: Number(conflict.current_file.content_version || 0),
+      })
+      fileVersionRef.current[id] = Number(updated.content_version || 0)
+      dispatch({ type: 'OPEN_FILE', payload: updated })
+      toast('Ta version a été enregistrée; l’autre reste disponible dans l’historique')
+      return updated
+    } catch (err) {
+      if (err.code === 'FILE_VERSION_CONFLICT' && err.details?.current_file) {
+        dispatch({
+          type: 'SET_FILE_CONFLICT',
+          payload: { id, local_content: conflict.local_content, current_file: err.details.current_file },
+        })
+        toast('Une nouvelle modification est arrivée; vérifie à nouveau le conflit', 'error')
+        return null
+      }
+      toast(err.message, 'error')
+      return null
+    }
+  }, [state.fileConflicts, toast])
 
   const deleteFile = useCallback(async (id, options = {}) => {
     await api.deleteFile(id, Boolean(options.confirmChildren))
@@ -241,7 +344,7 @@ export function AppProvider({ children }) {
     const today = new Date().toISOString().slice(0, 10)
     const fileName = `${today}.md`
     const flat = flattenTree(state.tree)
-    let journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id && f.type === 'folder')
+    let journalFolder = flat.find(f => f.name === 'Journal' && !f.parent_id && f.type === 'folder' && f.is_owner !== false)
     let todayFile = journalFolder && flat.find(f => f.name === fileName && f.parent_id === journalFolder.id)
     if (!journalFolder) {
       try {
@@ -305,6 +408,9 @@ export function AppProvider({ children }) {
     closeTab,
     closeAllTabs,
     saveFile,
+    undoFile: id => stepFileHistory(id, 'undo'),
+    redoFile: id => stepFileHistory(id, 'redo'),
+    resolveFileConflict,
     deleteFile,
     toast,
     showContextMenu,

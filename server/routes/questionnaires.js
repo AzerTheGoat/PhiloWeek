@@ -2,6 +2,7 @@ const express = require('express')
 const crypto = require('crypto')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
+const { getAccessibleFileRows, getFileAccess } = require('../fileAccess')
 
 const router = express.Router()
 
@@ -29,15 +30,11 @@ router.post('/session', (req, res) => {
 
 router.get('/linked/:fileId', (req, res) => {
   const db = getDb()
-  const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(req.params.fileId, req.user.id)
+  const target = getFileAccess(db, req.params.fileId, req.user.id)?.file
   if (!target || target.type !== 'file') return res.json([])
 
   const targetPath = getFilePath(db, target.id, req.user.id)
-  const rows = db.prepare(`
-    SELECT id, parent_id, name, content, created_at, updated_at
-    FROM files
-    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
-  `).all(req.user.id)
+  const rows = getAccessibleFileRows(db, req.user.id, { filesOnly: true }).filter(file => file.content !== null)
 
   const linked = rows
     .filter(file => isQuestionnaireContent(file.name, file.content))
@@ -100,16 +97,12 @@ router.get('/results', (req, res) => {
 module.exports = router
 
 function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId) {
-  let rows = db.prepare(`
-    SELECT id, parent_id, name, content, created_at, updated_at
-    FROM files
-    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
-  `).all(userId)
+  let rows = getAccessibleFileRows(db, userId, { filesOnly: true }).filter(file => file.content !== null)
 
   if (scope === 'file' && fileId) {
     rows = rows.filter(file => file.id === fileId)
   } else if (scope === 'linked_file' && fileId) {
-    const target = db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(fileId, userId)
+    const target = getFileAccess(db, fileId, userId)?.file
     if (!target || target.type !== 'file') return []
     const targetPath = getFilePath(db, target.id, userId)
     rows = rows.filter(file => {
@@ -120,7 +113,7 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
     const directIds = new Set(Array.isArray(fileIds) ? fileIds.map(id => String(id)) : [])
     const targets = Array.isArray(fileIds)
       ? fileIds
-        .map(id => db.prepare('SELECT id, name, parent_id, type FROM files WHERE id = ? AND user_id = ?').get(String(id), userId))
+        .map(id => getFileAccess(db, String(id), userId)?.file)
         .filter(file => file && file.type === 'file')
         .map(file => ({ file, path: getFilePath(db, file.id, userId) }))
       : []
@@ -142,11 +135,11 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
 
 function collectFolderScope(db, folderIds, userId) {
   const allowed = new Set()
-  const childrenStmt = db.prepare('SELECT id, type FROM files WHERE parent_id = ? AND user_id = ?')
+  const childrenStmt = db.prepare('SELECT id, type FROM files WHERE parent_id = ? AND deleted_at IS NULL')
   function walk(id) {
     if (!id || allowed.has(id)) return
     allowed.add(id)
-    childrenStmt.all(id, userId).forEach(child => {
+    childrenStmt.all(id).forEach(child => {
       if (child.type === 'folder') walk(child.id)
     })
   }
@@ -349,12 +342,13 @@ function questionnaireMatchesFile(questionnaire, file, filePath) {
 
 function getFilePath(db, fileId, userId) {
   const parts = []
-  let cursor = db.prepare('SELECT id, parent_id, name FROM files WHERE id = ? AND user_id = ?').get(fileId, userId)
+  let cursor = getFileAccess(db, fileId, userId)?.file
   while (cursor) {
     parts.unshift(cursor.name)
-    cursor = cursor.parent_id
-      ? db.prepare('SELECT id, parent_id, name FROM files WHERE id = ? AND user_id = ?').get(cursor.parent_id, userId)
-      : null
+    if (!cursor.parent_id) break
+    const parentAccess = getFileAccess(db, cursor.parent_id, userId)
+    if (!parentAccess) break
+    cursor = parentAccess.file
   }
   return parts.join('/')
 }

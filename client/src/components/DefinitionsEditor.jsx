@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import { normalizeTagsInput, parseDefinitionsJson } from '../utils/definitionsFile'
 import Icon from './Icons'
+import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
 
 const AUTOSAVE_DELAY = 800
@@ -28,7 +29,7 @@ export default function DefinitionsEditor() {
     setCurrentIndex(0)
     setAnswer('')
     setRevealed(false)
-  }, [currentFile?.id])
+  }, [currentFile])
 
   useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
@@ -54,6 +55,8 @@ export default function DefinitionsEditor() {
       try {
         await saveFile(openFileId, value)
         setDirty(false)
+      } catch (_) {
+        // Le contexte affiche déjà l'erreur et conserve l'état non sauvegardé.
       } finally {
         setSaving(false)
       }
@@ -176,6 +179,29 @@ export default function DefinitionsEditor() {
     }
   }, [answer, currentCard, currentIndex, session.length, startedAt, toast])
 
+  const flushPending = useCallback(async () => {
+    if (!dirty || !openFileId) return null
+    clearTimeout(saveTimerRef.current)
+    setSaving(true)
+    try {
+      const result = await saveFile(openFileId, content)
+      setDirty(false)
+      return result
+    } finally {
+      setSaving(false)
+    }
+  }, [content, dirty, openFileId, saveFile])
+
+  const applyHistoryContent = useCallback((value) => {
+    clearTimeout(saveTimerRef.current)
+    setContent(value)
+    setDirty(false)
+    setSession([])
+    setCurrentIndex(0)
+  }, [])
+
+  const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: dirty })
+
   if (!currentFile) return null
 
   return (
@@ -183,6 +209,7 @@ export default function DefinitionsEditor() {
       <div className="editor-titlebar">
         <h2 className="editor-filename">{currentFile.name.replace(/\.json$/i, '')}</h2>
         <div className="editor-meta">
+          <FileHistoryControls history={history} />
           <span className={`save-status ${dirty ? 'dirty' : ''}`}>
             {saving ? 'Enregistrement...' : dirty ? 'non sauvegarde' : 'sauvegarde'}
           </span>

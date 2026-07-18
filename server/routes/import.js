@@ -44,16 +44,19 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     // Phase 3: all DB writes in a single transaction (fast)
     const pathToId = {}
+    let fileHistoryPayload = null
+    let trashPayload = null
+    let sharePayload = null
 
     const importTx = db.transaction(() => {
       const insertFolder = db.prepare(
         "INSERT INTO files (id, parent_id, name, type, user_id, created_at, updated_at) VALUES (?, ?, ?, 'folder', ?, datetime('now'), datetime('now'))"
       )
       const insertFile = db.prepare(
-        "INSERT INTO files (id, parent_id, name, type, content, user_id, created_at, updated_at) VALUES (?, ?, ?, 'file', ?, ?, datetime('now'), datetime('now'))"
+        "INSERT INTO files (id, parent_id, name, type, content, user_id, last_edited_by, created_at, updated_at) VALUES (?, ?, ?, 'file', ?, ?, ?, datetime('now'), datetime('now'))"
       )
       const updateFile = db.prepare(
-        "UPDATE files SET content = ?, updated_at = datetime('now') WHERE id = ?"
+        "UPDATE files SET content = ?, history_revision = 0, content_version = content_version + 1, last_edited_by = ?, updated_at = datetime('now') WHERE id = ?"
       )
       const insertQuote = db.prepare(
         `INSERT INTO quotes (id, quote, author, source, notes, tags, user_id, created_at, updated_at)
@@ -118,11 +121,34 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           id, article_id, user_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?)`
       )
+      const insertRevision = db.prepare(`
+        INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at, actor_user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      const insertTrashedFile = db.prepare(`
+        INSERT INTO files (
+          id, parent_id, name, type, content, password_hash, encrypted_content,
+          created_at, updated_at, sort_order, user_id, deleted_at, history_revision,
+          content_version, last_edited_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
 
       for (const { relativePath, rawContent } of decompressed) {
         try {
           const jsonSpecial = safeJson(rawContent)
           const parsedSpecial = /\.md$/i.test(relativePath) ? safeMatter(rawContent) : { data: {}, content: rawContent }
+          if (jsonSpecial?.philoweek_type === 'file_history') {
+            fileHistoryPayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'trash') {
+            trashPayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'file_shares') {
+            sharePayload = jsonSpecial
+            continue
+          }
           if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
             const results = Array.isArray(jsonSpecial.results) ? jsonSpecial.results : []
             for (const result of results) {
@@ -382,7 +408,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             pathAccum = pathAccum ? pathAccum + '/' + dirName : dirName
             if (!pathToId[pathAccum]) {
               const existing = db.prepare(
-                "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ?"
+                "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ? AND deleted_at IS NULL"
               ).get(dirName, parentId, req.user.id)
               if (existing) {
                 pathToId[pathAccum] = existing.id
@@ -396,23 +422,24 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
 
           const existing = db.prepare(
-            'SELECT id FROM files WHERE name = ? AND parent_id IS ? AND user_id = ?'
+            'SELECT id FROM files WHERE name = ? AND parent_id IS ? AND user_id = ? AND deleted_at IS NULL'
           ).get(fileName, parentId, req.user.id)
 
           let fileId
           if (existing) {
             if (conflict === 'skip') { report.skipped++; return }
             if (conflict === 'overwrite') {
-              updateFile.run(rawContent, existing.id)
+              db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(existing.id)
+              updateFile.run(rawContent, req.user.id, existing.id)
               fileId = existing.id
             } else {
               const newName = fileName.replace(/\.md$/i, '') + `-import-${Date.now()}.md`
               fileId = uuidv4()
-              insertFile.run(fileId, parentId, newName, rawContent, req.user.id)
+              insertFile.run(fileId, parentId, newName, rawContent, req.user.id, req.user.id)
             }
           } else {
             fileId = uuidv4()
-            insertFile.run(fileId, parentId, fileName, rawContent, req.user.id)
+            insertFile.run(fileId, parentId, fileName, rawContent, req.user.id, req.user.id)
           }
 
           pathToId[relativePath] = fileId
@@ -422,12 +449,124 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           report.errors.push(`${relativePath}: ${err.message}`)
         }
       }
+
+      if (fileHistoryPayload && Array.isArray(fileHistoryPayload.files)) {
+        for (const historyFile of fileHistoryPayload.files) {
+          const fileId = pathToId[String(historyFile.path || '')]
+          if (!fileId) continue
+          const revisions = Array.isArray(historyFile.revisions) ? historyFile.revisions : []
+          if (!revisions.length) continue
+          db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(fileId)
+          for (const revision of revisions) {
+            if (!Number.isInteger(Number(revision.revision_no))) continue
+            insertRevision.run(
+              fileId,
+              req.user.id,
+              Number(revision.revision_no),
+              String(revision.content || ''),
+              normalizeIsoDate(revision.created_at) || new Date().toISOString(),
+              findUserIdByUsername(db, revision.actor_username)
+            )
+          }
+          const currentRevision = Number(historyFile.current_revision)
+          const currentExists = db.prepare(
+            'SELECT 1 FROM file_revisions WHERE file_id = ? AND revision_no = ?'
+          ).get(fileId, currentRevision)
+          const fallback = db.prepare('SELECT MAX(revision_no) AS value FROM file_revisions WHERE file_id = ?').get(fileId)?.value || 0
+          db.prepare('UPDATE files SET history_revision = ?, content_version = ? WHERE id = ?')
+            .run(currentExists ? currentRevision : fallback, Math.max(0, Number(historyFile.content_version) || 0), fileId)
+        }
+      }
+
+      if (trashPayload && Array.isArray(trashPayload.files)) {
+        const oldToNewId = new Map()
+        const pending = trashPayload.files.slice()
+        let safety = pending.length + 1
+        while (pending.length && safety-- > 0) {
+          let progressed = false
+          for (let index = pending.length - 1; index >= 0; index--) {
+            const file = pending[index]
+            const parentInTrash = trashPayload.files.some(candidate => candidate.id === file.parent_id)
+            if (parentInTrash && !oldToNewId.has(file.parent_id)) continue
+            const parentPath = trashPayload.active_parents?.[file.parent_id]
+            const parentId = oldToNewId.get(file.parent_id) || pathToId[parentPath] || null
+            const id = uuidv4()
+            insertTrashedFile.run(
+              id,
+              parentId,
+              String(file.name || 'Sans titre'),
+              ['file', 'folder', 'locked_folder'].includes(file.type) ? file.type : 'file',
+              file.content ?? null,
+              file.password_hash ?? null,
+              file.encrypted_content ?? null,
+              normalizeIsoDate(file.created_at) || new Date().toISOString(),
+              normalizeIsoDate(file.updated_at) || new Date().toISOString(),
+              Number(file.sort_order) || 0,
+              req.user.id,
+              normalizeIsoDate(file.deleted_at) || new Date().toISOString(),
+              Number(file.history_revision) || 0,
+              Math.max(0, Number(file.content_version) || 0),
+              findUserIdByUsername(db, file.last_edited_by_username)
+            )
+            oldToNewId.set(file.id, id)
+            pending.splice(index, 1)
+            progressed = true
+            report.imported++
+          }
+          if (!progressed) break
+        }
+        for (const revision of Array.isArray(trashPayload.revisions) ? trashPayload.revisions : []) {
+          const fileId = oldToNewId.get(revision.file_id)
+          if (!fileId || !Number.isInteger(Number(revision.revision_no))) continue
+          insertRevision.run(
+            fileId,
+            req.user.id,
+            Number(revision.revision_no),
+            String(revision.content || ''),
+            normalizeIsoDate(revision.created_at) || new Date().toISOString(),
+            findUserIdByUsername(db, revision.actor_username)
+          )
+        }
+      }
+
+      if (sharePayload && Array.isArray(sharePayload.shares)) {
+        const insertShare = db.prepare(`
+          INSERT INTO file_shares (
+            id, file_id, owner_id, shared_with_user_id, permission, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(file_id, shared_with_user_id)
+          DO UPDATE SET permission = excluded.permission, updated_at = excluded.updated_at
+        `)
+        for (const share of sharePayload.shares) {
+          const fileId = pathToId[String(share.path || '')]
+          const recipientId = findUserIdByUsername(db, share.username)
+          if (!fileId || !recipientId || recipientId === req.user.id) continue
+          insertShare.run(
+            uuidv4(),
+            fileId,
+            req.user.id,
+            recipientId,
+            share.permission === 'edit' ? 'edit' : 'view',
+            normalizeIsoDate(share.created_at) || new Date().toISOString(),
+            normalizeIsoDate(share.updated_at) || new Date().toISOString()
+          )
+          report.imported++
+        }
+      }
+
+      // Les imports Obsidian sans historique commencent avec leur contenu actuel.
+      db.prepare(`
+        INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at)
+        SELECT id, user_id, history_revision, COALESCE(content, ''), COALESCE(updated_at, datetime('now'))
+        FROM files
+        WHERE user_id = ? AND type = 'file' AND content IS NOT NULL
+      `).run(req.user.id)
     })
 
     importTx()
 
     // Phase 4: resolve [[links]] — one query to get all files with content
-    const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file' AND user_id = ?").all(req.user.id)
+    const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file' AND user_id = ? AND deleted_at IS NULL").all(req.user.id)
     const nameToId = {}
     allFiles.forEach(f => {
       nameToId[f.name] = f.id
@@ -603,4 +742,10 @@ function clampInt(value, min, max, fallback) {
   const next = Number(value)
   if (!Number.isFinite(next)) return fallback
   return Math.min(max, Math.max(min, Math.round(next)))
+}
+
+function findUserIdByUsername(db, username) {
+  const value = String(username || '').trim()
+  if (!value) return null
+  return db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(value)?.id || null
 }

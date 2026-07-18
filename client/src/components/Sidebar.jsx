@@ -75,6 +75,7 @@ export default function Sidebar() {
     { icon: 'database', label: 'Base de liens', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { icon: 'timeline', label: 'Frise historique', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
     { icon: 'newspaper', label: 'Journal public', active: view === 'social-journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }) },
+    { icon: 'trash', label: 'Corbeille', active: view === 'trash', action: () => dispatch({ type: 'SET_VIEW', payload: 'trash' }) },
     { icon: 'thought', label: 'Aide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },
   ]
 
@@ -148,7 +149,16 @@ export default function Sidebar() {
             ))}
           </div>
         ) : (
-          <FileTree nodes={tree} />
+          <>
+            <div className="file-section-label">Mes fichiers</div>
+            <FileTree nodes={tree.filter(node => !node.shared_root)} />
+            {tree.some(node => node.shared_root) && (
+              <>
+                <div className="file-section-label shared"><Icon name="cloud" size={13} /> Partagés avec moi</div>
+                <FileTree nodes={tree.filter(node => node.shared_root)} />
+              </>
+            )}
+          </>
         )}
       </div>
 

@@ -386,6 +386,56 @@ const MIGRATIONS = [
         ON app_snapshots(user_id, stack, created_at);
     `)
   },
+  // v11 -> v12 : corbeille 30 jours et historique persistant par fichier.
+  (db) => {
+    addColumnIfMissing(db, 'files', 'deleted_at', 'TEXT')
+    addColumnIfMissing(db, 'files', 'history_revision', 'INTEGER NOT NULL DEFAULT 0')
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS file_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        revision_no INTEGER NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(file_id, revision_no)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_files_user_deleted
+        ON files(user_id, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_file_revisions_file_revision
+        ON file_revisions(file_id, revision_no);
+
+      INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at)
+      SELECT id, user_id, 0, COALESCE(content, ''), COALESCE(updated_at, datetime('now'))
+      FROM files
+      WHERE type = 'file' AND user_id IS NOT NULL AND content IS NOT NULL;
+    `)
+  },
+  // v12 -> v13 : partage par identifiant et controle de concurrence cloud.
+  (db) => {
+    addColumnIfMissing(db, 'files', 'content_version', 'INTEGER NOT NULL DEFAULT 0')
+    addColumnIfMissing(db, 'files', 'last_edited_by', 'TEXT REFERENCES users(id) ON DELETE SET NULL')
+    addColumnIfMissing(db, 'file_revisions', 'actor_user_id', 'TEXT REFERENCES users(id) ON DELETE SET NULL')
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS file_shares (
+        id TEXT PRIMARY KEY,
+        file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        shared_with_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        permission TEXT NOT NULL DEFAULT 'view' CHECK(permission IN ('view', 'edit')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(file_id, shared_with_user_id),
+        CHECK(owner_id != shared_with_user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_file_shares_recipient
+        ON file_shares(shared_with_user_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_file_shares_owner
+        ON file_shares(owner_id, file_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne
@@ -495,14 +545,14 @@ function updateLinks(db, fileId, content, userId) {
     // Filtré par user_id : un lien [[Nom]] ne doit jamais se résoudre vers
     // le fichier d'un autre compte, même en cas d'homonymie.
     const target = db.prepare(
-      'SELECT id FROM files WHERE (name = ? OR name = ?) AND user_id IS ? LIMIT 1'
+      'SELECT id FROM files WHERE (name = ? OR name = ?) AND user_id IS ? AND deleted_at IS NULL LIMIT 1'
     ).get(nameWithExt, linkText, userId ?? null)
     if (target) insertLink.run(fileId, target.id, linkText)
   }
 }
 
 function updateAllLinks(db, userId) {
-  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file' AND user_id IS ?").all(userId ?? null)
+  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file' AND user_id IS ? AND deleted_at IS NULL").all(userId ?? null)
   const tx = db.transaction(() => {
     for (const file of files) updateLinks(db, file.id, file.content || '', userId)
   })

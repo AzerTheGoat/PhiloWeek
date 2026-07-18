@@ -45,6 +45,11 @@ const SECTIONS = [
         text: "Chaque modification est enregistrée ~800ms après la dernière frappe. Ctrl+S force une sauvegarde immédiate.",
       },
       {
+        icon: 'undo',
+        title: 'Annuler & rétablir',
+        text: "Les notes, graphes, questionnaires et définitions gardent un historique logique. Utilise les boutons du fichier, Ctrl+Z pour annuler et Ctrl+Shift+Z ou Ctrl+Y pour rétablir.",
+      },
+      {
         icon: 'upload',
         title: 'Coller une image',
         text: 'Colle une image directement dans le texte (Ctrl+V) : elle est compressée en WebP et intégrée en base64 dans la note.',
@@ -199,6 +204,21 @@ const SECTIONS = [
   {
     title: 'Partage & sauvegarde',
     items: [
+      {
+        icon: 'cloud',
+        title: 'Partager avec un utilisateur',
+        text: "Au clic droit sur un fichier ou dossier, choisis Partager puis saisis l’identifiant exact du compte. Accorde la lecture seule ou la modification; un dossier partage automatiquement tout son contenu.",
+      },
+      {
+        icon: 'alert',
+        title: 'Conflits sans écrasement',
+        text: "Chaque sauvegarde vérifie la version cloud. Si quelqu’un a modifié le fichier entre-temps, Opuscule bloque l’écrasement et te laisse choisir la version à conserver; une nouvelle concurrence est vérifiée à nouveau.",
+      },
+      {
+        icon: 'trash',
+        title: 'Corbeille 30 jours',
+        text: "Supprimer un fichier ou un dossier le place dans la Corbeille. Tu peux le restaurer pendant 30 jours, le supprimer définitivement ou vider toute la corbeille.",
+      },
       {
         icon: 'copy',
         title: 'Copier plusieurs notes',

@@ -251,6 +251,29 @@ const PATHS = {
       <path d="M20 5v6h-6" />
     </>
   ),
+  undo: (
+    <>
+      <path d="M9 7 4.5 11 9 15" />
+      <path d="M5 11h8a6 6 0 0 1 6 6" />
+    </>
+  ),
+  redo: (
+    <>
+      <path d="m15 7 4.5 4L15 15" />
+      <path d="M19 11h-8a6 6 0 0 0-6 6" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4.5 7h15" />
+      <path d="M9 7V4.5h6V7" />
+      <path d="m6.5 7 .8 13h9.4l.8-13" />
+      <path d="M10 11v5.5M14 11v5.5" />
+    </>
+  ),
+  cloud: (
+    <path d="M7.5 18.5h10a4 4 0 0 0 .4-8A6 6 0 0 0 6.5 9a4.8 4.8 0 0 0 1 9.5Z" />
+  ),
 }
 
 export default function Icon({ name, size = 20, className = '' }) {

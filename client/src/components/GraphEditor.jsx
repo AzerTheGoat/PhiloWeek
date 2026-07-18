@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
+import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
 
 const AUTOSAVE_DELAY = 650
@@ -75,6 +76,10 @@ export default function GraphEditor() {
   const pendingViewRef = useRef(null)   // vue à restaurer pour le fichier courant
   const viewReadyRef = useRef(false)    // true une fois la restauration faite
   const viewSaveTimerRef = useRef(null) // debounce de la sauvegarde au scroll
+  const graphRef = useRef(graph)
+  const dirtyRef = useRef(dirty)
+  graphRef.current = graph
+  dirtyRef.current = dirty
 
   // Refs toujours à jour — pour sauvegarder la vue au démontage
   const zoomRef = useRef(zoom)
@@ -102,7 +107,7 @@ export default function GraphEditor() {
       ? { mode: 'saved', zoom: savedView.zoom, scrollLeft: savedView.scrollLeft, scrollTop: savedView.scrollTop }
       : { mode: 'default', zoom: 1 }
     setZoom(savedView ? savedView.zoom : 1)
-  }, [currentFile?.id])
+  }, [currentFile])
 
   // Restaure la position de scroll une fois le zoom cible appliqué :
   //   - vue sauvegardée → scroll exact quitté la dernière fois
@@ -200,6 +205,8 @@ export default function GraphEditor() {
       try {
         await saveFile(openFileId, serializeGraph(currentFile, nextGraph))
         setDirty(false)
+      } catch (_) {
+        // Le contexte affiche déjà l'erreur et conserve l'état non sauvegardé.
       } finally {
         setSaving(false)
       }
@@ -494,6 +501,29 @@ export default function GraphEditor() {
     return map
   }, [graph.nodes])
 
+  const flushPending = useCallback(async () => {
+    if (!dirtyRef.current || !openFileId) return null
+    clearTimeout(saveTimerRef.current)
+    setSaving(true)
+    try {
+      const result = await saveFile(openFileId, serializeGraph(currentFile, graphRef.current))
+      setDirty(false)
+      return result
+    } finally {
+      setSaving(false)
+    }
+  }, [currentFile, openFileId, saveFile])
+
+  const applyHistoryContent = useCallback((value) => {
+    clearTimeout(saveTimerRef.current)
+    setGraph(parseGraph(value, currentFile?.name))
+    setSelectedId(null)
+    setSelectedIds(new Set())
+    setDirty(false)
+  }, [currentFile?.name])
+
+  const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: dirty })
+
   return (
     <div className="graph-editor">
       <div className="graph-titlebar">
@@ -504,6 +534,7 @@ export default function GraphEditor() {
           </span>
         </div>
         <div className="graph-toolbar">
+          <FileHistoryControls history={history} />
           <div className="graph-zoom-controls" aria-label="Zoom du graphe">
             <button type="button" className="graph-zoom-btn" onClick={zoomOut} title="Dézoomer">-</button>
             <button type="button" className="graph-zoom-value" onClick={resetZoom} title="Réinitialiser le zoom">

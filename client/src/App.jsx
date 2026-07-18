@@ -17,6 +17,7 @@ import HistoricalTimeline from './components/HistoricalTimeline'
 import SocialJournal from './components/SocialJournal'
 import PublicArticle from './components/PublicArticle'
 import Tutorial from './components/Tutorial'
+import Trash from './components/Trash'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
 import Toast from './components/Toast'
@@ -62,7 +63,11 @@ function getPublicArticleId() {
 function AppShell() {
   const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
 
-  useEffect(() => { loadTree() }, [])
+  useEffect(() => {
+    loadTree()
+    const timer = setInterval(loadTree, 30000)
+    return () => clearInterval(timer)
+  }, [loadTree])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -125,6 +130,8 @@ function AppShell() {
           <SocialJournal />
         ) : view === 'tutorial' ? (
           <Tutorial />
+        ) : view === 'trash' ? (
+          <Trash />
         ) : currentFile ? (
           <Editor />
         ) : (

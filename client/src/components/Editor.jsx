@@ -5,11 +5,13 @@ import Preview from './Preview'
 import GraphEditor from './GraphEditor'
 import QuestionnaireEditor from './QuestionnaireEditor'
 import DefinitionsEditor from './DefinitionsEditor'
+import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import Icon from './Icons'
 import { isGraphFile } from '../utils/graphFile'
 import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import { isDefinitionsFile } from '../utils/definitionsFile'
 import * as api from '../api'
+import CloudCollaborationBar from './CloudCollaborationBar'
 
 const AUTOSAVE_DELAY = 800
 
@@ -18,6 +20,36 @@ function initialMode() {
 }
 
 export default function Editor() {
+  const { currentFile } = useApp()
+  let editor
+  if (currentFile?.access?.can_edit === false) editor = <SharedFileViewer file={currentFile} />
+  else if (isGraphFile(currentFile)) editor = <GraphEditor />
+  else if (isDefinitionsFile(currentFile)) editor = <DefinitionsEditor />
+  else if (isQuestionnaireFile(currentFile)) editor = <QuestionnaireEditor />
+  else editor = <MarkdownEditor />
+  return <div className="cloud-editor-shell"><CloudCollaborationBar />{editor}</div>
+}
+
+function SharedFileViewer({ file }) {
+  const isJson = /\.json$/i.test(file.name || '')
+  let formatted = file.content || ''
+  if (isJson) {
+    try { formatted = JSON.stringify(JSON.parse(formatted), null, 2) } catch (_) {}
+  }
+  return (
+    <div className="shared-file-viewer">
+      <div className="editor-titlebar">
+        <h2 className="editor-filename">{file.name.replace(/\.(md|json)$/i, '')}</h2>
+        <span className="shared-readonly-badge"><Icon name="eye" size={14} /> Lecture seule</span>
+      </div>
+      <div className="shared-file-viewer-body">
+        {isJson ? <pre>{formatted}</pre> : <Preview content={file.content || ''} />}
+      </div>
+    </div>
+  )
+}
+
+function MarkdownEditor() {
   const { currentFile, openFileId, saveFile, toast, fileNames, insertRef } = useApp()
 
   // Content is LOCAL state — never dispatched to global context
@@ -79,7 +111,7 @@ export default function Editor() {
     if (prevId && openFileId && prevId !== openFileId && isDirtyRef.current) {
       clearTimeout(saveTimerRef.current)
       const { saveFile: fn } = saveRef.current
-      fn(prevId, contentRef.current)
+      fn(prevId, contentRef.current).catch(() => {})
     }
     prevFileIdRef.current = openFileId
     const newContent = currentFile?.content || ''
@@ -233,7 +265,8 @@ export default function Editor() {
       clearTimeout(saveTimerRef.current)
       const { openFileId: fid, saveFile: fn } = saveRef.current
       fn(fid, contentRef.current)
-      setIsDirty(false)
+        .then(() => setIsDirty(false))
+        .catch(() => {})
     }
   }, [triggerSave])
 
@@ -241,16 +274,39 @@ export default function Editor() {
     ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
     : []
 
+  const flushPending = useCallback(async () => {
+    if (!isDirtyRef.current) return null
+    clearTimeout(saveTimerRef.current)
+    const { openFileId: fid, saveFile: fn } = saveRef.current
+    if (!fid) return null
+    setSaving(true)
+    try {
+      const result = await fn(fid, contentRef.current)
+      setIsDirty(false)
+      return result
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
+  const applyHistoryContent = useCallback((value) => {
+    clearTimeout(saveTimerRef.current)
+    setContent(value)
+    setPreviewContent(value)
+    setIsDirty(false)
+    setWikiQuery(null)
+  }, [])
+
+  const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: isDirty })
+
   if (!currentFile) return null
-  if (isGraphFile(currentFile)) return <GraphEditor />
-  if (isDefinitionsFile(currentFile)) return <DefinitionsEditor />
-  if (isQuestionnaireFile(currentFile)) return <QuestionnaireEditor />
 
   return (
     <div className="editor-container">
       <div className="editor-titlebar">
         <h2 className="editor-filename">{currentFile.name.replace(/\.md$/i, '')}</h2>
         <div className="editor-meta">
+          <FileHistoryControls history={history} />
           <LinkedQuizLauncher currentFile={currentFile} />
           <span className="word-count">{wordCount} mots</span>
           <span className={`save-status ${isDirty ? 'dirty' : ''}`}>

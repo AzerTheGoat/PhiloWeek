@@ -2,6 +2,7 @@ const express = require('express')
 const matter = require('gray-matter')
 const router = express.Router()
 const { getDb } = require('../db')
+const { getAccessibleFileRows, getFileAccess } = require('../fileAccess')
 
 const COPY_PROMPTS = {
   none: '',
@@ -36,7 +37,8 @@ router.get('/', (req, res) => {
 
 router.get('/:id/references', (req, res) => {
   const db = getDb()
-  const target = db.prepare("SELECT * FROM files WHERE id = ? AND type = 'file' AND user_id = ?").get(req.params.id, req.user.id)
+  const targetAccess = getFileAccess(db, req.params.id, req.user.id)
+  const target = targetAccess?.file
   if (!target) return res.status(404).json({ error: 'Not found' })
 
   const paths = buildPaths(db, req.user.id)
@@ -96,12 +98,9 @@ router.post('/copy', (req, res) => {
 module.exports = router
 
 function getReadableFiles(db, userId) {
-  return db.prepare(`
-    SELECT id, parent_id, name, type, content, created_at, updated_at
-    FROM files
-    WHERE type = 'file' AND content IS NOT NULL AND user_id = ?
-    ORDER BY name ASC
-  `).all(userId)
+  return getAccessibleFileRows(db, userId, { filesOnly: true })
+    .filter(file => file.content !== null)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 function buildEdges(db, files, paths, userId) {
@@ -120,8 +119,9 @@ function buildEdges(db, files, paths, userId) {
     FROM file_links fl
     JOIN files s ON s.id = fl.source_id
     JOIN files t ON t.id = fl.target_id
-    WHERE s.type = 'file' AND t.type = 'file' AND s.user_id = ? AND t.user_id = ?
-  `).all(userId, userId)
+    WHERE s.type = 'file' AND t.type = 'file'
+      AND s.deleted_at IS NULL AND t.deleted_at IS NULL
+  `).all().filter(link => fileById.has(link.source_id) && fileById.has(link.target_id))
 
   for (const link of wikiLinks) {
     addEdge(edges, seen, {
@@ -163,8 +163,8 @@ function getWikiReferences(db, target, paths, userId) {
     SELECT f.id, f.name, f.content, fl.link_text
     FROM file_links fl
     JOIN files f ON f.id = fl.source_id
-    WHERE fl.target_id = ? AND f.type = 'file' AND f.content IS NOT NULL AND f.user_id = ?
-  `).all(target.id, userId)
+    WHERE fl.target_id = ? AND f.type = 'file' AND f.content IS NOT NULL AND f.deleted_at IS NULL
+  `).all(target.id).filter(file => getFileAccess(db, file.id, userId))
 
   return rows.flatMap(row => {
     const snippets = findWikiSnippets(row.content || '', row.link_text || target.name)
@@ -245,7 +245,7 @@ function collectNeighborhood(startId, depth, edges) {
 }
 
 function buildPaths(db, userId) {
-  const rows = db.prepare('SELECT id, parent_id, name FROM files WHERE user_id = ?').all(userId)
+  const rows = getAccessibleFileRows(db, userId).map(({ id, parent_id, name }) => ({ id, parent_id, name }))
   const byId = new Map(rows.map(row => [row.id, row]))
   const cache = {}
   function pathFor(id) {

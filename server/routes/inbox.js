@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { getDb } = require('../db')
+const { requireFileAccess } = require('../fileAccess')
 const { v4: uuidv4 } = require('uuid')
 
 // N'accepte que des URL http(s). Bloque javascript:, data:, file:, etc.
@@ -105,15 +106,32 @@ router.post('/ideas/:id/send-to-file', (req, res) => {
   const idea = db.prepare('SELECT * FROM inbox_ideas WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
   if (!idea) return res.status(404).json({ error: 'Idea not found' })
 
-  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(fileId, req.user.id)
-  if (!file) return res.status(404).json({ error: 'File not found' })
+  const accessCheck = requireFileAccess(db, fileId, req.user.id, 'edit')
+  if (accessCheck.error) return res.status(accessCheck.status).json({ error: accessCheck.error })
+  const file = accessCheck.access.file
+  if (file.type !== 'file') return res.status(400).json({ error: 'La cible doit etre un fichier' })
 
   const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
   const append = `\n\n---\n*Idée capturée le ${date} :*\n\n${idea.content}\n`
   const newContent = (file.content || '') + append
 
-  db.prepare("UPDATE files SET content = ?, updated_at = datetime('now') WHERE id = ?").run(newContent, fileId)
-  db.prepare('DELETE FROM inbox_ideas WHERE id = ?').run(req.params.id)
+  const nextRevision = Number(file.history_revision || 0) + 1
+  const now = new Date().toISOString()
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM file_revisions WHERE file_id = ? AND revision_no > ?').run(fileId, Number(file.history_revision || 0))
+    db.prepare(
+      'INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(fileId, file.user_id, Number(file.history_revision || 0), file.content || '', file.updated_at || now)
+    db.prepare(
+      'INSERT INTO file_revisions (file_id, user_id, revision_no, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(fileId, file.user_id, nextRevision, newContent, now)
+    db.prepare('UPDATE file_revisions SET actor_user_id = ? WHERE file_id = ? AND revision_no IN (?, ?)')
+      .run(req.user.id, fileId, Number(file.history_revision || 0), nextRevision)
+    db.prepare('UPDATE files SET content = ?, history_revision = ?, content_version = content_version + 1, last_edited_by = ?, updated_at = ? WHERE id = ?')
+      .run(newContent, nextRevision, req.user.id, now, fileId)
+    db.prepare('DELETE FROM inbox_ideas WHERE id = ?').run(req.params.id)
+  })
+  tx()
 
   res.json({ ok: true, file: db.prepare('SELECT * FROM files WHERE id = ?').get(fileId) })
 })

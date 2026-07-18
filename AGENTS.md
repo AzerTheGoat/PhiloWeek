@@ -52,6 +52,8 @@ PhiloWeek/
 files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order, user_id
 file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
+file_revisions — id, file_id, user_id (proprietaire), actor_user_id, revision_no, content, created_at
+file_shares  — id, file_id, owner_id, shared_with_user_id, permission (view/edit), created_at, updated_at
 timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
 voice_notes  — id, file_id, filename, duration_seconds, title, user_id
 quotes       — id, quote, author, source, notes, tags, user_id, created_at, updated_at
@@ -269,3 +271,25 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
 - Les vues Editeur, Journal, Timer, Inbox, Todo et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
 - Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.
+
+## Historique des fichiers et corbeille
+
+- Chaque fichier edite par l'application (note Markdown, graphe d'idees, questionnaire JSON et definitions JSON) garde un historique persistant de ses sauvegardes logiques.
+- Les boutons Annuler/Retablir sont disponibles dans le header de chaque editeur; les raccourcis sont `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` et `Ctrl/Cmd+Y`.
+- Une nouvelle modification apres une annulation efface la branche de retablissement; les 100 versions les plus recentes sont conservees par fichier.
+- Verrouiller un dossier efface l'historique en clair de ses enfants afin de ne pas contourner le chiffrement; un nouvel historique commence apres deverrouillage.
+- Supprimer un fichier ou un dossier le place dans la corbeille avec tout son sous-arbre. Les elements restent restaurables pendant 30 jours, puis sont purges automatiquement.
+- La vue `Corbeille` permet de restaurer, supprimer definitivement un element ou vider toute la corbeille apres confirmation explicite.
+- L'export Obsidian ajoute `_Opuscule/FileHistory.json` et `_Opuscule/Trash.json`; l'import restaure l'historique et la corbeille en remappant les identifiants de fichiers.
+
+## Partage cloud entre utilisateurs
+
+- Un fichier ou dossier appartient toujours a un proprietaire (`files.user_id`). Le partage donne acces a la meme donnee, sans creer de copie.
+- Le partage se fait avec le `username` exact d'un compte existant et un droit `view` (lecture seule) ou `edit` (modification du contenu).
+- Partager un dossier partage tout son sous-arbre actuel et futur. Les droits sont herites; en cas de partages imbriques, le droit le plus permissif s'applique.
+- Un collaborateur `edit` peut modifier les fichiers et creer dans un dossier partage. Seul le proprietaire peut renommer, deplacer, supprimer, verrouiller ou repartager.
+- Les fichiers partages apparaissent comme racines dediees dans l'arbre avec le nom du proprietaire et un badge cloud. Un retrait de partage les fait disparaitre au prochain rafraichissement cloud.
+- `files.content_version` est un verrou optimiste obligatoire pour toute sauvegarde de contenu et tout undo/redo. Une version obsolete renvoie `FILE_VERSION_CONFLICT`; le client propose explicitement de charger le cloud ou de conserver sa version.
+- Meme apres le choix de conserver la version locale, le serveur revérifie la version courante : une troisieme modification concurrente provoque un nouveau conflit au lieu d'etre ecrasee.
+- La presence collaborative est un heartbeat ephemere de 45 secondes; elle n'accorde aucun droit et ne remplace jamais les controles d'acces serveur.
+- L'export Obsidian ajoute `_Opuscule/Shares.json` avec les usernames et permissions. A l'import, seuls les comptes qui existent deja sur l'instance sont reconnectes.

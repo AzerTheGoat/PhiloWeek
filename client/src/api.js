@@ -14,6 +14,7 @@ async function req(method, path, body, isFormData = false) {
     const e = new Error(err.error || res.statusText)
     e.status = res.status
     e.code = err.code || null
+    e.details = err
     throw e
   }
   return res.json()
@@ -35,9 +36,23 @@ export const createFile = data => req('POST', '/files', data)
 export const updateFile = (id, data) => req('PUT', `/files/${id}`, data)
 export const deleteFile = (id, confirmChildren = false) =>
   req('DELETE', `/files/${id}${confirmChildren ? '?confirm_children=1' : ''}`)
+export const undoFile = (id, base_version) => req('POST', `/files/${id}/history/undo`, { base_version })
+export const redoFile = (id, base_version) => req('POST', `/files/${id}/history/redo`, { base_version })
+export const getTrash = () => req('GET', '/files/trash')
+export const restoreTrashItem = id => req('POST', `/files/trash/${id}/restore`)
+export const permanentlyDeleteTrashItem = id => req('DELETE', `/files/trash/${id}`)
+export const emptyTrash = () => req('DELETE', '/files/trash')
 export const moveFile = (id, parent_id, sort_order) => req('PUT', `/files/${id}/move`, { parent_id, sort_order })
 export const unlockFolder = (id, password) => req('POST', `/files/${id}/unlock`, { password })
 export const lockFolder = (id, password) => req('POST', `/files/${id}/lock`, { password })
+
+// Partage et présence collaborative
+export const getFileShares = id => req('GET', `/shares/${id}`)
+export const shareFile = (id, username, permission) => req('POST', `/shares/${id}`, { username, permission })
+export const updateFileShare = (fileId, shareId, permission) => req('PATCH', `/shares/${fileId}/${shareId}`, { permission })
+export const removeFileShare = (fileId, shareId) => req('DELETE', `/shares/${fileId}/${shareId}`)
+export const heartbeatFilePresence = id => req('POST', `/shares/presence/${id}`)
+export const leaveFilePresence = id => req('DELETE', `/shares/presence/${id}`)
 
 // Export / Import
 export const exportObsidian = () => {

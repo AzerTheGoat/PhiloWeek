@@ -8,7 +8,7 @@ router.get('/obsidian', async (req, res) => {
   try {
     const db = getDb()
     const zip = new JSZip()
-    const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? ORDER BY type DESC, sort_order, name').all(req.user.id)
+    const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? AND deleted_at IS NULL ORDER BY type DESC, sort_order, name').all(req.user.id)
 
   const pathMap = {}
   function getPath(id) {
@@ -177,6 +177,79 @@ router.get('/obsidian', async (req, res) => {
       comments: articleComments,
       reactions: articleReactions,
       reads: articleReads,
+    }, null, 2))
+  }
+
+  const activeRevisions = db.prepare(`
+    SELECT r.file_id, r.revision_no, r.content, r.created_at, actor.username AS actor_username
+    FROM file_revisions r
+    JOIN files f ON f.id = r.file_id
+    LEFT JOIN users actor ON actor.id = r.actor_user_id
+    WHERE r.user_id = ? AND f.deleted_at IS NULL
+    ORDER BY r.file_id, r.revision_no
+  `).all(req.user.id)
+  if (activeRevisions.length > 0) {
+    zip.file('_Opuscule/FileHistory.json', JSON.stringify({
+      philoweek_type: 'file_history',
+      exported: new Date().toISOString(),
+      files: allFiles
+        .filter(file => file.type === 'file')
+        .map(file => ({
+          path: pathMap[file.id] || file.name,
+          current_revision: Number(file.history_revision || 0),
+          content_version: Number(file.content_version || 0),
+          revisions: activeRevisions
+            .filter(revision => revision.file_id === file.id)
+            .map(({ revision_no, content, created_at, actor_username }) => ({ revision_no, content, created_at, actor_username })),
+        })),
+    }, null, 2))
+  }
+
+  const trashedFiles = db.prepare(`
+    SELECT f.id, f.parent_id, f.name, f.type, f.content, f.password_hash, f.encrypted_content,
+      f.created_at, f.updated_at, f.sort_order, f.deleted_at, f.history_revision, f.content_version,
+      editor.username AS last_edited_by_username
+    FROM files f
+    LEFT JOIN users editor ON editor.id = f.last_edited_by
+    WHERE f.user_id = ? AND f.deleted_at IS NOT NULL
+    ORDER BY f.deleted_at ASC, f.type DESC, f.name ASC
+  `).all(req.user.id)
+  if (trashedFiles.length > 0) {
+    const trashedIds = new Set(trashedFiles.map(file => file.id))
+    const revisions = db.prepare(`
+      SELECT r.file_id, r.revision_no, r.content, r.created_at, actor.username AS actor_username
+      FROM file_revisions r
+      LEFT JOIN users actor ON actor.id = r.actor_user_id
+      WHERE r.user_id = ? ORDER BY r.file_id, r.revision_no
+    `).all(req.user.id).filter(revision => trashedIds.has(revision.file_id))
+    zip.file('_Opuscule/Trash.json', JSON.stringify({
+      philoweek_type: 'trash',
+      exported: new Date().toISOString(),
+      active_parents: Object.fromEntries(allFiles.map(file => [file.id, pathMap[file.id] || file.name])),
+      files: trashedFiles,
+      revisions,
+    }, null, 2))
+  }
+
+  const shares = db.prepare(`
+    SELECT s.file_id, s.permission, s.created_at, s.updated_at, recipient.username
+    FROM file_shares s
+    JOIN users recipient ON recipient.id = s.shared_with_user_id
+    JOIN files f ON f.id = s.file_id
+    WHERE s.owner_id = ? AND f.deleted_at IS NULL
+    ORDER BY s.created_at ASC
+  `).all(req.user.id)
+  if (shares.length > 0) {
+    zip.file('_Opuscule/Shares.json', JSON.stringify({
+      philoweek_type: 'file_shares',
+      exported: new Date().toISOString(),
+      shares: shares.map(share => ({
+        path: pathMap[share.file_id],
+        username: share.username,
+        permission: share.permission,
+        created_at: share.created_at,
+        updated_at: share.updated_at,
+      })),
     }, null, 2))
   }
 

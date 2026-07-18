@@ -4,6 +4,7 @@ import { createGraphMarkdown } from '../utils/graphFile'
 import { createQuestionnaireJson } from '../utils/questionnaireFile'
 import { createDefinitionsJson } from '../utils/definitionsFile'
 import * as api from '../api'
+import ShareModal from './ShareModal'
 
 function shouldAutoFocus() {
   return true
@@ -33,6 +34,7 @@ export default function Modals() {
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
       {modal.type === 'account' && <AccountModal {...props} />}
+      {modal.type === 'share-file' && <ShareModal {...props} />}
     </div>
   )
 }
