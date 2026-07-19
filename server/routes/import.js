@@ -609,7 +609,13 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             id, trip_id, user_id, filename, caption, point_id, lat, lng, width, height, bytes, sort_order, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
+        const insertNote = db.prepare(`
+          INSERT INTO road_trip_notes (
+            id, trip_id, user_id, lat, lng, title, body, color, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
         const allPhotos = Array.isArray(roadTripsPayload.photos) ? roadTripsPayload.photos : []
+        const allNotes = Array.isArray(roadTripsPayload.notes) ? roadTripsPayload.notes : []
         const now = new Date().toISOString()
         roadTripsPayload.trips.forEach((trip, index) => {
           const newTripId = uuidv4()
@@ -663,6 +669,23 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           if (newCover) {
             db.prepare('UPDATE road_trips SET cover_photo_id = ? WHERE id = ? AND user_id = ?').run(newCover, newTripId, req.user.id)
           }
+
+          const tripNotes = allNotes.filter(n => n.trip_id === trip.id)
+          tripNotes.forEach((note, noteIndex) => {
+            const lat = Number(note.lat)
+            const lng = Number(note.lng)
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+            insertNote.run(
+              uuidv4(), newTripId, req.user.id, lat, lng,
+              note.title ? String(note.title).slice(0, 200) : null,
+              note.body ? String(note.body).slice(0, 5000) : null,
+              /^#[0-9a-f]{6}$/i.test(String(note.color || '')) ? String(note.color).toLowerCase() : null,
+              Number.isFinite(Number(note.sort_order)) ? Number(note.sort_order) : noteIndex,
+              normalizeIsoDate(note.created_at) || now,
+              normalizeIsoDate(note.updated_at) || now
+            )
+            report.imported++
+          })
         })
       }
 

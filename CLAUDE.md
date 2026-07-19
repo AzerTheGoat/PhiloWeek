@@ -64,11 +64,12 @@ sessions     — id, user_id, token_hash, expires_at, user_agent
 fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
 road_trips   — id, user_id, title, description, status (done/planned), tag, color, points_json (villes ordonnées [{id,name,lat,lng,note}]), distance_km, distance_manual, elevation_m, start_date, end_date, cover_photo_id, sort_order
 road_trip_photos — id, trip_id, user_id, filename (sur disque, jamais en base), caption, point_id, lat, lng, width, height, bytes, sort_order
+road_trip_notes — id, trip_id, user_id, lat, lng, title, body, color, sort_order (note de texte géolocalisée, marqueur cliquable sur la carte)
 ```
 
 Toutes les tables de contenu (`files`, `timer_sessions`, `voice_notes`, `quotes`,
 `inbox_resources`, `inbox_ideas`, `questionnaire_results`, `fact_checks`,
-`road_trips`, `road_trip_photos`) ont une
+`road_trips`, `road_trip_photos`, `road_trip_notes`) ont une
 colonne `user_id` : chaque requête dans `server/routes/*.js` doit filtrer dessus
 (`WHERE user_id = ?` / `AND user_id = ?`) — voir la section authentification
 plus bas.
@@ -208,16 +209,26 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   **jamais en base** — seul `filename` est stocké. Servies par
   `GET /api/roadtrips/photos/:filename` (vérifie `user_id`). Une photo peut être
   épinglée sur la carte (`lat`/`lng`) et/ou désignée couverture.
+- **Placer photos & notes sur la carte** : un **mode placement** (état
+  `placement` dans `RoadTrips.jsx`, passé à `MapCanvas` + `TripEditor`) capture
+  le prochain clic carte pour poser une **note** (`road_trip_notes`, texte
+  géolocalisé affiché en marqueur cliquable → bulle Leaflet), déplacer une note
+  (`note-move`), ou placer une **photo** (`photo`). Le clic est capté une seule
+  fois via `map.on('click')` + un ref vers le handler courant. Les photos
+  restent épinglables à une ville via le menu. Toujours filtrer les popups par
+  `escapeHtml` (contenu utilisateur injecté en HTML). Routes :
+  `POST /:id/notes`, `PUT /notes/:noteId`, `DELETE /notes/:noteId`.
 - **Mode « Carte postale »** (`StoryView`) : mise en page instagramable
   (couverture, stats km/dénivelé/étapes, mini-carte du tracé, galerie) prête
   pour une capture d'écran.
 - **Export** : `GET /api/roadtrips/export` (JSON complet, `?photos=embed` pour
   inclure les photos en base64) et `GET /api/roadtrips/:id/geojson` (GeoJSON
   standard). Inclus aussi dans l'export/import Obsidian
-  (`_Opuscule/RoadTrips.json` + binaires sous `_Opuscule/roadtrip-photos/`) :
-  à l'import, les voyages et photos sont recréés avec de **nouveaux ids et
-  noms de fichiers** (la couverture est remappée ; le voyage est inséré **avant**
-  ses photos à cause de la FK `road_trip_photos.trip_id`).
+  (`_Opuscule/RoadTrips.json` — trips + photos + notes — et binaires sous
+  `_Opuscule/roadtrip-photos/`) : à l'import, voyages, photos et notes sont
+  recréés avec de **nouveaux ids et noms de fichiers** (la couverture est
+  remappée ; le voyage est inséré **avant** ses photos/notes à cause des FK
+  `road_trip_photos.trip_id` / `road_trip_notes.trip_id`).
 
 ## Thème
 

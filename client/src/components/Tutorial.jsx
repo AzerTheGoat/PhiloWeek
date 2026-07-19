@@ -232,7 +232,12 @@ const SECTIONS = [
       {
         icon: 'image',
         title: 'Photos & souvenirs',
-        text: "Ajoute des photos (compressées avant l'envoi — tu choisis la qualité), écris une légende, épingle-les sur une ville de la carte, et désigne une couverture. Un récit libre accompagne le voyage.",
+        text: "Ajoute des photos (compressées avant l'envoi — tu choisis la qualité), écris une légende et désigne une couverture. Un récit libre accompagne le voyage.",
+      },
+      {
+        icon: 'pin',
+        title: 'Photos & notes sur la carte',
+        text: "Place une photo OU une note de texte à un endroit précis en cliquant sur la carte (ou épingle une photo à une ville). Les photos apparaissent en vignette, les notes en marqueur : clique dessus pour lire le souvenir dans une bulle, directement sur la carte.",
       },
       {
         icon: 'eye',

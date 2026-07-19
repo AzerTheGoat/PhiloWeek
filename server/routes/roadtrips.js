@@ -125,6 +125,27 @@ function serializePhoto(row) {
   }
 }
 
+function notesForTrip(db, tripId, userId) {
+  return db.prepare(
+    'SELECT * FROM road_trip_notes WHERE trip_id = ? AND user_id = ? ORDER BY sort_order ASC, created_at ASC'
+  ).all(tripId, userId).map(serializeNote)
+}
+
+function serializeNote(row) {
+  return {
+    id: row.id,
+    trip_id: row.trip_id,
+    lat: row.lat,
+    lng: row.lng,
+    title: row.title,
+    body: row.body,
+    color: row.color,
+    sort_order: row.sort_order,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
+
 function serializeTrip(db, row, userId) {
   const points = normalizePoints(row.points_json)
   return {
@@ -146,6 +167,7 @@ function serializeTrip(db, row, userId) {
     created_at: row.created_at,
     updated_at: row.updated_at,
     photos: photosForTrip(db, row.id, userId),
+    notes: notesForTrip(db, row.id, userId),
   }
 }
 
@@ -310,6 +332,13 @@ router.get('/:id/geojson', (req, res) => {
       })
     }
   }
+  for (const note of trip.notes) {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'note', title: note.title, body: note.body },
+      geometry: { type: 'Point', coordinates: [note.lng, note.lat] },
+    })
+  }
 
   const fc = { type: 'FeatureCollection', properties: { title: trip.title, status: trip.status }, features }
   res.setHeader('Content-Type', 'application/geo+json; charset=utf-8')
@@ -469,6 +498,52 @@ router.delete('/photos/:photoId', (req, res) => {
   // Si c'était la couverture du voyage, on la retire.
   db.prepare('UPDATE road_trips SET cover_photo_id = NULL WHERE cover_photo_id = ? AND user_id = ?').run(req.params.photoId, req.user.id)
   deletePhotoFile(photo.filename)
+  res.json({ ok: true })
+})
+
+// ————————————————————————————————————— Notes géolocalisées (texte sur la carte)
+
+router.post('/:id/notes', (req, res) => {
+  const db = getDb()
+  const trip = getOwnedTrip(db, req.params.id, req.user.id)
+  if (!trip) return res.status(404).json({ error: 'Not found' })
+  const lat = nullableNumber(req.body.lat, -90, 90)
+  const lng = nullableNumber(req.body.lng, -180, 180)
+  if (lat === null || lng === null) return res.status(400).json({ error: 'Coordonnées invalides' })
+
+  const id = uuidv4()
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM road_trip_notes WHERE trip_id = ?').get(req.params.id).m
+  db.prepare(`
+    INSERT INTO road_trip_notes (id, trip_id, user_id, lat, lng, title, body, color, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    id, req.params.id, req.user.id, lat, lng,
+    emptyToNull(req.body.title, 200), emptyToNull(req.body.body, 5000),
+    req.body.color !== undefined ? normalizeColor(req.body.color, null) : null,
+    maxOrder + 1
+  )
+  res.status(201).json(serializeNote(db.prepare('SELECT * FROM road_trip_notes WHERE id = ?').get(id)))
+})
+
+router.put('/notes/:noteId', (req, res) => {
+  const db = getDb()
+  const note = db.prepare('SELECT * FROM road_trip_notes WHERE id = ? AND user_id = ?').get(req.params.noteId, req.user.id)
+  if (!note) return res.status(404).json({ error: 'Not found' })
+  const title = req.body.title !== undefined ? emptyToNull(req.body.title, 200) : note.title
+  const body = req.body.body !== undefined ? emptyToNull(req.body.body, 5000) : note.body
+  const color = req.body.color !== undefined ? normalizeColor(req.body.color, null) : note.color
+  const lat = req.body.lat !== undefined ? (nullableNumber(req.body.lat, -90, 90) ?? note.lat) : note.lat
+  const lng = req.body.lng !== undefined ? (nullableNumber(req.body.lng, -180, 180) ?? note.lng) : note.lng
+  db.prepare("UPDATE road_trip_notes SET title = ?, body = ?, color = ?, lat = ?, lng = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?")
+    .run(title, body, color, lat, lng, req.params.noteId, req.user.id)
+  res.json(serializeNote(db.prepare('SELECT * FROM road_trip_notes WHERE id = ?').get(req.params.noteId)))
+})
+
+router.delete('/notes/:noteId', (req, res) => {
+  const db = getDb()
+  const note = db.prepare('SELECT * FROM road_trip_notes WHERE id = ? AND user_id = ?').get(req.params.noteId, req.user.id)
+  if (!note) return res.status(404).json({ error: 'Not found' })
+  db.prepare('DELETE FROM road_trip_notes WHERE id = ? AND user_id = ?').run(req.params.noteId, req.user.id)
   res.json({ ok: true })
 })
 

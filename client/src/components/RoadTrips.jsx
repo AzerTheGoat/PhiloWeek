@@ -34,6 +34,13 @@ const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">Ope
 
 const TRIP_COLORS = ['#e8663f', '#e0a020', '#4caf7d', '#6ba3e8', '#7c64f0', '#d0518f', '#2fb0a8', '#8a6d3b']
 
+// Icône SVG (blanche) au centre du marqueur de note.
+const noteMarkerIcon = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h9L18 7.5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"/><path d="M8 10h7M8 13.5h5"/></svg>'
+
+function escapeHtml(text) {
+  return String(text || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+
 function haversineKm(a, b) {
   const R = 6371
   const dLat = (b.lat - a.lat) * Math.PI / 180
@@ -70,6 +77,7 @@ export default function RoadTrips() {
   const [tagFilter, setTagFilter] = useState(null)
   const [story, setStory] = useState(false)
   const [lightbox, setLightbox] = useState(null) // { photos, index }
+  const [placement, setPlacement] = useState(null) // null | { type:'note' } | { type:'photo', photoId }
 
   const load = useCallback(async (keepSelection = true) => {
     try {
@@ -84,6 +92,8 @@ export default function RoadTrips() {
   }, [toast])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => { setPlacement(null) }, [selectedId, story])
 
   const allTags = useMemo(() => {
     const set = new Set()
@@ -124,6 +134,30 @@ export default function RoadTrips() {
       return null
     }
   }, [toast, load])
+
+  // Clic sur la carte en mode placement : dépose une note ou place une photo.
+  const handleMapClick = useCallback(async (latlng) => {
+    if (!placement || !selectedId) return
+    const tripId = selectedId
+    setPlacement(null)
+    try {
+      if (placement.type === 'note') {
+        await api.createRoadTripNote(tripId, { lat: latlng.lat, lng: latlng.lng, title: '', body: '' })
+        await load()
+        toast('Note posée sur la carte — écris-la dans le panneau')
+      } else if (placement.type === 'note-move') {
+        await api.updateRoadTripNote(placement.noteId, { lat: latlng.lat, lng: latlng.lng })
+        await load()
+        toast('Note déplacée')
+      } else if (placement.type === 'photo') {
+        await api.updateRoadTripPhoto(placement.photoId, { lat: latlng.lat, lng: latlng.lng })
+        await load()
+        toast('Photo placée sur la carte')
+      }
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }, [placement, selectedId, load, toast])
 
   const removeTrip = useCallback(async (id) => {
     if (!window.confirm('Supprimer ce road trip et ses photos ?')) return
@@ -204,8 +238,11 @@ export default function RoadTrips() {
           <MapCanvas
             trips={visibleTrips}
             selected={selected}
+            placement={placement}
             onSelectTrip={(id) => setSelectedId(id)}
             onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
+            onMapClick={handleMapClick}
+            onCancelPlacement={() => setPlacement(null)}
           />
         </div>
 
@@ -213,11 +250,13 @@ export default function RoadTrips() {
           <TripEditor
             key={selected.id}
             trip={selected}
+            placement={placement}
             onPatch={patchTrip}
             onDelete={() => removeTrip(selected.id)}
             onReload={load}
             onStory={() => setStory(true)}
             onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
+            onPlace={(p) => setPlacement(p)}
           />
         )}
       </div>
@@ -262,7 +301,7 @@ function TripCard({ trip, active, onSelect }) {
 
 // ————————————————————————————————————— Carte Leaflet
 
-function MapCanvas({ trips, selected, onSelectTrip, onOpenPhoto }) {
+function MapCanvas({ trips, selected, placement, onSelectTrip, onOpenPhoto, onMapClick, onCancelPlacement }) {
   const { theme } = useApp()
   const mapEl = useRef(null)
   const mapRef = useRef(null)
@@ -270,7 +309,11 @@ function MapCanvas({ trips, selected, onSelectTrip, onOpenPhoto }) {
   const tileRef = useRef(null)
   const labelRef = useRef(null)
   const fitSigRef = useRef('')
+  const clickRef = useRef(null)
   const [tileStyle, setTileStyle] = useState(theme === 'light' ? 'light' : 'voyager')
+
+  // Garde la dernière version du handler de clic (évite de ré-enregistrer l'événement).
+  clickRef.current = (e) => { if (placement && onMapClick) onMapClick(e.latlng) }
 
   // Init une seule fois.
   useEffect(() => {
@@ -279,6 +322,7 @@ function MapCanvas({ trips, selected, onSelectTrip, onOpenPhoto }) {
       .setView([46.6, 2.4], 5)
     map.attributionControl.setPrefix('')
     layerRef.current = L.layerGroup().addTo(map)
+    map.on('click', (e) => clickRef.current && clickRef.current(e))
     mapRef.current = map
     // Nécessaire car le conteneur est monté dans un flex/grid (taille tardive).
     setTimeout(() => map.invalidateSize(), 60)
@@ -352,6 +396,24 @@ function MapCanvas({ trips, selected, onSelectTrip, onOpenPhoto }) {
           marker.on('click', () => onOpenPhoto(trip.photos, trip.photos.indexOf(ph)))
           allBounds.push([ph.lat, ph.lng])
         })
+
+        // Notes géolocalisées : marqueur cliquable ouvrant une bulle de texte.
+        trip.notes.forEach(note => {
+          const marker = L.marker([note.lat, note.lng], {
+            icon: L.divIcon({
+              className: 'rt-note-marker-wrap',
+              html: `<span class="rt-note-marker" style="--c:${note.color || trip.color}">${noteMarkerIcon}</span>`,
+              iconSize: [30, 34],
+              iconAnchor: [15, 32],
+            }),
+            zIndexOffset: 550,
+          }).addTo(group)
+          const title = note.title ? `<strong>${escapeHtml(note.title)}</strong>` : ''
+          const body = note.body ? `<p>${escapeHtml(note.body).replace(/\n/g, '<br>')}</p>` : ''
+          marker.bindPopup(`<div class="rt-note-popup">${title}${body || (title ? '' : '<em>Note vide</em>')}</div>`, { maxWidth: 260 })
+          marker.on('click', () => onSelectTrip(trip.id))
+          allBounds.push([note.lat, note.lng])
+        })
       }
     }
 
@@ -369,20 +431,26 @@ function MapCanvas({ trips, selected, onSelectTrip, onOpenPhoto }) {
   }, [trips, selected, onSelectTrip, onOpenPhoto])
 
   return (
-    <div className="rt-map-container">
+    <div className={`rt-map-container ${placement ? 'placing' : ''}`}>
       <div ref={mapEl} className="rt-map" />
       <div className="rt-map-styles">
         {Object.entries(TILE_STYLES).map(([key, s]) => (
           <button key={key} className={`rt-style-btn ${tileStyle === key ? 'active' : ''}`} onClick={() => setTileStyle(key)}>{s.label}</button>
         ))}
       </div>
+      {placement && (
+        <div className="rt-place-banner">
+          <span><Icon name="pin" size={14} /> Clique sur la carte pour {placement.type === 'photo' ? 'placer la photo' : placement.type === 'note-move' ? 'déplacer la note' : 'poser la note'}</span>
+          <button onClick={onCancelPlacement}>Annuler</button>
+        </div>
+      )}
     </div>
   )
 }
 
 // ————————————————————————————————————— Éditeur du voyage sélectionné
 
-function TripEditor({ trip, onPatch, onDelete, onReload, onStory, onOpenPhoto }) {
+function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onOpenPhoto, onPlace }) {
   const { toast } = useApp()
   const [title, setTitle] = useState(trip.title)
   const [description, setDescription] = useState(trip.description || '')
@@ -494,6 +562,15 @@ function TripEditor({ trip, onPatch, onDelete, onReload, onStory, onOpenPhoto })
   }
   const unpinPhoto = async (photo) => {
     try { await api.updateRoadTripPhoto(photo.id, { lat: '', lng: '' }); await onReload() }
+    catch (err) { toast(err.message, 'error') }
+  }
+
+  const saveNote = async (noteId, patch) => {
+    try { await api.updateRoadTripNote(noteId, patch); await onReload() }
+    catch (err) { toast(err.message, 'error') }
+  }
+  const deleteNote = async (noteId) => {
+    try { await api.deleteRoadTripNote(noteId); await onReload() }
     catch (err) { toast(err.message, 'error') }
   }
 
@@ -618,6 +695,33 @@ function TripEditor({ trip, onPatch, onDelete, onReload, onStory, onOpenPhoto })
               onCaption={(c) => captionPhoto(photo.id, c)}
               onPin={(point) => pinPhoto(photo, point)}
               onUnpin={() => unpinPhoto(photo)}
+              onPlaceOnMap={() => onPlace({ type: 'photo', photoId: photo.id })}
+            />
+          ))}
+        </div>
+
+        {/* Notes géolocalisées */}
+        <div className="rt-section-title">
+          Notes sur la carte
+          <button
+            className={`rt-add-photos ${placement?.type === 'note' ? 'placing' : ''}`}
+            onClick={() => onPlace(placement?.type === 'note' ? null : { type: 'note' })}
+          >
+            <Icon name="pin" size={14} /> {placement?.type === 'note' ? 'Clique la carte…' : 'Poser une note'}
+          </button>
+        </div>
+        <div className="rt-notes-list">
+          {trip.notes.length === 0 && (
+            <div className="rt-photos-empty">Pose une note à un endroit précis de la carte 📍</div>
+          )}
+          {trip.notes.map(note => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              color={trip.color}
+              onSave={(patch) => saveNote(note.id, patch)}
+              onDelete={() => deleteNote(note.id)}
+              onReplace={() => onPlace({ type: 'note-move', noteId: note.id })}
             />
           ))}
         </div>
@@ -644,7 +748,7 @@ function TripEditor({ trip, onPatch, onDelete, onReload, onStory, onOpenPhoto })
   )
 }
 
-function PhotoTile({ photo, isCover, points, color, onOpen, onCover, onDelete, onCaption, onPin, onUnpin }) {
+function PhotoTile({ photo, isCover, points, color, onOpen, onCover, onDelete, onCaption, onPin, onUnpin, onPlaceOnMap }) {
   const [caption, setCaption] = useState(photo.caption || '')
   const [menu, setMenu] = useState(false)
   return (
@@ -667,7 +771,8 @@ function PhotoTile({ photo, isCover, points, color, onOpen, onCover, onDelete, o
           <button onClick={() => setMenu(m => !m)} title="Épingler sur la carte"><Icon name="pin" size={13} /></button>
           {menu && (
             <div className="rt-pin-dropdown" onMouseLeave={() => setMenu(false)}>
-              {points.length === 0 && <div className="rt-pin-empty">Ajoute d'abord une ville</div>}
+              <button className="rt-pin-click" onClick={() => { onPlaceOnMap(); setMenu(false) }}><Icon name="pin" size={12} /> Cliquer sur la carte</button>
+              {points.length > 0 && <div className="rt-pin-sep">ou une ville :</div>}
               {points.map(p => (
                 <button key={p.id} onClick={() => { onPin(p); setMenu(false) }}>{p.name}</button>
               ))}
@@ -677,6 +782,35 @@ function PhotoTile({ photo, isCover, points, color, onOpen, onCover, onDelete, o
         </div>
         <button className="danger" onClick={onDelete} title="Supprimer"><Icon name="trash" size={13} /></button>
       </div>
+    </div>
+  )
+}
+
+function NoteCard({ note, color, onSave, onDelete, onReplace }) {
+  const [title, setTitle] = useState(note.title || '')
+  const [body, setBody] = useState(note.body || '')
+  return (
+    <div className="rt-note-card" style={{ '--c': note.color || color }}>
+      <div className="rt-note-card-head">
+        <span className="rt-note-dot" />
+        <input
+          className="rt-note-title"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onBlur={() => { if (title !== (note.title || '')) onSave({ title }) }}
+          placeholder="Titre de la note"
+        />
+        <button className="rt-note-mini" title="Repositionner sur la carte" onClick={onReplace}><Icon name="pin" size={13} /></button>
+        <button className="rt-note-mini danger" title="Supprimer" onClick={onDelete}><Icon name="trash" size={13} /></button>
+      </div>
+      <textarea
+        className="rt-note-body"
+        value={body}
+        onChange={e => setBody(e.target.value)}
+        onBlur={() => { if (body !== (note.body || '')) onSave({ body }) }}
+        rows={2}
+        placeholder="Écris ton souvenir, une anecdote…"
+      />
     </div>
   )
 }
@@ -753,11 +887,27 @@ function StoryView({ trip, onClose, onOpenPhoto }) {
         icon: L.divIcon({ className: 'rt-marker-wrap', html: `<span class="rt-marker" style="--c:${trip.color}">${i + 1}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
       }).addTo(map)
     })
+    trip.notes.forEach(note => {
+      L.marker([note.lat, note.lng], {
+        icon: L.divIcon({ className: 'rt-note-marker-wrap', html: `<span class="rt-note-marker" style="--c:${note.color || trip.color}">${noteMarkerIcon}</span>`, iconSize: [30, 34], iconAnchor: [15, 32] }),
+      }).addTo(map)
+    })
+    const geoPhotos = trip.photos.filter(ph => ph.lat != null && ph.lng != null)
+    geoPhotos.forEach(ph => {
+      L.marker([ph.lat, ph.lng], {
+        icon: L.divIcon({ className: 'rt-photo-marker-wrap', html: `<span class="rt-photo-marker" style="--c:${trip.color}"><img src="${ph.url}" alt=""/></span>`, iconSize: [40, 40], iconAnchor: [20, 40] }),
+      }).addTo(map)
+    })
     storyMap.current = map
+    const allPts = [
+      ...latlngs,
+      ...trip.notes.map(n => [n.lat, n.lng]),
+      ...geoPhotos.map(ph => [ph.lat, ph.lng]),
+    ]
     setTimeout(() => {
       map.invalidateSize()
-      if (latlngs.length === 1) map.setView(latlngs[0], 8)
-      else if (latlngs.length > 1) map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 12 })
+      if (allPts.length === 1) map.setView(allPts[0], 8)
+      else if (allPts.length > 1) map.fitBounds(allPts, { padding: [40, 40], maxZoom: 12 })
     }, 80)
     return () => { map.remove(); storyMap.current = null }
   }, [trip])

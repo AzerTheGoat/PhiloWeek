@@ -279,11 +279,13 @@ router.get('/obsidian', async (req, res) => {
         if (fs.existsSync(filePath)) zip.file(`_Opuscule/roadtrip-photos/${photo.filename}`, fs.readFileSync(filePath))
       } catch (_) {}
     }
+    const roadTripNotes = db.prepare('SELECT * FROM road_trip_notes WHERE user_id = ? ORDER BY trip_id, sort_order ASC').all(req.user.id)
     zip.file('_Opuscule/RoadTrips.json', JSON.stringify({
       philoweek_type: 'road_trips',
       exported: new Date().toISOString(),
       trips: roadTrips,
       photos: roadTripPhotos,
+      notes: roadTripNotes,
     }, null, 2))
   }
 

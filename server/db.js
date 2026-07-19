@@ -487,6 +487,31 @@ const MIGRATIONS = [
         ON road_trip_photos(user_id);
     `)
   },
+  // v14 -> v15 : notes de texte géolocalisées sur la carte des road trips.
+  //   Une note libre (titre + texte) posée à des coordonnées arbitraires,
+  //   indépendante des villes du tracé, affichée en marqueur cliquable.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS road_trip_notes (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL REFERENCES road_trips(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        title TEXT,
+        body TEXT,
+        color TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_road_trip_notes_trip
+        ON road_trip_notes(trip_id, sort_order);
+      CREATE INDEX IF NOT EXISTS idx_road_trip_notes_user
+        ON road_trip_notes(user_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

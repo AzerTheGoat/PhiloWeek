@@ -172,6 +172,9 @@ export const uploadRoadTripPhoto = (tripId, blob, meta = {}) => {
 export const updateRoadTripPhoto = (photoId, data) => req('PUT', `/roadtrips/photos/${photoId}`, data)
 export const deleteRoadTripPhoto = photoId => req('DELETE', `/roadtrips/photos/${photoId}`)
 export const reorderRoadTripPhotos = (tripId, ids) => req('PUT', `/roadtrips/${tripId}/photos/order`, { ids })
+export const createRoadTripNote = (tripId, data) => req('POST', `/roadtrips/${tripId}/notes`, data)
+export const updateRoadTripNote = (noteId, data) => req('PUT', `/roadtrips/notes/${noteId}`, data)
+export const deleteRoadTripNote = noteId => req('DELETE', `/roadtrips/notes/${noteId}`)
 export const exportRoadTripsJson = (embed = false) => {
   window.location.href = BASE + `/roadtrips/export${embed ? '?photos=embed' : ''}`
 }
