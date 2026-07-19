@@ -377,7 +377,7 @@ export default function FilePicker() {
   return (
     <>
       {/* Backdrop */}
-      <div className="picker-backdrop" onClick={() => dispatch({ type: 'TOGGLE_FILE_PICKER' })} />
+      <div className="picker-backdrop" data-focus-layer onClick={() => dispatch({ type: 'TOGGLE_FILE_PICKER' })} />
 
       {/* Slide-in panel */}
       <div className="picker-panel">

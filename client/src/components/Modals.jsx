@@ -28,7 +28,7 @@ export default function Modals() {
   const props = { modal, hideModal }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && hideModal()}>
+    <div className="modal-overlay" data-focus-layer onClick={e => e.target === e.currentTarget && hideModal()}>
       {modal.type === 'new-file' && <NewFileModal {...props} />}
       {modal.type === 'new-graph' && <NewGraphModal {...props} />}
       {modal.type === 'new-questionnaire' && <NewQuestionnaireModal {...props} />}

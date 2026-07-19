@@ -37,7 +37,7 @@ export default function TodoReminder() {
   if (!visible || urgentTodos.length === 0) return null
 
   return (
-    <div className="todo-reminder-backdrop" role="dialog" aria-modal="true" aria-label="Rappel agenda">
+    <div className="todo-reminder-backdrop" data-focus-layer role="dialog" aria-modal="true" aria-label="Rappel agenda">
       <section className="todo-reminder-panel">
         <div className="todo-reminder-head">
           <span className="todo-reminder-icon"><Icon name="calendar" size={22} /></span>

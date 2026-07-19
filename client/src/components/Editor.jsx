@@ -458,7 +458,7 @@ function LinkedQuizLauncher({ currentFile }) {
       </button>
 
       {session.length > 0 && (
-        <div className="linked-quiz-panel">
+        <div className="linked-quiz-panel" data-focus-layer>
           <div className="linked-quiz-head">
             <strong>Quiz lie</strong>
             <span>{done ? session.length : Math.min(currentIndex + 1, session.length)} / {session.length}</span>

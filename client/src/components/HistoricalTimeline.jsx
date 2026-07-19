@@ -618,7 +618,7 @@ export default function HistoricalTimeline() {
       )}
 
       {pasteOpen && (
-        <div className="timeline-import-overlay" role="dialog" aria-modal="true">
+        <div className="timeline-import-overlay" data-focus-layer role="dialog" aria-modal="true">
           <section className="timeline-import-panel timeline-paste-panel">
             <header className="timeline-import-head">
               <div>
@@ -657,7 +657,7 @@ export default function HistoricalTimeline() {
 function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onRemove, onImage, onImageUrl, onClose, onConfirm }) {
   const selectedCount = items.filter(item => item.selected).length
   return (
-    <div className="timeline-import-overlay" role="dialog" aria-modal="true">
+    <div className="timeline-import-overlay" data-focus-layer role="dialog" aria-modal="true">
       <section className="timeline-import-panel">
         <header className="timeline-import-head">
           <div>

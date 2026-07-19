@@ -119,7 +119,7 @@ export default function GlobalQuizLauncher() {
 
   return (
     <>
-      <div className="picker-backdrop" onClick={close} />
+      <div className="picker-backdrop" data-focus-layer onClick={close} />
       <div className="picker-panel global-quiz-panel">
         <div className="picker-header">
           <h3>Reviser</h3>

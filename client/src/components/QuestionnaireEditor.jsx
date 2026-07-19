@@ -394,7 +394,7 @@ function SourceFilesModal({ tree, files, selectedSourcePaths, onClose, onValidat
 
   return (
     <>
-      <div className="picker-backdrop" onClick={onClose} />
+      <div className="picker-backdrop" data-focus-layer onClick={onClose} />
       <div className="picker-panel source-link-panel">
         <div className="picker-header">
           <h3>Fichiers du questionnaire</h3>

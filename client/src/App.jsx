@@ -24,6 +24,7 @@ import Toast from './components/Toast'
 import ContextMenu from './components/ContextMenu'
 import Modals from './components/Modals'
 import Icon from './components/Icons'
+import useFocusRecovery from './hooks/useFocusRecovery'
 
 export default function App() {
   return (
@@ -62,6 +63,8 @@ function getPublicArticleId() {
 
 function AppShell() {
   const { theme, sidebarOpen, view, currentFile, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
+
+  useFocusRecovery()
 
   useEffect(() => {
     loadTree()
