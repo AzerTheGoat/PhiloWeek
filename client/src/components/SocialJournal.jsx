@@ -4,6 +4,7 @@ import { useApp } from '../context/useApp'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { useArticleReadTracker } from '../utils/useArticleReadTracker'
 import { promptImageUrl } from '../utils/imageInput'
+import useIsMobile from '../hooks/useIsMobile'
 import Icon from './Icons'
 import * as api from '../api'
 
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
 
 export default function SocialJournal() {
   const { toast } = useApp()
+  const isMobile = useIsMobile()
   const [scope, setScope] = useState('feed')
   const [query, setQuery] = useState('')
   const [articles, setArticles] = useState([])
@@ -32,6 +34,9 @@ export default function SocialJournal() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [comment, setComment] = useState('')
+  // Mobile uniquement : afficher soit le fil, soit l'article/formulaire (plein écran).
+  const [mobileView, setMobileView] = useState('feed') // 'feed' | 'reader'
+  const backToFeed = useCallback(() => { setMode('read'); setMobileView('feed') }, [])
 
   const loadArticles = useCallback(async () => {
     setLoading(true)
@@ -114,6 +119,7 @@ export default function SocialJournal() {
       const full = await api.getArticle(id)
       setSelected(full)
       setMode('read')
+      setMobileView('reader')
     } catch (err) {
       toast(err.message || 'Article introuvable', 'error')
     }
@@ -123,6 +129,7 @@ export default function SocialJournal() {
     setEditingId(null)
     setForm({ ...EMPTY_FORM, published_on: localDate() })
     setMode('write')
+    setMobileView('reader')
   }
 
   const startEdit = (article) => {
@@ -138,6 +145,7 @@ export default function SocialJournal() {
       cover_image_data: article.cover_image_data || '',
     })
     setMode('write')
+    setMobileView('reader')
   }
 
   const saveArticle = async (event) => {
@@ -164,6 +172,7 @@ export default function SocialJournal() {
     try {
       await api.deleteArticle(article.id)
       setSelected(null)
+      setMobileView('feed')
       await loadArticles()
       toast('Article supprime')
     } catch (err) {
@@ -241,7 +250,13 @@ export default function SocialJournal() {
   }
 
   return (
-    <div className="social-journal-page">
+    <div className="social-journal-page" data-mobile-view={isMobile ? mobileView : 'both'}>
+      {isMobile && mobileView === 'reader' && (
+        <button type="button" className="social-journal-back" onClick={backToFeed}>
+          <Icon name="back" size={16} /> Retour au fil
+        </button>
+      )}
+
       <header className="social-journal-header">
         <div>
           <span>Journal public</span>
@@ -307,7 +322,7 @@ export default function SocialJournal() {
               events={events}
               editingId={editingId}
               onSubmit={saveArticle}
-              onCancel={() => setMode('read')}
+              onCancel={backToFeed}
               onCover={handleCover}
               onCoverUrl={handleCoverUrl}
             />

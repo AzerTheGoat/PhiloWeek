@@ -41,6 +41,20 @@ function escapeHtml(text) {
   return String(text || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
 
+// Bascule mobile : sous ce seuil, la vue passe en onglets Carte/Liste/Fiche
+// (le layout 3 colonnes desktop n'a plus la place). Réactif au redimensionnement.
+const MOBILE_QUERY = '(max-width: 860px)'
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const onChange = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
+}
+
 function haversineKm(a, b) {
   const R = 6371
   const dLat = (b.lat - a.lat) * Math.PI / 180
@@ -70,6 +84,7 @@ function fmtDateRange(start, end) {
 
 export default function RoadTrips() {
   const { toast } = useApp()
+  const isMobile = useIsMobile()
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
@@ -78,6 +93,7 @@ export default function RoadTrips() {
   const [story, setStory] = useState(false)
   const [lightbox, setLightbox] = useState(null) // { photos, index }
   const [placement, setPlacement] = useState(null) // null | { type:'note' } | { type:'photo', photoId }
+  const [mobilePanel, setMobilePanel] = useState('list') // mobile only : 'map' | 'list' | 'edit'
 
   const load = useCallback(async (keepSelection = true) => {
     try {
@@ -94,6 +110,11 @@ export default function RoadTrips() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => { setPlacement(null) }, [selectedId, story])
+
+  // Onglet Fiche mobile sans voyage sélectionné → retombe sur la liste.
+  useEffect(() => {
+    if (isMobile && mobilePanel === 'edit' && !selectedId) setMobilePanel('list')
+  }, [isMobile, mobilePanel, selectedId])
 
   const allTags = useMemo(() => {
     const set = new Set()
@@ -116,6 +137,7 @@ export default function RoadTrips() {
       setTrips(prev => [...prev, trip])
       setSelectedId(trip.id)
       setStory(false)
+      setMobilePanel('edit')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -144,6 +166,7 @@ export default function RoadTrips() {
       if (placement.type === 'note') {
         await api.createRoadTripNote(tripId, { lat: latlng.lat, lng: latlng.lng, title: '', body: '' })
         await load()
+        setMobilePanel('edit') // sur mobile : file écrire la note
         toast('Note posée sur la carte — écris-la dans le panneau')
       } else if (placement.type === 'note-move') {
         await api.updateRoadTripNote(placement.noteId, { lat: latlng.lat, lng: latlng.lng })
@@ -193,21 +216,23 @@ export default function RoadTrips() {
           <h2>Carnet de voyage</h2>
         </div>
         <div className="roadtrips-header-actions">
-          <div className="roadtrips-filters">
-            {[['all', 'Tous'], ['done', 'Réalisés'], ['planned', 'Prévus']].map(([key, label]) => (
-              <button key={key} className={`rt-chip ${statusFilter === key ? 'active' : ''}`} onClick={() => setStatusFilter(key)}>{label}</button>
-            ))}
-          </div>
-          <button className="rt-btn" onClick={() => api.exportRoadTripsJson(true)} title="Exporter tous les voyages en JSON (photos incluses)">
-            <Icon name="download" size={15} /> JSON
+          {(!isMobile || mobilePanel === 'list') && (
+            <div className="roadtrips-filters">
+              {[['all', 'Tous'], ['done', 'Réalisés'], ['planned', 'Prévus']].map(([key, label]) => (
+                <button key={key} className={`rt-chip ${statusFilter === key ? 'active' : ''}`} onClick={() => setStatusFilter(key)}>{label}</button>
+              ))}
+            </div>
+          )}
+          <button className="rt-btn rt-btn-compact" onClick={() => api.exportRoadTripsJson(true)} title="Exporter tous les voyages en JSON (photos incluses)">
+            <Icon name="download" size={15} /> <span className="rt-btn-label">JSON</span>
           </button>
           <button className="rt-btn primary" onClick={createTrip}>
-            <Icon name="plus" size={15} /> Nouveau
+            <Icon name="plus" size={15} /> <span className="rt-btn-label">Nouveau</span>
           </button>
         </div>
       </header>
 
-      {allTags.length > 0 && (
+      {allTags.length > 0 && (!isMobile || mobilePanel === 'list') && (
         <div className="roadtrips-tagbar">
           <button className={`rt-tag ${!tagFilter ? 'active' : ''}`} onClick={() => setTagFilter(null)}>Tous les tags</button>
           {allTags.map(tag => (
@@ -216,7 +241,21 @@ export default function RoadTrips() {
         </div>
       )}
 
-      <div className="roadtrips-body">
+      {isMobile && (
+        <div className="roadtrips-mobile-tabs" role="tablist">
+          <button role="tab" aria-selected={mobilePanel === 'list'} className={mobilePanel === 'list' ? 'active' : ''} onClick={() => setMobilePanel('list')}>
+            <Icon name="listCheck" size={17} /><span>Voyages</span>
+          </button>
+          <button role="tab" aria-selected={mobilePanel === 'map'} className={mobilePanel === 'map' ? 'active' : ''} onClick={() => setMobilePanel('map')}>
+            <Icon name="map" size={17} /><span>Carte</span>
+          </button>
+          <button role="tab" aria-selected={mobilePanel === 'edit'} className={mobilePanel === 'edit' ? 'active' : ''} disabled={!selected} onClick={() => selected && setMobilePanel('edit')}>
+            <Icon name="edit" size={17} /><span>Fiche</span>
+          </button>
+        </div>
+      )}
+
+      <div className="roadtrips-body" data-mobile-panel={isMobile ? mobilePanel : 'all'}>
         <aside className="roadtrips-list">
           {visibleTrips.length === 0 && (
             <div className="roadtrips-empty-list">
@@ -229,7 +268,7 @@ export default function RoadTrips() {
               key={trip.id}
               trip={trip}
               active={trip.id === selectedId}
-              onSelect={() => { setSelectedId(trip.id); setStory(false) }}
+              onSelect={() => { setSelectedId(trip.id); setStory(false); if (isMobile) setMobilePanel('map') }}
             />
           ))}
         </aside>
@@ -239,11 +278,21 @@ export default function RoadTrips() {
             trips={visibleTrips}
             selected={selected}
             placement={placement}
+            active={!isMobile || mobilePanel === 'map'}
             onSelectTrip={(id) => setSelectedId(id)}
             onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
             onMapClick={handleMapClick}
             onCancelPlacement={() => setPlacement(null)}
           />
+          {isMobile && mobilePanel === 'map' && selected && !placement && (
+            <div className="rt-map-tripbar">
+              <div className="rt-map-tripbar-info">
+                <strong>{selected.title}</strong>
+                <span>{fmtKm(selected.distance_km)} · {selected.points.length} étape{selected.points.length > 1 ? 's' : ''}{selected.elevation_m != null ? ` · ${selected.elevation_m} m D+` : ''}</span>
+              </div>
+              <button className="rt-btn primary" onClick={() => setMobilePanel('edit')}><Icon name="edit" size={14} /> Éditer</button>
+            </div>
+          )}
         </div>
 
         {selected && (
@@ -256,7 +305,7 @@ export default function RoadTrips() {
             onReload={load}
             onStory={() => setStory(true)}
             onOpenPhoto={(photos, index) => setLightbox({ photos, index })}
-            onPlace={(p) => setPlacement(p)}
+            onPlace={(p) => { setPlacement(p); if (p && isMobile) setMobilePanel('map') }}
           />
         )}
       </div>
@@ -301,7 +350,7 @@ function TripCard({ trip, active, onSelect }) {
 
 // ————————————————————————————————————— Carte Leaflet
 
-function MapCanvas({ trips, selected, placement, onSelectTrip, onOpenPhoto, onMapClick, onCancelPlacement }) {
+function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, onOpenPhoto, onMapClick, onCancelPlacement }) {
   const { theme } = useApp()
   const mapEl = useRef(null)
   const mapRef = useRef(null)
@@ -310,6 +359,7 @@ function MapCanvas({ trips, selected, placement, onSelectTrip, onOpenPhoto, onMa
   const labelRef = useRef(null)
   const fitSigRef = useRef('')
   const clickRef = useRef(null)
+  const lastBoundsRef = useRef([])
   const [tileStyle, setTileStyle] = useState(theme === 'light' ? 'light' : 'voyager')
 
   // Garde la dernière version du handler de clic (évite de ré-enregistrer l'événement).
@@ -417,6 +467,7 @@ function MapCanvas({ trips, selected, placement, onSelectTrip, onOpenPhoto, onMa
       }
     }
 
+    lastBoundsRef.current = allBounds
     // Ne recadre que si les coordonnées visibles (ou la sélection) ont changé,
     // pour ne pas faire sauter la carte à chaque édition de titre/tag.
     const sig = (selected?.id || '') + '|' + allBounds.map(b => b.join(',')).join(';')
@@ -429,6 +480,21 @@ function MapCanvas({ trips, selected, placement, onSelectTrip, onOpenPhoto, onMa
       }
     }
   }, [trips, selected, onSelectTrip, onOpenPhoto])
+
+  // Quand la carte (re)devient visible sur mobile (onglet Carte), Leaflet doit
+  // recalculer sa taille — sinon les tuiles restent grises / mal placées.
+  useEffect(() => {
+    if (!active) return
+    const map = mapRef.current
+    if (!map) return
+    const t = setTimeout(() => {
+      map.invalidateSize()
+      const b = lastBoundsRef.current
+      if (b.length > 1) map.fitBounds(b, { padding: [50, 50], maxZoom: 13 })
+      else if (b.length === 1) map.setView(b[0], Math.max(map.getZoom(), 9))
+    }, 150)
+    return () => clearTimeout(t)
+  }, [active])
 
   return (
     <div className={`rt-map-container ${placement ? 'placing' : ''}`}>
