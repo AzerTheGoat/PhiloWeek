@@ -5,6 +5,7 @@ import { useApp } from '../context/useApp'
 import * as api from '../api'
 import Icon from './Icons'
 import { compressPhoto, PHOTO_QUALITY_PRESETS } from '../utils/photoCompress'
+import { ROAD_TRIP_CATEGORIES, ROAD_TRIP_PLAN_PROMPT } from '../utils/roadTripPlan'
 
 // ————————————————————————————————————————————————————————————————
 // Carnet de voyage — carte belle et complète des road trips.
@@ -36,6 +37,12 @@ const TRIP_COLORS = ['#e8663f', '#e0a020', '#4caf7d', '#6ba3e8', '#7c64f0', '#d0
 
 // Icône SVG (blanche) au centre du marqueur de note.
 const noteMarkerIcon = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h9L18 7.5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"/><path d="M8 10h7M8 13.5h5"/></svg>'
+
+function routeLatLngs(trip) {
+  const track = Array.isArray(trip.plan?.track) ? trip.plan.track : []
+  const source = track.length >= 2 ? track : trip.points
+  return source.map(point => [Number(point.lat), Number(point.lng)]).filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+}
 
 function escapeHtml(text) {
   return String(text || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -94,6 +101,7 @@ export default function RoadTrips() {
   const [lightbox, setLightbox] = useState(null) // { photos, index }
   const [placement, setPlacement] = useState(null) // null | { type:'note' } | { type:'photo', photoId }
   const [mobilePanel, setMobilePanel] = useState('list') // mobile only : 'map' | 'list' | 'edit'
+  const [importOpen, setImportOpen] = useState(false)
 
   const load = useCallback(async (keepSelection = true) => {
     try {
@@ -194,6 +202,22 @@ export default function RoadTrips() {
     }
   }, [toast])
 
+  const copyPlanPrompt = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(ROAD_TRIP_PLAN_PROMPT)
+      toast('Prompt de trajet copié')
+    } catch (_) { toast('Impossible de copier le prompt', 'error') }
+  }, [toast])
+
+  const importPlan = useCallback((trip) => {
+    setTrips(prev => [...prev, trip])
+    setSelectedId(trip.id)
+    setImportOpen(false)
+    setStory(false)
+    setMobilePanel('map')
+    toast('Tracé et lieux utiles importés')
+  }, [toast])
+
   if (loading) {
     return <div className="roadtrips-view"><div className="roadtrips-empty">Chargement…</div></div>
   }
@@ -225,6 +249,12 @@ export default function RoadTrips() {
           )}
           <button className="rt-btn rt-btn-compact" onClick={() => api.exportRoadTripsJson(true)} title="Exporter tous les voyages en JSON (photos incluses)">
             <Icon name="download" size={15} /> <span className="rt-btn-label">JSON</span>
+          </button>
+          <button className="rt-btn rt-btn-compact" onClick={copyPlanPrompt} title="Copier le prompt pour demander un trajet JSON à une IA">
+            <Icon name="copy" size={15} /> <span className="rt-btn-label">Prompt IA</span>
+          </button>
+          <button className="rt-btn rt-btn-compact" onClick={() => setImportOpen(true)} title="Importer un trajet conseillé au format JSON">
+            <Icon name="upload" size={15} /> <span className="rt-btn-label">Importer</span>
           </button>
           <button className="rt-btn primary" onClick={createTrip}>
             <Icon name="plus" size={15} /> <span className="rt-btn-label">Nouveau</span>
@@ -318,6 +348,7 @@ export default function RoadTrips() {
           onIndex={(i) => setLightbox(lb => ({ ...lb, index: i }))}
         />
       )}
+      {importOpen && <RoadTripImportModal onClose={() => setImportOpen(false)} onImported={importPlan} onCopyPrompt={copyPlanPrompt} />}
     </div>
   )
 }
@@ -403,7 +434,7 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
     for (const trip of trips) {
       const isSel = selected && trip.id === selected.id
       const dim = focus && !isSel
-      const latlngs = trip.points.map(p => [p.lat, p.lng])
+      const latlngs = routeLatLngs(trip)
 
       if (latlngs.length >= 2) {
         L.polyline(latlngs, {
@@ -414,6 +445,7 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(group).on('click', () => onSelectTrip(trip.id))
+        if (!dim) allBounds.push(...latlngs)
       }
 
       trip.points.forEach((p, i) => {
@@ -458,9 +490,10 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
             }),
             zIndexOffset: 550,
           }).addTo(group)
+          const category = `<span class="rt-note-popup-category">${escapeHtml(ROAD_TRIP_CATEGORIES[note.category] || ROAD_TRIP_CATEGORIES.other)}</span>`
           const title = note.title ? `<strong>${escapeHtml(note.title)}</strong>` : ''
           const body = note.body ? `<p>${escapeHtml(note.body).replace(/\n/g, '<br>')}</p>` : ''
-          marker.bindPopup(`<div class="rt-note-popup">${title}${body || (title ? '' : '<em>Note vide</em>')}</div>`, { maxWidth: 260 })
+          marker.bindPopup(`<div class="rt-note-popup">${category}${title}${body || (title ? '' : '<em>Note vide</em>')}</div>`, { maxWidth: 260 })
           marker.on('click', () => onSelectTrip(trip.id))
           allBounds.push([note.lat, note.lng])
         })
@@ -530,11 +563,14 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
   const [busy, setBusy] = useState(false)
   const [pendingFiles, setPendingFiles] = useState(null)
   const [placingPhoto, setPlacingPhoto] = useState(null)
+  const [noteFilter, setNoteFilter] = useState('all')
   const fileInputRef = useRef(null)
   const searchTimer = useRef(null)
 
   const livePoints = trip.points
   const liveAuto = autoDistance(livePoints)
+  const noteCategories = useMemo(() => [...new Set(trip.notes.map(note => note.category || 'practical'))], [trip.notes])
+  const visibleNotes = noteFilter === 'all' ? trip.notes : trip.notes.filter(note => note.category === noteFilter)
 
   // Sauvegarde des champs texte après une pause. Les patches en attente sont
   // fusionnés : éditer titre puis description en < 600ms n'écrase pas l'un l'autre.
@@ -737,6 +773,8 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
           ))}
         </ol>
 
+        {trip.plan && Object.keys(trip.plan).length > 0 && <ImportedPlan plan={trip.plan} />}
+
         {/* Photos */}
         <div className="rt-section-title">
           Photos
@@ -776,11 +814,21 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
             <Icon name="pin" size={14} /> {placement?.type === 'note' ? 'Clique la carte…' : 'Poser une note'}
           </button>
         </div>
+        {trip.notes.length > 0 && (
+          <div className="rt-note-filters" aria-label="Filtrer les lieux utiles">
+            <button className={noteFilter === 'all' ? 'active' : ''} onClick={() => setNoteFilter('all')}>Tous · {trip.notes.length}</button>
+            {noteCategories.map(category => (
+              <button key={category} className={noteFilter === category ? 'active' : ''} onClick={() => setNoteFilter(category)}>
+                {ROAD_TRIP_CATEGORIES[category] || ROAD_TRIP_CATEGORIES.other} · {trip.notes.filter(note => (note.category || 'practical') === category).length}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="rt-notes-list">
           {trip.notes.length === 0 && (
             <div className="rt-photos-empty">Pose une note à un endroit précis de la carte 📍</div>
           )}
-          {trip.notes.map(note => (
+          {visibleNotes.map(note => (
             <NoteCard
               key={note.id}
               note={note}
@@ -859,6 +907,9 @@ function NoteCard({ note, color, onSave, onDelete, onReplace }) {
     <div className="rt-note-card" style={{ '--c': note.color || color }}>
       <div className="rt-note-card-head">
         <span className="rt-note-dot" />
+        <select className="rt-note-category" value={note.category || 'practical'} onChange={e => onSave({ category: e.target.value })} aria-label="Catégorie">
+          {Object.entries(ROAD_TRIP_CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
         <input
           className="rt-note-title"
           value={title}
@@ -877,6 +928,118 @@ function NoteCard({ note, color, onSave, onDelete, onReplace }) {
         rows={2}
         placeholder="Écris ton souvenir, une anecdote…"
       />
+      <ImportedNoteDetails details={note.details} />
+    </div>
+  )
+}
+
+function ImportedNoteDetails({ details }) {
+  if (!details || typeof details !== 'object') return null
+  const rows = [
+    ['Importance', details.importance],
+    ['Adresse', details.address], ['Horaires', details.opening_hours], ['Prix', details.price],
+    ['Meilleur moment', details.best_time], ['Réservation', details.reservation], ['Accessibilité', details.accessibility],
+  ].filter(([, value]) => value)
+  const warnings = Array.isArray(details.warnings) ? details.warnings.filter(Boolean) : []
+  const supplies = Array.isArray(details.supplies) ? details.supplies.filter(Boolean) : []
+  if (!rows.length && !details.website && !details.source_url && !details.phone && !warnings.length && !supplies.length) return null
+  return (
+    <details className="rt-note-details">
+      <summary>Informations pratiques</summary>
+      {rows.map(([label, value]) => <div key={label}><strong>{label}</strong><span>{String(value)}</span></div>)}
+      {details.phone && <div><strong>Téléphone</strong><a href={`tel:${details.phone}`}>{details.phone}</a></div>}
+      {supplies.length > 0 && <div><strong>Disponible</strong><span>{supplies.join(', ')}</span></div>}
+      {warnings.length > 0 && <div className="warning"><strong>Vigilance</strong><span>{warnings.join(' · ')}</span></div>}
+      <div className="rt-note-links">
+        {safeExternalUrl(details.website) && <a href={safeExternalUrl(details.website)} target="_blank" rel="noreferrer">Site</a>}
+        {safeExternalUrl(details.source_url) && <a href={safeExternalUrl(details.source_url)} target="_blank" rel="noreferrer">Source</a>}
+        {(details.confidence || details.verified_on) && <span>Fiabilité : {details.confidence || 'non précisée'}{details.verified_on ? ` · vérifié le ${details.verified_on}` : ''}</span>}
+      </div>
+    </details>
+  )
+}
+
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ''))
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
+  } catch (_) { return null }
+}
+
+function ImportedPlan({ plan }) {
+  const segments = Array.isArray(plan.segments) ? plan.segments : []
+  const days = Array.isArray(plan.days) ? plan.days : []
+  const checklist = Array.isArray(plan.checklist) ? plan.checklist : []
+  const assumptions = Array.isArray(plan.assumptions) ? plan.assumptions : []
+  const practical = plan.practical && typeof plan.practical === 'object' ? plan.practical : null
+  return (
+    <details className="rt-imported-plan" open>
+      <summary>Plan conseillé importé</summary>
+      {plan.summary && <p>{plan.summary}</p>}
+      <div className="rt-plan-counts"><span>{segments.length} segments</span><span>{days.length} jours</span><span>{checklist.length} actions</span></div>
+      {days.length > 0 && <details><summary>Programme jour par jour</summary>{days.map((day, index) => { const schedule = [...(Array.isArray(day.morning) ? day.morning : []), ...(Array.isArray(day.afternoon) ? day.afternoon : []), ...(Array.isArray(day.evening) ? day.evening : [])]; return <article key={index}><strong>Jour {day.day || index + 1}{day.title ? ` · ${day.title}` : ''}</strong><span>{[day.start_point, day.end_point].filter(Boolean).join(' → ')}</span>{schedule.length > 0 && <p>{schedule.join(' · ')}</p>}{Array.isArray(day.meals) && day.meals.length > 0 && <p>Repas : {day.meals.join(' · ')}</p>}{day.sleep && <p>Nuit : {day.sleep}</p>}{Array.isArray(day.notes) && day.notes.length > 0 && <p>{day.notes.join(' · ')}</p>}</article> })}</details>}
+      {segments.length > 0 && <details><summary>Segments du trajet</summary>{segments.map((segment, index) => <article key={index}><strong>{segment.from || '?'} → {segment.to || '?'}</strong><span>{[segment.distance_km != null ? `${segment.distance_km} km` : null, segment.duration_minutes != null ? `${segment.duration_minutes} min` : null, segment.route].filter(Boolean).join(' · ')}</span></article>)}</details>}
+      {checklist.length > 0 && <details><summary>Checklist avant départ</summary><ul>{checklist.map((item, index) => <li key={index}>{String(item)}</li>)}</ul></details>}
+      {practical && <details><summary>Conseils pratiques</summary>{Object.entries(practical).map(([key, value]) => <article key={key}><strong>{PRACTICAL_LABELS[key] || key.replaceAll('_', ' ')}</strong><span>{formatPracticalValue(value)}</span></article>)}</details>}
+      {assumptions.length > 0 && <details className="warning"><summary>Hypothèses à vérifier</summary><ul>{assumptions.map((item, index) => <li key={index}>{String(item)}</li>)}</ul></details>}
+    </details>
+  )
+}
+
+const PRACTICAL_LABELS = { budget: 'Budget', weather_and_season: 'Météo et saison', documents_and_rules: 'Documents et règles', health_and_safety: 'Santé et sécurité', connectivity: 'Réseau et recharge', packing: 'À emporter', alternatives: 'Plans B' }
+function formatPracticalValue(value) {
+  if (Array.isArray(value)) return value.map(String).join(' · ')
+  if (value && typeof value === 'object') return Object.entries(value).map(([key, item]) => `${key.replaceAll('_', ' ')} : ${Array.isArray(item) ? item.join(', ') : item ?? '—'}`).join(' · ')
+  return String(value ?? '—')
+}
+
+function RoadTripImportModal({ onClose, onImported, onCopyPrompt }) {
+  const [text, setText] = useState('')
+  const [payload, setPayload] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef(null)
+
+  const prepare = async (raw = text) => {
+    setError(''); setPreview(null); setPayload(null)
+    let parsed
+    try { parsed = JSON.parse(raw) }
+    catch (_) { setError('Le texte ne contient pas un JSON valide. Retire notamment les blocs ```json.'); return }
+    setBusy(true)
+    try {
+      const result = await api.previewRoadTripPlan(parsed)
+      setPayload(parsed); setPreview(result)
+    } catch (err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+  const chooseFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (file.size > 12 * 1024 * 1024) return setError('Le fichier dépasse 12 Mo.')
+    const raw = await file.text()
+    setText(raw); prepare(raw)
+  }
+  const confirm = async () => {
+    if (!payload) return
+    setBusy(true); setError('')
+    try { onImported(await api.importRoadTripPlan(payload)) }
+    catch (err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="rt-import-backdrop" data-focus-layer onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <section className="rt-import-modal" role="dialog" aria-modal="true" aria-labelledby="rt-import-title">
+        <header><div><h3 id="rt-import-title">Importer un trajet conseillé</h3><p>L’application n’appelle aucune IA : copie le prompt, construis le trajet où tu veux, puis colle ici le JSON final.</p></div><button className="rt-icon-btn" onClick={onClose}><Icon name="close" size={17} /></button></header>
+        <div className="rt-import-steps"><span><b>1</b> Copier le prompt</span><span><b>2</b> Discuter du trajet avec l’IA</span><span><b>3</b> Coller son JSON</span></div>
+        <div className="rt-import-actions"><button className="rt-btn" onClick={onCopyPrompt}><Icon name="copy" size={14} /> Copier le prompt complet</button><button className="rt-btn" onClick={() => fileRef.current?.click()}><Icon name="upload" size={14} /> Choisir un .json</button></div>
+        <input ref={fileRef} hidden type="file" accept="application/json,.json" onChange={chooseFile} />
+        <textarea value={text} onChange={e => { setText(e.target.value); setPreview(null); setPayload(null) }} placeholder='Colle ici { "philoweek_type": "road_trip_plan", ... }' spellCheck="false" />
+        {error && <div className="rt-import-error">{error}</div>}
+        {preview && <div className="rt-import-preview"><strong>{preview.title}</strong><div><span>{preview.points} étapes</span><span>{preview.segments} segments</span><span>{preview.days} jours</span><span>{preview.places} lieux utiles</span></div>{preview.categories.length > 0 && <p>{preview.categories.map(category => ROAD_TRIP_CATEGORIES[category] || category).join(' · ')}</p>}{preview.warnings.map((warning, index) => <p className="warning" key={index}>{warning}</p>)}</div>}
+        <footer><button className="rt-btn" onClick={onClose}>Annuler</button>{!preview ? <button className="rt-btn primary" disabled={!text.trim() || busy} onClick={() => prepare()}>{busy ? 'Analyse…' : 'Vérifier le JSON'}</button> : <button className="rt-btn primary" disabled={busy} onClick={confirm}>{busy ? 'Import…' : 'Importer ce trajet'}</button>}</footer>
+      </section>
     </div>
   )
 }
@@ -944,7 +1107,7 @@ function StoryView({ trip, onClose, onOpenPhoto }) {
     }).setView([46.6, 2.4], 4)
     L.tileLayer(TILE_STYLES.voyager.url, { subdomains: 'abcd', maxZoom: 20 }).addTo(map)
     L.tileLayer(TILE_STYLES.voyager.labels, { subdomains: 'abcd', maxZoom: 20 }).addTo(map)
-    const latlngs = trip.points.map(p => [p.lat, p.lng])
+    const latlngs = routeLatLngs(trip)
     if (latlngs.length >= 2) {
       L.polyline(latlngs, { color: trip.color, weight: 4, opacity: 0.95, dashArray: trip.status === 'planned' ? '2 9' : null, lineCap: 'round' }).addTo(map)
     }

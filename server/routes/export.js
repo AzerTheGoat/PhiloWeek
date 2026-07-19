@@ -282,6 +282,7 @@ router.get('/obsidian', async (req, res) => {
     const roadTripNotes = db.prepare('SELECT * FROM road_trip_notes WHERE user_id = ? ORDER BY trip_id, sort_order ASC').all(req.user.id)
     zip.file('_Opuscule/RoadTrips.json', JSON.stringify({
       philoweek_type: 'road_trips',
+      version: 2,
       exported: new Date().toISOString(),
       trips: roadTrips,
       photos: roadTripPhotos,

@@ -158,6 +158,8 @@ export const updateRoadTrip = (id, data) => req('PUT', `/roadtrips/${id}`, data)
 export const deleteRoadTrip = id => req('DELETE', `/roadtrips/${id}`)
 export const reorderRoadTrips = ids => req('PUT', '/roadtrips/reorder/list', { ids })
 export const geocodePlace = q => req('GET', `/roadtrips/geocode?q=${encodeURIComponent(q)}`)
+export const previewRoadTripPlan = data => req('POST', '/roadtrips/import-plan/preview', data)
+export const importRoadTripPlan = data => req('POST', '/roadtrips/import-plan', data)
 export const uploadRoadTripPhoto = (tripId, blob, meta = {}) => {
   const fd = new FormData()
   fd.append('photo', blob, meta.filename || 'photo.jpg')

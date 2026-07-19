@@ -295,6 +295,17 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La presence collaborative est un heartbeat ephemere de 45 secondes; elle n'accorde aucun droit et ne remplace jamais les controles d'acces serveur.
 - L'export Obsidian ajoute `_Opuscule/Shares.json` avec les usernames et permissions. A l'import, seuls les comptes qui existent deja sur l'instance sont reconnectes.
 
+## Carnet de voyage et import de traces conseilles
+
+- Le Carnet de voyage permet de copier un prompt complet, de definir un trajet avec un LLM externe, puis d'importer sa reponse; l'application ne fait aucun appel IA et ne transmet aucune donnee a un fournisseur.
+- Le format importe utilise `philoweek_type: road_trip_plan`, `version: 1` et un objet `trip`; il separe les etapes (`points`), la geometrie detaillee optionnelle (`track`), les segments, les jours, les lieux utiles, les informations pratiques, la checklist, les sources et les hypotheses.
+- L'import se fait en deux temps : `POST /api/roadtrips/import-plan/preview` valide et resume sans ecrire, puis `POST /api/roadtrips/import-plan` cree le voyage et ses lieux en une transaction.
+- `road_trips.plan_json` conserve le plan structure. `road_trip_notes.category` et `road_trip_notes.details_json` conservent les lieux utiles et leurs metadonnees (adresse, horaires, prix, source, date de verification, confiance, avertissements, ravitaillement).
+- Les categories supportees sont `food`, `water`, `supplies`, `fuel`, `charging`, `sleep`, `medical`, `parking`, `transport`, `visit`, `activity`, `viewpoint`, `warning`, `practical` et `other`; elles servent au filtrage dans la fiche du voyage.
+- Une information volatile sans `source_url` ou `verified_on` doit etre signalee dans l'apercu. Le prompt demande au LLM de laisser `null` plutot que d'inventer et rappelle que securite, meteo, frontieres, fermetures et horaires doivent etre verifies avant le depart.
+- Si `track` contient au moins deux coordonnees, il dessine la route et alimente le GeoJSON; sinon la carte relie les etapes par des lignes droites.
+- L'export Obsidian `_Opuscule/RoadTrips.json` conserve `plan_json`, `category` et `details_json`; l'import les restaure et reste compatible avec les sauvegardes v1 sans ces champs.
+
 ## Tableurs Excel
 
 - La sidebar et tous les menus contextuels permettent de creer un `Tableur Excel`; son nom visible se termine par `.xlsx`.

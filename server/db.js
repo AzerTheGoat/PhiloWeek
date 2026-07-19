@@ -512,6 +512,14 @@ const MIGRATIONS = [
         ON road_trip_notes(user_id);
     `)
   },
+  // v15 -> v16 : plans de trajet structurés importés depuis un LLM externe.
+  // Le plan riche reste attaché au voyage; les lieux utiles deviennent des
+  // notes catégorisées afin de rester visibles et éditables sur la carte.
+  (db) => {
+    addColumnIfMissing(db, 'road_trips', 'plan_json', "TEXT NOT NULL DEFAULT '{}'")
+    addColumnIfMissing(db, 'road_trip_notes', 'category', "TEXT NOT NULL DEFAULT 'practical'")
+    addColumnIfMissing(db, 'road_trip_notes', 'details_json', "TEXT NOT NULL DEFAULT '{}'")
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

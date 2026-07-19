@@ -599,10 +599,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
       if (roadTripsPayload && Array.isArray(roadTripsPayload.trips)) {
         const insertTrip = db.prepare(`
           INSERT INTO road_trips (
-            id, user_id, title, description, status, tag, color, points_json,
+            id, user_id, title, description, status, tag, color, points_json, plan_json,
             distance_km, distance_manual, elevation_m, start_date, end_date,
             cover_photo_id, sort_order, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         const insertPhoto = db.prepare(`
           INSERT INTO road_trip_photos (
@@ -611,8 +611,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         `)
         const insertNote = db.prepare(`
           INSERT INTO road_trip_notes (
-            id, trip_id, user_id, lat, lng, title, body, color, sort_order, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, trip_id, user_id, lat, lng, title, body, color, category, details_json, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         const allPhotos = Array.isArray(roadTripsPayload.photos) ? roadTripsPayload.photos : []
         const allNotes = Array.isArray(roadTripsPayload.notes) ? roadTripsPayload.notes : []
@@ -629,6 +629,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             trip.tag ? String(trip.tag).slice(0, 60) : null,
             /^#[0-9a-f]{6}$/i.test(String(trip.color || '')) ? String(trip.color).toLowerCase() : '#e8663f',
             typeof trip.points_json === 'string' ? trip.points_json : JSON.stringify(trip.points || []),
+            typeof trip.plan_json === 'string' ? trip.plan_json : JSON.stringify(trip.plan || {}),
             Number.isFinite(Number(trip.distance_km)) ? Number(trip.distance_km) : null,
             trip.distance_manual ? 1 : 0,
             Number.isFinite(Number(trip.elevation_m)) ? Number(trip.elevation_m) : null,
@@ -680,6 +681,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
               note.title ? String(note.title).slice(0, 200) : null,
               note.body ? String(note.body).slice(0, 5000) : null,
               /^#[0-9a-f]{6}$/i.test(String(note.color || '')) ? String(note.color).toLowerCase() : null,
+              ['food', 'water', 'supplies', 'fuel', 'charging', 'sleep', 'medical', 'parking', 'transport', 'visit', 'activity', 'viewpoint', 'warning', 'practical', 'other'].includes(note.category) ? note.category : 'practical',
+              typeof note.details_json === 'string' ? note.details_json : JSON.stringify(note.details || {}),
               Number.isFinite(Number(note.sort_order)) ? Number(note.sort_order) : noteIndex,
               normalizeIsoDate(note.created_at) || now,
               normalizeIsoDate(note.updated_at) || now

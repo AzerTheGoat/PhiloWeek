@@ -230,6 +230,16 @@ const SECTIONS = [
         text: "Cherche les villes que tu as traversées : elles s'ajoutent comme étapes numérotées et se relient automatiquement par un tracé en ligne droite (plein pour un voyage réalisé, pointillé pour un projet). La distance à vol d'oiseau se calcule toute seule, ou tu saisis les kilomètres réels et le dénivelé.",
       },
       {
+        icon: 'copy',
+        title: 'Faire conseiller un trajet',
+        text: "Le bouton Prompt IA copie un cahier des charges complet. Colle-le dans le LLM de ton choix après avoir défini avec lui le départ, l'arrivée, les dates, le rythme, le budget et tes envies. Opuscule n'envoie aucune donnée à une IA.",
+      },
+      {
+        icon: 'upload',
+        title: 'Importer le plan JSON',
+        text: "Le bouton Importer accepte le fichier .json ou le texte final du LLM. Un aperçu vérifie les étapes, segments, jours, lieux utiles et sources avant confirmation. Repas, eau, ravitaillement, couchage, santé, visites et vigilances deviennent des notes filtrables sur la carte.",
+      },
+      {
         icon: 'image',
         title: 'Photos & souvenirs',
         text: "Ajoute des photos (compressées avant l'envoi — tu choisis la qualité), écris une légende et désigne une couverture. Un récit libre accompagne le voyage.",
