@@ -209,6 +209,10 @@ function normalizeAiPlan(payload) {
     version: Number(root.version) || 1,
     summary: trip.summary || null,
     traveler_profile: trip.traveler_profile || null,
+    departure: trip.departure || (trip.start_date || trip.start_time ? { date: trip.start_date || null, time: trip.start_time || null } : null),
+    arrival: trip.arrival || (trip.end_date || trip.end_time ? { date: trip.end_date || null, time: trip.end_time || null } : null),
+    transport_options: Array.isArray(trip.transport_options) ? trip.transport_options.slice(0, 20) : [],
+    selected_transport: trip.selected_transport || null,
     segments: Array.isArray(trip.segments) ? trip.segments.slice(0, 300) : [],
     days: Array.isArray(trip.days) ? trip.days.slice(0, 180) : [],
     practical: trip.practical || null,
@@ -236,6 +240,8 @@ function normalizeAiPlan(payload) {
     preview: {
       title: emptyToNull(trip.title, 200) || 'Voyage conseillé', points: points.length,
       segments: plan.segments.length, days: plan.days.length, places: notes.length,
+      transport_options: plan.transport_options.length,
+      selected_transport: plan.selected_transport?.label || null,
       categories: [...new Set(notes.map(note => note.category))], warnings,
     },
   }

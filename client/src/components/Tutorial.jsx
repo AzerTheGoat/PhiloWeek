@@ -232,12 +232,17 @@ const SECTIONS = [
       {
         icon: 'copy',
         title: 'Faire conseiller un trajet',
-        text: "Le bouton Prompt IA copie un cahier des charges complet. Colle-le dans le LLM de ton choix après avoir défini avec lui le départ, l'arrivée, les dates, le rythme, le budget et tes envies. Opuscule n'envoie aucune donnée à une IA.",
+        text: "Le bouton Prompt IA lance un dialogue en trois phases. Le LLM demande d'abord départ et arrivée avec dates et heures, budget, nombre de personnes, de vélos et bagages. Il compare ensuite plusieurs transports avec leur prix total; choisis celui qui te convient avant qu'il génère le JSON. Opuscule n'envoie aucune donnée à une IA.",
       },
       {
         icon: 'upload',
         title: 'Importer le plan JSON',
         text: "Le bouton Importer accepte le fichier .json ou le texte final du LLM. Un aperçu vérifie les étapes, segments, jours, lieux utiles et sources avant confirmation. Repas, eau, ravitaillement, couchage, santé, visites et vigilances deviennent des notes filtrables sur la carte.",
+      },
+      {
+        icon: 'route',
+        title: 'Plan, lieux et modification',
+        text: "Un trajet conseillé s'ouvre sur une feuille de route lisible : résumé, statistiques, journées, segments, conseils pratiques et checklist. L'onglet Lieux regroupe les adresses et ravitaillements par catégorie; Modifier garde les réglages du voyage à part.",
       },
       {
         icon: 'image',

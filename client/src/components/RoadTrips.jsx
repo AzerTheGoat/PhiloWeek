@@ -35,8 +35,20 @@ const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">Ope
 
 const TRIP_COLORS = ['#e8663f', '#e0a020', '#4caf7d', '#6ba3e8', '#7c64f0', '#d0518f', '#2fb0a8', '#8a6d3b']
 
-// Icône SVG (blanche) au centre du marqueur de note.
-const noteMarkerIcon = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h9L18 7.5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"/><path d="M8 10h7M8 13.5h5"/></svg>'
+const NOTE_CATEGORY_META = {
+  food: { glyph: '🍴', color: '#e76f51' }, water: { glyph: '💧', color: '#2d9cdb' },
+  supplies: { glyph: '▣', color: '#6f9e4f' }, fuel: { glyph: '⛽', color: '#d28b25' },
+  charging: { glyph: '⚡', color: '#9b7de3' }, sleep: { glyph: '⌂', color: '#6574cd' },
+  medical: { glyph: '✚', color: '#d95858' }, parking: { glyph: 'P', color: '#557a95' },
+  transport: { glyph: '↔', color: '#5b8c85' }, visit: { glyph: '◇', color: '#b071c3' },
+  activity: { glyph: '●', color: '#e08145' }, viewpoint: { glyph: '◉', color: '#4b9f90' },
+  warning: { glyph: '!', color: '#db6b38' }, practical: { glyph: 'i', color: '#6b7f99' },
+  other: { glyph: '•', color: '#7d8792' },
+}
+
+function categoryMeta(category) {
+  return NOTE_CATEGORY_META[category] || NOTE_CATEGORY_META.other
+}
 
 function routeLatLngs(trip) {
   const track = Array.isArray(trip.plan?.track) ? trip.plan.track : []
@@ -358,6 +370,7 @@ export default function RoadTrips() {
 function TripCard({ trip, active, onSelect }) {
   const cover = trip.photos.find(p => p.id === trip.cover_photo_id) || trip.photos[0]
   const range = fmtDateRange(trip.start_date, trip.end_date)
+  const routeLabel = trip.points.length > 1 ? `${trip.points[0].name} → ${trip.points[trip.points.length - 1].name}` : null
   return (
     <button className={`rt-card ${active ? 'active' : ''}`} onClick={onSelect}>
       <div className="rt-card-thumb" style={{ background: cover ? undefined : `linear-gradient(135deg, ${trip.color}, ${trip.color}55)` }}>
@@ -368,6 +381,7 @@ function TripCard({ trip, active, onSelect }) {
       </div>
       <div className="rt-card-body">
         <strong className="rt-card-title" style={{ borderColor: trip.color }}>{trip.title}</strong>
+        {trip.status === 'planned' && routeLabel && <div className="rt-card-route">{routeLabel}</div>}
         <div className="rt-card-meta">
           {trip.tag && <span className="rt-card-tag">#{trip.tag}</span>}
           <span><Icon name="route" size={12} /> {fmtKm(trip.distance_km)}</span>
@@ -438,10 +452,17 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
 
       if (latlngs.length >= 2) {
         L.polyline(latlngs, {
+          color: tileStyle === 'dark' ? '#101318' : '#fff',
+          weight: isSel ? 8 : 6,
+          opacity: dim ? 0.12 : 0.78,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(group).on('click', () => onSelectTrip(trip.id))
+        L.polyline(latlngs, {
           color: trip.color,
-          weight: isSel ? 4 : 3,
+          weight: isSel ? 5 : 4,
           opacity: dim ? 0.25 : 0.95,
-          dashArray: trip.status === 'planned' ? '2 9' : null,
+          dashArray: trip.status === 'planned' ? '11 9' : null,
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(group).on('click', () => onSelectTrip(trip.id))
@@ -481,10 +502,11 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
 
         // Notes géolocalisées : marqueur cliquable ouvrant une bulle de texte.
         trip.notes.forEach(note => {
+          const meta = categoryMeta(note.category)
           const marker = L.marker([note.lat, note.lng], {
             icon: L.divIcon({
               className: 'rt-note-marker-wrap',
-              html: `<span class="rt-note-marker" style="--c:${note.color || trip.color}">${noteMarkerIcon}</span>`,
+              html: `<span class="rt-note-marker" style="--c:${note.color || meta.color}"><b>${escapeHtml(meta.glyph)}</b></span>`,
               iconSize: [30, 34],
               iconAnchor: [15, 32],
             }),
@@ -512,7 +534,7 @@ function MapCanvas({ trips, selected, placement, active = true, onSelectTrip, on
         map.fitBounds(allBounds, { padding: [60, 60], maxZoom: 13 })
       }
     }
-  }, [trips, selected, onSelectTrip, onOpenPhoto])
+  }, [trips, selected, onSelectTrip, onOpenPhoto, tileStyle])
 
   // Quand la carte (re)devient visible sur mobile (onglet Carte), Leaflet doit
   // recalculer sa taille — sinon les tuiles restent grises / mal placées.
@@ -562,8 +584,9 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
   const [searching, setSearching] = useState(false)
   const [busy, setBusy] = useState(false)
   const [pendingFiles, setPendingFiles] = useState(null)
-  const [placingPhoto, setPlacingPhoto] = useState(null)
   const [noteFilter, setNoteFilter] = useState('all')
+  const hasPlan = Boolean(trip.plan && Object.keys(trip.plan).length > 0)
+  const [editorTab, setEditorTab] = useState(hasPlan && trip.status === 'planned' ? 'plan' : 'edit')
   const fileInputRef = useRef(null)
   const searchTimer = useRef(null)
 
@@ -689,6 +712,17 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
           <button className="rt-icon-btn danger" title="Supprimer le voyage" onClick={onDelete}><Icon name="trash" size={16} /></button>
         </div>
 
+        {hasPlan && (
+          <nav className="rt-detail-tabs" aria-label="Sections du voyage">
+            <button className={editorTab === 'plan' ? 'active' : ''} onClick={() => setEditorTab('plan')}><Icon name="route" size={14} /> Plan</button>
+            <button className={editorTab === 'places' ? 'active' : ''} onClick={() => setEditorTab('places')}><Icon name="pin" size={14} /> Lieux <span>{trip.notes.length}</span></button>
+            <button className={editorTab === 'edit' ? 'active' : ''} onClick={() => setEditorTab('edit')}><Icon name="edit" size={14} /> Modifier</button>
+          </nav>
+        )}
+
+        {hasPlan && editorTab === 'plan' && <PlannedTripOverview trip={trip} />}
+
+        {(!hasPlan || editorTab === 'edit') && <>
         <div className="rt-row">
           <div className="rt-status-toggle">
             <button className={trip.status === 'done' ? 'active' : ''} onClick={() => onPatch(trip.id, { status: 'done' })}>Réalisé</button>
@@ -773,8 +807,6 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
           ))}
         </ol>
 
-        {trip.plan && Object.keys(trip.plan).length > 0 && <ImportedPlan plan={trip.plan} />}
-
         {/* Photos */}
         <div className="rt-section-title">
           Photos
@@ -804,6 +836,13 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
           ))}
         </div>
 
+        <label className="rt-field rt-desc">
+          <span>Récit / notes</span>
+          <textarea value={description} onChange={e => { setDescription(e.target.value); debouncedPatch({ description: e.target.value }) }} rows={5} placeholder="Raconte ce road trip…" />
+        </label>
+        </>}
+
+        {(!hasPlan || editorTab === 'places') && <>
         {/* Notes géolocalisées */}
         <div className="rt-section-title">
           Notes sur la carte
@@ -839,11 +878,7 @@ function TripEditor({ trip, placement, onPatch, onDelete, onReload, onStory, onO
             />
           ))}
         </div>
-
-        <label className="rt-field rt-desc">
-          <span>Récit / notes</span>
-          <textarea value={description} onChange={e => { setDescription(e.target.value); debouncedPatch({ description: e.target.value }) }} rows={5} placeholder="Raconte ce road trip…" />
-        </label>
+        </>}
 
         <div className="rt-editor-footer">
           <button className="rt-btn" onClick={onStory}><Icon name="eye" size={15} /> Carte postale</button>
@@ -903,59 +938,75 @@ function PhotoTile({ photo, isCover, points, color, onOpen, onCover, onDelete, o
 function NoteCard({ note, color, onSave, onDelete, onReplace }) {
   const [title, setTitle] = useState(note.title || '')
   const [body, setBody] = useState(note.body || '')
+  const [category, setCategory] = useState(note.category || 'practical')
+  const [editing, setEditing] = useState(false)
+  const meta = categoryMeta(note.category)
+  const importance = note.details?.importance
+  const confidence = note.details?.confidence
+
+  const save = async () => {
+    await onSave({ title, body, category })
+    setEditing(false)
+  }
+
   return (
-    <div className="rt-note-card" style={{ '--c': note.color || color }}>
-      <div className="rt-note-card-head">
-        <span className="rt-note-dot" />
-        <select className="rt-note-category" value={note.category || 'practical'} onChange={e => onSave({ category: e.target.value })} aria-label="Catégorie">
-          {Object.entries(ROAD_TRIP_CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <input
-          className="rt-note-title"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onBlur={() => { if (title !== (note.title || '')) onSave({ title }) }}
-          placeholder="Titre de la note"
-        />
+    <article className="rt-note-card" data-category={note.category || 'other'} style={{ '--c': note.color || meta.color || color }}>
+      <div className="rt-place-head">
+        <span className="rt-place-glyph" aria-hidden="true">{meta.glyph}</span>
+        <div className="rt-place-heading">
+          <span className="rt-place-category">{ROAD_TRIP_CATEGORIES[note.category] || ROAD_TRIP_CATEGORIES.other}</span>
+          <strong>{note.title || 'Lieu sans titre'}</strong>
+          <div className="rt-place-badges">
+            {importance && <span className={`importance ${importance}`}>{importance === 'essential' ? 'Essentiel' : importance === 'recommended' ? 'Conseillé' : 'Optionnel'}</span>}
+            {confidence && <span className={`confidence ${confidence}`}>{confidence === 'high' ? 'Info fiable' : confidence === 'medium' ? 'À confirmer' : 'À vérifier'}</span>}
+          </div>
+        </div>
+        <button className="rt-note-mini" title="Modifier" onClick={() => setEditing(value => !value)}><Icon name="edit" size={13} /></button>
         <button className="rt-note-mini" title="Repositionner sur la carte" onClick={onReplace}><Icon name="pin" size={13} /></button>
         <button className="rt-note-mini danger" title="Supprimer" onClick={onDelete}><Icon name="trash" size={13} /></button>
       </div>
-      <textarea
-        className="rt-note-body"
-        value={body}
-        onChange={e => setBody(e.target.value)}
-        onBlur={() => { if (body !== (note.body || '')) onSave({ body }) }}
-        rows={2}
-        placeholder="Écris ton souvenir, une anecdote…"
-      />
-      <ImportedNoteDetails details={note.details} />
-    </div>
+      {editing ? (
+        <div className="rt-place-edit">
+          <select className="rt-note-category" value={category} onChange={e => setCategory(e.target.value)} aria-label="Catégorie">
+            {Object.entries(ROAD_TRIP_CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <input className="rt-note-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Titre du lieu" />
+          <textarea className="rt-note-body" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="Conseil ou souvenir…" />
+          <div className="rt-place-edit-actions"><button className="rt-btn" onClick={() => { setTitle(note.title || ''); setBody(note.body || ''); setCategory(note.category || 'practical'); setEditing(false) }}>Annuler</button><button className="rt-btn primary" onClick={save}>Enregistrer</button></div>
+        </div>
+      ) : (
+        <>
+          {note.body && <p className="rt-place-body">{note.body}</p>}
+          <ImportedNoteDetails details={note.details} />
+        </>
+      )}
+    </article>
   )
 }
 
 function ImportedNoteDetails({ details }) {
   if (!details || typeof details !== 'object') return null
   const rows = [
-    ['Importance', details.importance],
-    ['Adresse', details.address], ['Horaires', details.opening_hours], ['Prix', details.price],
-    ['Meilleur moment', details.best_time], ['Réservation', details.reservation], ['Accessibilité', details.accessibility],
-  ].filter(([, value]) => value)
+    ['⌖', 'Adresse', details.address], ['◷', 'Horaires', details.opening_hours], ['€', 'Prix', details.price],
+    ['☀', 'Meilleur moment', details.best_time], ['✓', 'Réservation', details.reservation], ['♿', 'Accessibilité', details.accessibility],
+  ].filter(([, , value]) => value)
   const warnings = Array.isArray(details.warnings) ? details.warnings.filter(Boolean) : []
   const supplies = Array.isArray(details.supplies) ? details.supplies.filter(Boolean) : []
   if (!rows.length && !details.website && !details.source_url && !details.phone && !warnings.length && !supplies.length) return null
   return (
-    <details className="rt-note-details">
-      <summary>Informations pratiques</summary>
-      {rows.map(([label, value]) => <div key={label}><strong>{label}</strong><span>{String(value)}</span></div>)}
-      {details.phone && <div><strong>Téléphone</strong><a href={`tel:${details.phone}`}>{details.phone}</a></div>}
-      {supplies.length > 0 && <div><strong>Disponible</strong><span>{supplies.join(', ')}</span></div>}
-      {warnings.length > 0 && <div className="warning"><strong>Vigilance</strong><span>{warnings.join(' · ')}</span></div>}
+    <div className="rt-note-details">
+      <div className="rt-place-facts">
+        {rows.map(([glyph, label, value]) => <div key={label}><span aria-hidden="true">{glyph}</span><p><strong>{label}</strong>{String(value)}</p></div>)}
+        {details.phone && <div><span aria-hidden="true">☎</span><p><strong>Téléphone</strong><a href={`tel:${details.phone}`}>{details.phone}</a></p></div>}
+      </div>
+      {supplies.length > 0 && <div className="rt-place-supplies"><strong>Sur place</strong>{supplies.map(item => <span key={item}>{item}</span>)}</div>}
+      {warnings.length > 0 && <div className="rt-place-warning"><strong>À savoir</strong><span>{warnings.join(' · ')}</span></div>}
       <div className="rt-note-links">
         {safeExternalUrl(details.website) && <a href={safeExternalUrl(details.website)} target="_blank" rel="noreferrer">Site</a>}
         {safeExternalUrl(details.source_url) && <a href={safeExternalUrl(details.source_url)} target="_blank" rel="noreferrer">Source</a>}
-        {(details.confidence || details.verified_on) && <span>Fiabilité : {details.confidence || 'non précisée'}{details.verified_on ? ` · vérifié le ${details.verified_on}` : ''}</span>}
+        {details.verified_on && <span>Vérifié le {formatShortDate(details.verified_on)}</span>}
       </div>
-    </details>
+    </div>
   )
 }
 
@@ -966,31 +1017,184 @@ function safeExternalUrl(value) {
   } catch (_) { return null }
 }
 
-function ImportedPlan({ plan }) {
+function PlannedTripOverview({ trip }) {
+  const plan = trip.plan || {}
   const segments = Array.isArray(plan.segments) ? plan.segments : []
   const days = Array.isArray(plan.days) ? plan.days : []
   const checklist = Array.isArray(plan.checklist) ? plan.checklist : []
   const assumptions = Array.isArray(plan.assumptions) ? plan.assumptions : []
   const practical = plan.practical && typeof plan.practical === 'object' ? plan.practical : null
+  const transportOptions = Array.isArray(plan.transport_options) ? plan.transport_options : []
+  const selectedTransport = plan.selected_transport && typeof plan.selected_transport === 'object' ? plan.selected_transport : null
+  const totalMinutes = days.reduce((total, day) => total + (Number(day.duration_minutes) || 0), 0) || segments.reduce((total, segment) => total + (Number(segment.duration_minutes) || 0), 0)
+  const routeLabel = trip.points.length > 1 ? `${trip.points[0].name} → ${trip.points[trip.points.length - 1].name}` : 'Itinéraire prévu'
   return (
-    <details className="rt-imported-plan" open>
-      <summary>Plan conseillé importé</summary>
-      {plan.summary && <p>{plan.summary}</p>}
-      <div className="rt-plan-counts"><span>{segments.length} segments</span><span>{days.length} jours</span><span>{checklist.length} actions</span></div>
-      {days.length > 0 && <details><summary>Programme jour par jour</summary>{days.map((day, index) => { const schedule = [...(Array.isArray(day.morning) ? day.morning : []), ...(Array.isArray(day.afternoon) ? day.afternoon : []), ...(Array.isArray(day.evening) ? day.evening : [])]; return <article key={index}><strong>Jour {day.day || index + 1}{day.title ? ` · ${day.title}` : ''}</strong><span>{[day.start_point, day.end_point].filter(Boolean).join(' → ')}</span>{schedule.length > 0 && <p>{schedule.join(' · ')}</p>}{Array.isArray(day.meals) && day.meals.length > 0 && <p>Repas : {day.meals.join(' · ')}</p>}{day.sleep && <p>Nuit : {day.sleep}</p>}{Array.isArray(day.notes) && day.notes.length > 0 && <p>{day.notes.join(' · ')}</p>}</article> })}</details>}
-      {segments.length > 0 && <details><summary>Segments du trajet</summary>{segments.map((segment, index) => <article key={index}><strong>{segment.from || '?'} → {segment.to || '?'}</strong><span>{[segment.distance_km != null ? `${segment.distance_km} km` : null, segment.duration_minutes != null ? `${segment.duration_minutes} min` : null, segment.route].filter(Boolean).join(' · ')}</span></article>)}</details>}
-      {checklist.length > 0 && <details><summary>Checklist avant départ</summary><ul>{checklist.map((item, index) => <li key={index}>{String(item)}</li>)}</ul></details>}
-      {practical && <details><summary>Conseils pratiques</summary>{Object.entries(practical).map(([key, value]) => <article key={key}><strong>{PRACTICAL_LABELS[key] || key.replaceAll('_', ' ')}</strong><span>{formatPracticalValue(value)}</span></article>)}</details>}
-      {assumptions.length > 0 && <details className="warning"><summary>Hypothèses à vérifier</summary><ul>{assumptions.map((item, index) => <li key={index}>{String(item)}</li>)}</ul></details>}
-    </details>
+    <div className="rt-plan-view" style={{ '--trip-color': trip.color }}>
+      <section className="rt-plan-hero">
+        <span className="rt-plan-eyebrow">Voyage prévu · {formatTripWindow(plan.departure, plan.arrival, trip)}</span>
+        <h3>{routeLabel}</h3>
+        {plan.summary && <p>{plan.summary}</p>}
+        <div className="rt-plan-stats">
+          <div><strong>{fmtKm(trip.distance_km)}</strong><span>distance</span></div>
+          <div><strong>{formatDuration(totalMinutes)}</strong><span>de route</span></div>
+          <div><strong>{days.length || '—'}</strong><span>jour{days.length > 1 ? 's' : ''}</span></div>
+          <div><strong>{trip.elevation_m != null ? `${trip.elevation_m.toLocaleString('fr-FR')} m` : '—'}</strong><span>dénivelé</span></div>
+        </div>
+      </section>
+
+      {selectedTransport && <TransportChoice selected={selectedTransport} options={transportOptions} profile={plan.traveler_profile} />}
+
+      {days.length > 0 && <section className="rt-plan-section"><PlanSectionTitle kicker="Programme" title="Jour par jour" count={days.length} /><div className="rt-day-list">{days.map((day, index) => <PlannedDayCard key={index} day={day} index={index} />)}</div></section>}
+
+      {segments.length > 0 && <section className="rt-plan-section"><PlanSectionTitle kicker="Route" title="Étapes de conduite" count={segments.length} /><div className="rt-segment-list">{segments.map((segment, index) => <SegmentCard key={index} segment={segment} index={index} />)}</div></section>}
+
+      {practical && <section className="rt-plan-section"><PlanSectionTitle kicker="À garder en tête" title="Conseils pratiques" /><div className="rt-practical-grid">{Object.entries(practical).map(([key, value]) => <PracticalCard key={key} name={key} value={value} />)}</div></section>}
+
+      {checklist.length > 0 && <section className="rt-plan-section"><PlanSectionTitle kicker="Avant de partir" title="Checklist" count={checklist.length} /><ol className="rt-plan-checklist">{checklist.map((item, index) => <li key={index}><span>{index + 1}</span><p>{String(item)}</p></li>)}</ol></section>}
+
+      {assumptions.length > 0 && <section className="rt-plan-assumptions"><strong>À vérifier avant le départ</strong><ul>{assumptions.map((item, index) => <li key={index}>{String(item)}</li>)}</ul></section>}
+    </div>
   )
 }
 
-const PRACTICAL_LABELS = { budget: 'Budget', weather_and_season: 'Météo et saison', documents_and_rules: 'Documents et règles', health_and_safety: 'Santé et sécurité', connectivity: 'Réseau et recharge', packing: 'À emporter', alternatives: 'Plans B' }
-function formatPracticalValue(value) {
-  if (Array.isArray(value)) return value.map(String).join(' · ')
-  if (value && typeof value === 'object') return Object.entries(value).map(([key, item]) => `${key.replaceAll('_', ' ')} : ${Array.isArray(item) ? item.join(', ') : item ?? '—'}`).join(' · ')
-  return String(value ?? '—')
+function TransportChoice({ selected, options, profile }) {
+  const travelers = Number(profile?.travelers) || null
+  const bicycles = Number(profile?.bicycles) || 0
+  const alternatives = options.filter(option => option?.id !== selected.option_id)
+  const bookingUrl = safeExternalUrl(selected.booking_url)
+  return (
+    <section className="rt-plan-section">
+      <PlanSectionTitle kicker="Choix confirmé" title="Transport retenu" />
+      <article className="rt-selected-transport">
+        <div className="rt-transport-icon"><Icon name="route" size={18} /></div>
+        <div className="rt-transport-main">
+          <span>{selected.mode || 'Transport'}</span>
+          <h5>{selected.label || 'Option choisie'}</h5>
+          {selected.why_selected && <p>{selected.why_selected}</p>}
+        </div>
+        {selected.group_total != null && <div className="rt-transport-price"><strong>{formatMoney(selected.group_total, selected.currency)}</strong><span>groupe complet</span></div>}
+        <div className="rt-transport-facts">
+          {selected.departure_at && <div><span>Départ</span><strong>{formatDateTime(selected.departure_at)}</strong></div>}
+          {selected.arrival_at && <div><span>Arrivée</span><strong>{formatDateTime(selected.arrival_at)}</strong></div>}
+          {selected.duration_minutes != null && <div><span>Durée</span><strong>{formatDuration(selected.duration_minutes)}</strong></div>}
+          {travelers && <div><span>Voyageurs</span><strong>{travelers}</strong></div>}
+          {bicycles > 0 && <div><span>Vélos</span><strong>{bicycles}</strong></div>}
+        </div>
+        {selected.bicycle_policy && <div className="rt-transport-bike"><strong>Vélos</strong><span>{selected.bicycle_policy}</span></div>}
+        {bookingUrl && <a className="rt-transport-book" href={bookingUrl} target="_blank" rel="noreferrer">Ouvrir la réservation ↗</a>}
+      </article>
+      {alternatives.length > 0 && <details className="rt-transport-alternatives"><summary>{alternatives.length} autre{alternatives.length > 1 ? 's' : ''} option{alternatives.length > 1 ? 's' : ''} comparée{alternatives.length > 1 ? 's' : ''}</summary><div>{alternatives.map((option, index) => <TransportAlternative key={option.id || index} option={option} />)}</div></details>}
+    </section>
+  )
+}
+
+function TransportAlternative({ option }) {
+  const groupTotal = option?.price?.group_total
+  return <article className="rt-transport-alternative"><div><strong>{option.label || option.mode || 'Alternative'}</strong><span>{[option.mode, option.duration_minutes != null ? formatDuration(option.duration_minutes) : null].filter(Boolean).join(' · ')}</span></div>{groupTotal != null && <b>{formatMoney(groupTotal, option.price?.currency)}</b>}</article>
+}
+
+function PlanSectionTitle({ kicker, title, count }) {
+  return <header className="rt-plan-section-title"><div><span>{kicker}</span><h4>{title}</h4></div>{count != null && <b>{count}</b>}</header>
+}
+
+function PlannedDayCard({ day, index }) {
+  const periods = [
+    ['Matin', day.morning], ['Après-midi', day.afternoon], ['Soir', day.evening],
+  ].filter(([, items]) => Array.isArray(items) && items.length)
+  return (
+    <article className="rt-day-card">
+      <header><div className="rt-day-number"><span>Jour</span><strong>{day.day || index + 1}</strong></div><div><time>{formatDayDate(day.date)}</time><h5>{day.title || `Étape ${index + 1}`}</h5><p>{[day.start_point, day.end_point].filter(Boolean).join(' → ')}</p></div></header>
+      {(day.distance_km != null || day.duration_minutes != null) && <div className="rt-day-meta">{day.distance_km != null && <span><Icon name="route" size={12} /> {day.distance_km} km</span>}{day.duration_minutes != null && <span>◷ {formatDuration(day.duration_minutes)}</span>}</div>}
+      <div className="rt-day-schedule">{periods.map(([label, items]) => <div key={label}><strong>{label}</strong><ul>{items.map((item, itemIndex) => <li key={itemIndex}>{String(item)}</li>)}</ul></div>)}</div>
+      {(Array.isArray(day.meals) && day.meals.length > 0 || day.sleep) && <div className="rt-day-stay">{Array.isArray(day.meals) && day.meals.length > 0 && <p><span>🍴</span><strong>Repas</strong>{day.meals.join(' · ')}</p>}{day.sleep && <p><span>⌂</span><strong>Nuit</strong>{day.sleep}</p>}</div>}
+      {Array.isArray(day.notes) && day.notes.length > 0 && <div className="rt-day-tip"><span>Conseil</span>{day.notes.join(' · ')}</div>}
+    </article>
+  )
+}
+
+function SegmentCard({ segment, index }) {
+  const advice = Array.isArray(segment.advice) ? segment.advice : []
+  const warnings = Array.isArray(segment.warnings) ? segment.warnings : []
+  return (
+    <article className="rt-segment-card">
+      <div className="rt-segment-index">{index + 1}</div>
+      <div className="rt-segment-content"><h5>{segment.from || '?'} <span>→</span> {segment.to || '?'}</h5><div className="rt-segment-meta">{segment.distance_km != null && <span>{segment.distance_km} km</span>}{segment.duration_minutes != null && <span>{formatDuration(segment.duration_minutes)}</span>}{segment.tolls && <span>Péage · {segment.tolls}</span>}</div>{segment.route && <p className="rt-segment-route">{segment.route}</p>}{segment.road_conditions && <p className="rt-segment-condition">Route : {segment.road_conditions}</p>}{advice.length > 0 && <ul className="rt-segment-advice">{advice.map((item, i) => <li key={i}>{String(item)}</li>)}</ul>}{warnings.length > 0 && <div className="rt-segment-warning">{warnings.join(' · ')}</div>}</div>
+    </article>
+  )
+}
+
+const PRACTICAL_META = {
+  budget: { glyph: '€', label: 'Budget' }, weather_and_season: { glyph: '☀', label: 'Météo & saison' },
+  documents_and_rules: { glyph: '▤', label: 'Documents & règles' }, health_and_safety: { glyph: '✚', label: 'Santé & sécurité' },
+  connectivity: { glyph: '⌁', label: 'Réseau & recharge' }, packing: { glyph: '□', label: 'À emporter' },
+  alternatives: { glyph: '↗', label: 'Plans B' },
+}
+
+function PracticalCard({ name, value }) {
+  const meta = PRACTICAL_META[name] || { glyph: 'i', label: name.replaceAll('_', ' ') }
+  const lines = practicalLines(value)
+  return <article className="rt-practical-card"><span className="rt-practical-glyph">{meta.glyph}</span><div><h5>{meta.label}</h5><ul>{lines.map((line, index) => <li key={index}>{line}</li>)}</ul></div></article>
+}
+
+function practicalLines(value) {
+  if (Array.isArray(value)) return value.map(String)
+  if (value && typeof value === 'object') {
+    const lines = []
+    if (value.total_estimate != null) lines.push(`Estimation : ${Number(value.total_estimate).toLocaleString('fr-FR')} ${value.currency || 'EUR'}`)
+    if (Array.isArray(value.breakdown)) lines.push(...value.breakdown.map(String))
+    Object.entries(value).forEach(([key, item]) => {
+      if (['total_estimate', 'currency', 'breakdown'].includes(key) || item == null) return
+      lines.push(`${key.replaceAll('_', ' ')} : ${Array.isArray(item) ? item.join(', ') : item}`)
+    })
+    return lines
+  }
+  return value == null ? [] : [String(value)]
+}
+
+function formatDuration(minutes) {
+  const value = Number(minutes)
+  if (!Number.isFinite(value) || value <= 0) return '—'
+  const hours = Math.floor(value / 60)
+  const rest = Math.round(value % 60)
+  if (!hours) return `${rest} min`
+  return rest ? `${hours} h ${String(rest).padStart(2, '0')}` : `${hours} h`
+}
+
+function formatDayDate(date) {
+  if (!date) return 'Date à définir'
+  return new Date(`${date}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+function formatShortDate(date) {
+  if (!date) return ''
+  return new Date(`${date}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatTripWindow(departure, arrival, trip) {
+  const start = formatPlanEndpoint(departure, trip.start_date)
+  const end = formatPlanEndpoint(arrival, trip.end_date)
+  if (start && end) return `${start} → ${end}`
+  return start || end || 'dates à définir'
+}
+
+function formatPlanEndpoint(endpoint, fallbackDate) {
+  const date = endpoint?.date || fallbackDate
+  if (!date) return ''
+  const formatted = new Date(`${date}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return endpoint?.time ? `${formatted} · ${endpoint.time}` : formatted
+}
+
+function formatDateTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatMoney(value, currency = 'EUR') {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return '—'
+  try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 0 }).format(amount) }
+  catch (_) { return `${amount.toLocaleString('fr-FR')} ${currency || 'EUR'}` }
 }
 
 function RoadTripImportModal({ onClose, onImported, onCopyPrompt }) {
@@ -1037,7 +1241,7 @@ function RoadTripImportModal({ onClose, onImported, onCopyPrompt }) {
         <input ref={fileRef} hidden type="file" accept="application/json,.json" onChange={chooseFile} />
         <textarea value={text} onChange={e => { setText(e.target.value); setPreview(null); setPayload(null) }} placeholder='Colle ici { "philoweek_type": "road_trip_plan", ... }' spellCheck="false" />
         {error && <div className="rt-import-error">{error}</div>}
-        {preview && <div className="rt-import-preview"><strong>{preview.title}</strong><div><span>{preview.points} étapes</span><span>{preview.segments} segments</span><span>{preview.days} jours</span><span>{preview.places} lieux utiles</span></div>{preview.categories.length > 0 && <p>{preview.categories.map(category => ROAD_TRIP_CATEGORIES[category] || category).join(' · ')}</p>}{preview.warnings.map((warning, index) => <p className="warning" key={index}>{warning}</p>)}</div>}
+        {preview && <div className="rt-import-preview"><strong>{preview.title}</strong><div><span>{preview.points} étapes</span><span>{preview.segments} segments</span><span>{preview.days} jours</span><span>{preview.places} lieux utiles</span>{preview.transport_options > 0 && <span>{preview.transport_options} transports comparés</span>}</div>{preview.selected_transport && <p>Transport retenu : <strong>{preview.selected_transport}</strong></p>}{preview.categories.length > 0 && <p>{preview.categories.map(category => ROAD_TRIP_CATEGORIES[category] || category).join(' · ')}</p>}{preview.warnings.map((warning, index) => <p className="warning" key={index}>{warning}</p>)}</div>}
         <footer><button className="rt-btn" onClick={onClose}>Annuler</button>{!preview ? <button className="rt-btn primary" disabled={!text.trim() || busy} onClick={() => prepare()}>{busy ? 'Analyse…' : 'Vérifier le JSON'}</button> : <button className="rt-btn primary" disabled={busy} onClick={confirm}>{busy ? 'Import…' : 'Importer ce trajet'}</button>}</footer>
       </section>
     </div>
@@ -1117,8 +1321,9 @@ function StoryView({ trip, onClose, onOpenPhoto }) {
       }).addTo(map)
     })
     trip.notes.forEach(note => {
+      const meta = categoryMeta(note.category)
       L.marker([note.lat, note.lng], {
-        icon: L.divIcon({ className: 'rt-note-marker-wrap', html: `<span class="rt-note-marker" style="--c:${note.color || trip.color}">${noteMarkerIcon}</span>`, iconSize: [30, 34], iconAnchor: [15, 32] }),
+        icon: L.divIcon({ className: 'rt-note-marker-wrap', html: `<span class="rt-note-marker" style="--c:${note.color || meta.color}"><b>${escapeHtml(meta.glyph)}</b></span>`, iconSize: [30, 34], iconAnchor: [15, 32] }),
       }).addTo(map)
     })
     const geoPhotos = trip.photos.filter(ph => ph.lat != null && ph.lng != null)
