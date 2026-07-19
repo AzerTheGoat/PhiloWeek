@@ -14,6 +14,7 @@ import TodosPage from './components/TodosPage'
 import TodoReminder from './components/TodoReminder'
 import KnowledgeGraph from './components/KnowledgeGraph'
 import HistoricalTimeline from './components/HistoricalTimeline'
+import RoadTrips from './components/RoadTrips'
 import SocialJournal from './components/SocialJournal'
 import PublicArticle from './components/PublicArticle'
 import Tutorial from './components/Tutorial'
@@ -129,6 +130,8 @@ function AppShell() {
           <KnowledgeGraph />
         ) : view === 'timeline' ? (
           <HistoricalTimeline />
+        ) : view === 'roadtrips' ? (
+          <RoadTrips />
         ) : view === 'social-journal' ? (
           <SocialJournal />
         ) : view === 'tutorial' ? (
@@ -238,6 +241,7 @@ function MobileNav() {
     { key: 'agenda', label: 'Agenda', icon: 'calendar', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
     { key: 'graph', label: 'Base', icon: 'database', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { key: 'timeline', label: 'Frise', icon: 'timeline', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
+    { key: 'roadtrips', label: 'Voyages', icon: 'map', active: view === 'roadtrips', action: () => dispatch({ type: 'SET_VIEW', payload: 'roadtrips' }) },
     { key: 'social', label: 'Articles', icon: 'newspaper', active: view === 'social-journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }) },
     { key: 'timer', label: 'Focus', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },

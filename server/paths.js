@@ -29,6 +29,9 @@ ensureDir(DATA_DIR)
 const DB_PATH = process.env.DATABASE_PATH || path.join(DATA_DIR, 'philoweek_v2.db')
 const RECORDINGS_DIR = ensureDir(path.join(DATA_DIR, 'recordings'))
 const BACKUPS_DIR = ensureDir(path.join(DATA_DIR, 'backups'))
+// Photos des road trips : fichiers binaires, stockés sur le volume persistant
+// (jamais dans la base). Comme recordings/, survit aux déploiements Railway.
+const ROADTRIP_PHOTOS_DIR = ensureDir(path.join(DATA_DIR, 'roadtrip_photos'))
 
 // Détecte un déploiement Railway sans volume persistant : dans ce cas on
 // écrit sur un disque éphémère et les données seront perdues au prochain push.
@@ -54,4 +57,4 @@ if (isRailway && !hasPersistentVolume) {
   console.log(`  📦 Données persistées dans : ${DATA_DIR}`)
 }
 
-module.exports = { DATA_DIR, DB_PATH, RECORDINGS_DIR, BACKUPS_DIR, ensureDir, isRailway, hasPersistentVolume }
+module.exports = { DATA_DIR, DB_PATH, RECORDINGS_DIR, BACKUPS_DIR, ROADTRIP_PHOTOS_DIR, ensureDir, isRailway, hasPersistentVolume }

@@ -217,6 +217,31 @@ const SECTIONS = [
     ],
   },
   {
+    title: 'Carnet de voyage',
+    items: [
+      {
+        icon: 'map',
+        title: 'Une carte belle et perso',
+        text: "Le bouton Carnet de voyage ouvre une carte plein écran (fond Couleur / Clair / Sombre). Chaque road trip a un tag, une couleur, un statut Réalisé ou Prévu, et sa carte t'appartient — personne d'autre ne la voit.",
+      },
+      {
+        icon: 'pin',
+        title: 'Villes reliées en tracé',
+        text: "Cherche les villes que tu as traversées : elles s'ajoutent comme étapes numérotées et se relient automatiquement par un tracé en ligne droite (plein pour un voyage réalisé, pointillé pour un projet). La distance à vol d'oiseau se calcule toute seule, ou tu saisis les kilomètres réels et le dénivelé.",
+      },
+      {
+        icon: 'image',
+        title: 'Photos & souvenirs',
+        text: "Ajoute des photos (compressées avant l'envoi — tu choisis la qualité), écris une légende, épingle-les sur une ville de la carte, et désigne une couverture. Un récit libre accompagne le voyage.",
+      },
+      {
+        icon: 'eye',
+        title: 'Carte postale à partager',
+        text: "Le mode Carte postale met en page couverture, statistiques (km, dénivelé, étapes), mini-carte du tracé et galerie — prêt pour une capture d'écran instagramable. Export JSON (photos incluses) ou GeoJSON pour réutiliser tes tracés ailleurs.",
+      },
+    ],
+  },
+  {
     title: 'Journal public',
     items: [
       {

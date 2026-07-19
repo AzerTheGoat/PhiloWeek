@@ -62,10 +62,13 @@ voice_notes  — id, file_id, filename, duration_seconds, title, user_id
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
 fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
+road_trips   — id, user_id, title, description, status (done/planned), tag, color, points_json (villes ordonnées [{id,name,lat,lng,note}]), distance_km, distance_manual, elevation_m, start_date, end_date, cover_photo_id, sort_order
+road_trip_photos — id, trip_id, user_id, filename (sur disque, jamais en base), caption, point_id, lat, lng, width, height, bytes, sort_order
 ```
 
 Toutes les tables de contenu (`files`, `timer_sessions`, `voice_notes`, `quotes`,
-`inbox_resources`, `inbox_ideas`, `questionnaire_results`, `fact_checks`) ont une
+`inbox_resources`, `inbox_ideas`, `questionnaire_results`, `fact_checks`,
+`road_trips`, `road_trip_photos`) ont une
 colonne `user_id` : chaque requête dans `server/routes/*.js` doit filtrer dessus
 (`WHERE user_id = ?` / `AND user_id = ?`) — voir la section authentification
 plus bas.
@@ -179,6 +182,42 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Menu contextuel de l'explorateur de fichiers
 
 - Clic droit sur une zone vide de la liste de fichiers (`Sidebar.jsx` → `.sidebar-content`) : menu **Nouveau fichier / Nouveau graphe / Nouveau dossier / Importer (.zip) / Exporter**. Le clic droit sur un fichier/dossier garde son propre menu (`FileTree.jsx`).
+
+## Carnet de voyage (road trips)
+
+- Vue `roadtrips` (`client/src/components/RoadTrips.jsx`) : carte Leaflet plein
+  écran, une carte **par utilisateur**. Tout le rendu carto est **côté client**.
+- **Carte gratuite sans clé API** : Leaflet (`npm i leaflet`, bundlé par Vite,
+  jamais de CDN à cause de la CSP `script-src 'self'`) + tuiles **CARTO**
+  (`voyager`/`light`/`dark`, chargées comme `<img>` donc couvertes par
+  `imgSrc https:`). **Aucune tuile ne doit passer par `fetch`** (bloqué par
+  `connectSrc 'self'`).
+- **Géocodage** : proxy backend `GET /api/roadtrips/geocode?q=` → Nominatim
+  (OpenStreetMap, gratuit, `User-Agent` obligatoire). Le client n'appelle
+  jamais Nominatim directement (CSP). L'utilisateur cherche une ville → un
+  point est ajouté ; les points sont **reliés en lignes droites** (pas de suivi
+  de route réelle).
+- **Tracés** : plein = voyage `done`, pointillé = `planned`. La distance se
+  calcule en **haversine** (somme des segments) côté serveur ET client
+  (`distance_auto_km`), sauf si `distance_manual` (km réels saisis). Le
+  dénivelé (`elevation_m`) est **toujours manuel** (pas d'API payante).
+- **Photos** : compressées **dans le navigateur** avant upload
+  (`client/src/utils/photoCompress.js`, canvas → JPEG, 4 presets de qualité
+  proposés dans une modale). Stockées **sur disque** via multer dans
+  `paths.ROADTRIP_PHOTOS_DIR` (= `<data>/roadtrip_photos/`, volume Railway),
+  **jamais en base** — seul `filename` est stocké. Servies par
+  `GET /api/roadtrips/photos/:filename` (vérifie `user_id`). Une photo peut être
+  épinglée sur la carte (`lat`/`lng`) et/ou désignée couverture.
+- **Mode « Carte postale »** (`StoryView`) : mise en page instagramable
+  (couverture, stats km/dénivelé/étapes, mini-carte du tracé, galerie) prête
+  pour une capture d'écran.
+- **Export** : `GET /api/roadtrips/export` (JSON complet, `?photos=embed` pour
+  inclure les photos en base64) et `GET /api/roadtrips/:id/geojson` (GeoJSON
+  standard). Inclus aussi dans l'export/import Obsidian
+  (`_Opuscule/RoadTrips.json` + binaires sous `_Opuscule/roadtrip-photos/`) :
+  à l'import, les voyages et photos sont recréés avec de **nouveaux ids et
+  noms de fichiers** (la couverture est remappée ; le voyage est inséré **avant**
+  ses photos à cause de la FK `road_trip_photos.trip_id`).
 
 ## Thème
 

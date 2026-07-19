@@ -3,9 +3,14 @@ const router = express.Router()
 const multer = require('multer')
 const JSZip = require('jszip')
 const matter = require('gray-matter')
+const fs = require('fs')
+const path = require('path')
 const { getDb, updateTags } = require('../db')
 const { v4: uuidv4 } = require('uuid')
+const { ROADTRIP_PHOTOS_DIR } = require('../paths')
 const { xlsxBufferToSpreadsheetContent } = require('../spreadsheetXlsx')
+
+const ROADTRIP_PHOTO_EXT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' }
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } })
 
@@ -21,16 +26,26 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     // Phase 1: collect supported entries (sorted shallowest first)
     const importEntries = []
+    const roadtripPhotoEntries = []
     zip.forEach((relativePath, entry) => {
-      if (
-        !entry.dir &&
-        /\.(md|json|xlsx)$/i.test(relativePath) &&
-        !relativePath.startsWith('__MACOSX')
-      ) {
+      if (entry.dir || relativePath.startsWith('__MACOSX')) return
+      if (/^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(relativePath)) {
+        roadtripPhotoEntries.push({ relativePath, entry })
+      } else if (/\.(md|json|xlsx)$/i.test(relativePath)) {
         importEntries.push({ relativePath, entry })
       }
     })
     importEntries.sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
+
+    // Décompresse les binaires photos des road trips (clé = nom de fichier d'origine).
+    const roadtripPhotoBuffers = new Map()
+    for (const { relativePath, entry } of roadtripPhotoEntries) {
+      try {
+        roadtripPhotoBuffers.set(relativePath.split('/').pop(), await entry.async('nodebuffer'))
+      } catch (err) {
+        report.errors.push(`${relativePath}: ${err.message}`)
+      }
+    }
 
     // Phase 2: decompress all files asynchronously (before touching the DB)
     const decompressed = []
@@ -51,6 +66,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     let trashPayload = null
     let sharePayload = null
     let spreadsheetMetadataPayload = null
+    let roadTripsPayload = null
+    const roadtripPhotoWrites = [] // { filename, buffer } écrits sur disque après la transaction
 
     const importTx = db.transaction(() => {
       const insertFolder = db.prepare(
@@ -155,6 +172,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
           if (jsonSpecial?.philoweek_type === 'spreadsheet_metadata') {
             spreadsheetMetadataPayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'road_trips') {
+            roadTripsPayload = jsonSpecial
             continue
           }
           if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
@@ -575,6 +596,76 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         }
       }
 
+      if (roadTripsPayload && Array.isArray(roadTripsPayload.trips)) {
+        const insertTrip = db.prepare(`
+          INSERT INTO road_trips (
+            id, user_id, title, description, status, tag, color, points_json,
+            distance_km, distance_manual, elevation_m, start_date, end_date,
+            cover_photo_id, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        const insertPhoto = db.prepare(`
+          INSERT INTO road_trip_photos (
+            id, trip_id, user_id, filename, caption, point_id, lat, lng, width, height, bytes, sort_order, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        const allPhotos = Array.isArray(roadTripsPayload.photos) ? roadTripsPayload.photos : []
+        const now = new Date().toISOString()
+        roadTripsPayload.trips.forEach((trip, index) => {
+          const newTripId = uuidv4()
+          // Insère d'abord le voyage (le trip_id des photos y fait référence via FK),
+          // couverture nulle pour l'instant — on la remappe après les photos.
+          insertTrip.run(
+            newTripId, req.user.id,
+            String(trip.title || 'Voyage sans titre').slice(0, 200),
+            trip.description ? String(trip.description).slice(0, 20000) : null,
+            trip.status === 'planned' ? 'planned' : 'done',
+            trip.tag ? String(trip.tag).slice(0, 60) : null,
+            /^#[0-9a-f]{6}$/i.test(String(trip.color || '')) ? String(trip.color).toLowerCase() : '#e8663f',
+            typeof trip.points_json === 'string' ? trip.points_json : JSON.stringify(trip.points || []),
+            Number.isFinite(Number(trip.distance_km)) ? Number(trip.distance_km) : null,
+            trip.distance_manual ? 1 : 0,
+            Number.isFinite(Number(trip.elevation_m)) ? Number(trip.elevation_m) : null,
+            normalizeDueDate(trip.start_date),
+            normalizeDueDate(trip.end_date),
+            null,
+            Number.isFinite(Number(trip.sort_order)) ? Number(trip.sort_order) : index,
+            normalizeIsoDate(trip.created_at) || now,
+            normalizeIsoDate(trip.updated_at) || now
+          )
+          report.imported++
+
+          const oldToNewPhotoId = new Map()
+          const tripPhotos = allPhotos.filter(p => p.trip_id === trip.id)
+          tripPhotos.forEach((photo, photoIndex) => {
+            const buffer = roadtripPhotoBuffers.get(photo.filename)
+            if (!buffer) return // binaire absent du zip : on saute cette photo
+            const ext = (path.extname(photo.filename || '').toLowerCase()) || '.jpg'
+            const newFilename = `${uuidv4()}${ROADTRIP_PHOTO_EXT[ext] ? ext : '.jpg'}`
+            const newPhotoId = uuidv4()
+            oldToNewPhotoId.set(photo.id, newPhotoId)
+            insertPhoto.run(
+              newPhotoId, newTripId, req.user.id, newFilename,
+              photo.caption || null, photo.point_id || null,
+              Number.isFinite(Number(photo.lat)) ? Number(photo.lat) : null,
+              Number.isFinite(Number(photo.lng)) ? Number(photo.lng) : null,
+              Number.isFinite(Number(photo.width)) ? Number(photo.width) : null,
+              Number.isFinite(Number(photo.height)) ? Number(photo.height) : null,
+              Number.isFinite(Number(photo.bytes)) ? Number(photo.bytes) : buffer.length,
+              Number.isFinite(Number(photo.sort_order)) ? Number(photo.sort_order) : photoIndex,
+              normalizeIsoDate(photo.created_at) || now
+            )
+            roadtripPhotoWrites.push({ filename: newFilename, buffer })
+            report.imported++
+          })
+
+          const newCover = oldToNewPhotoId.get(trip.cover_photo_id)
+          if (newCover) {
+            db.prepare('UPDATE road_trips SET cover_photo_id = ? WHERE id = ? AND user_id = ?').run(newCover, newTripId, req.user.id)
+          }
+        })
+      }
+
       // Les imports Obsidian sans historique commencent avec leur contenu actuel.
       db.prepare(`
         INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at)
@@ -585,6 +676,15 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     })
 
     importTx()
+
+    // Écrit les binaires des photos road trips sur le volume persistant (après commit DB).
+    if (roadtripPhotoWrites.length > 0) {
+      try { if (!fs.existsSync(ROADTRIP_PHOTOS_DIR)) fs.mkdirSync(ROADTRIP_PHOTOS_DIR, { recursive: true }) } catch (_) {}
+      for (const { filename, buffer } of roadtripPhotoWrites) {
+        try { fs.writeFileSync(path.join(ROADTRIP_PHOTOS_DIR, filename), buffer) }
+        catch (err) { report.errors.push(`roadtrip-photos/${filename}: ${err.message}`) }
+      }
+    }
 
     // Phase 4: resolve [[links]] — one query to get all files with content
     const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file' AND user_id = ? AND deleted_at IS NULL").all(req.user.id)

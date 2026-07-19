@@ -151,6 +151,34 @@ export const createHistoricalEvent = data => req('POST', '/historical-timeline',
 export const updateHistoricalEvent = (id, data) => req('PUT', `/historical-timeline/${id}`, data)
 export const deleteHistoricalEvent = id => req('DELETE', `/historical-timeline/${id}`)
 
+// Road trips (carnet de voyage)
+export const getRoadTrips = () => req('GET', '/roadtrips')
+export const createRoadTrip = data => req('POST', '/roadtrips', data)
+export const updateRoadTrip = (id, data) => req('PUT', `/roadtrips/${id}`, data)
+export const deleteRoadTrip = id => req('DELETE', `/roadtrips/${id}`)
+export const reorderRoadTrips = ids => req('PUT', '/roadtrips/reorder/list', { ids })
+export const geocodePlace = q => req('GET', `/roadtrips/geocode?q=${encodeURIComponent(q)}`)
+export const uploadRoadTripPhoto = (tripId, blob, meta = {}) => {
+  const fd = new FormData()
+  fd.append('photo', blob, meta.filename || 'photo.jpg')
+  if (meta.caption != null) fd.append('caption', meta.caption)
+  if (meta.point_id) fd.append('point_id', meta.point_id)
+  if (meta.lat != null) fd.append('lat', String(meta.lat))
+  if (meta.lng != null) fd.append('lng', String(meta.lng))
+  if (meta.width != null) fd.append('width', String(meta.width))
+  if (meta.height != null) fd.append('height', String(meta.height))
+  return req('POST', `/roadtrips/${tripId}/photos`, fd, true)
+}
+export const updateRoadTripPhoto = (photoId, data) => req('PUT', `/roadtrips/photos/${photoId}`, data)
+export const deleteRoadTripPhoto = photoId => req('DELETE', `/roadtrips/photos/${photoId}`)
+export const reorderRoadTripPhotos = (tripId, ids) => req('PUT', `/roadtrips/${tripId}/photos/order`, { ids })
+export const exportRoadTripsJson = (embed = false) => {
+  window.location.href = BASE + `/roadtrips/export${embed ? '?photos=embed' : ''}`
+}
+export const exportRoadTripGeoJson = id => {
+  window.location.href = BASE + `/roadtrips/${id}/geojson`
+}
+
 // Social journal
 export const getPublicArticle = id => req('GET', `/public/social-journal/articles/${encodeURIComponent(id)}`)
 export const markPublicArticleRead = (id, anonId) => req('POST', `/public/social-journal/articles/${encodeURIComponent(id)}/read`, { anon_id: anonId })

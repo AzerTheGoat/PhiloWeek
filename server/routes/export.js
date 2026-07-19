@@ -2,7 +2,10 @@ const express = require('express')
 const router = express.Router()
 const JSZip = require('jszip')
 const matter = require('gray-matter')
+const fs = require('fs')
+const path = require('path')
 const { getDb } = require('../db')
+const { ROADTRIP_PHOTOS_DIR } = require('../paths')
 const { spreadsheetToXlsxBuffer } = require('../spreadsheetXlsx')
 
 router.get('/obsidian', async (req, res) => {
@@ -262,6 +265,25 @@ router.get('/obsidian', async (req, res) => {
         created_at: share.created_at,
         updated_at: share.updated_at,
       })),
+    }, null, 2))
+  }
+
+  const roadTrips = db.prepare('SELECT * FROM road_trips WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC').all(req.user.id)
+  if (roadTrips.length > 0) {
+    const roadTripPhotos = db.prepare('SELECT * FROM road_trip_photos WHERE user_id = ? ORDER BY trip_id, sort_order ASC').all(req.user.id)
+    // Les binaires des photos sont ajoutés au ZIP sous _Opuscule/roadtrip-photos/
+    // pour que la sauvegarde manuelle soit complète (photos incluses).
+    for (const photo of roadTripPhotos) {
+      try {
+        const filePath = path.join(ROADTRIP_PHOTOS_DIR, photo.filename)
+        if (fs.existsSync(filePath)) zip.file(`_Opuscule/roadtrip-photos/${photo.filename}`, fs.readFileSync(filePath))
+      } catch (_) {}
+    }
+    zip.file('_Opuscule/RoadTrips.json', JSON.stringify({
+      philoweek_type: 'road_trips',
+      exported: new Date().toISOString(),
+      trips: roadTrips,
+      photos: roadTripPhotos,
     }, null, 2))
   }
 

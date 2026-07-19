@@ -295,6 +295,36 @@ const PATHS = {
   cloud: (
     <path d="M7.5 18.5h10a4 4 0 0 0 .4-8A6 6 0 0 0 6.5 9a4.8 4.8 0 0 0 1 9.5Z" />
   ),
+  map: (
+    <>
+      <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z" />
+      <path d="M9 4v14" />
+      <path d="M15 6v14" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10Z" />
+      <circle cx="12" cy="11" r="2.2" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m5 17 4.5-4 3 2.5L16 12l3 3.2" />
+    </>
+  ),
+  mountain: (
+    <path d="M3 19h18L14 7l-3.2 5.2L8.5 9Z" />
+  ),
+  route: (
+    <>
+      <circle cx="6" cy="6" r="2.2" />
+      <circle cx="18" cy="18" r="2.2" />
+      <path d="M8.2 6H14a3 3 0 0 1 0 6H10a3 3 0 0 0 0 6h5.8" />
+    </>
+  ),
 }
 
 export default function Icon({ name, size = 20, className = '' }) {

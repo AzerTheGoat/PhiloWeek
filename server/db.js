@@ -436,6 +436,57 @@ const MIGRATIONS = [
         ON file_shares(owner_id, file_id);
     `)
   },
+  // v13 -> v14 : carnet de voyage (road trips) avec tracés et photos géolocalisées.
+  //   - road_trips : un voyage = un titre, un statut (réalisé/prévu), un tag, une
+  //     couleur, la liste ordonnée des villes (points_json), distance et dénivelé.
+  //   - road_trip_photos : photos stockées sur disque (volume Railway, via
+  //     paths.ROADTRIP_PHOTOS_DIR), jamais en base ; référencées par filename.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS road_trips (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'done' CHECK(status IN ('done', 'planned')),
+        tag TEXT,
+        color TEXT NOT NULL DEFAULT '#e8663f',
+        points_json TEXT NOT NULL DEFAULT '[]',
+        distance_km REAL,
+        distance_manual INTEGER NOT NULL DEFAULT 0,
+        elevation_m INTEGER,
+        start_date TEXT,
+        end_date TEXT,
+        cover_photo_id TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS road_trip_photos (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL REFERENCES road_trips(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        caption TEXT,
+        point_id TEXT,
+        lat REAL,
+        lng REAL,
+        width INTEGER,
+        height INTEGER,
+        bytes INTEGER,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_road_trips_user
+        ON road_trips(user_id, sort_order, created_at);
+      CREATE INDEX IF NOT EXISTS idx_road_trip_photos_trip
+        ON road_trip_photos(trip_id, sort_order);
+      CREATE INDEX IF NOT EXISTS idx_road_trip_photos_user
+        ON road_trip_photos(user_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

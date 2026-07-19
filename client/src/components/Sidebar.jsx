@@ -76,6 +76,7 @@ export default function Sidebar() {
     { icon: 'timer', label: 'Focus', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
     { icon: 'database', label: 'Base de liens', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
     { icon: 'timeline', label: 'Frise historique', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
+    { icon: 'map', label: 'Carnet de voyage', active: view === 'roadtrips', action: () => dispatch({ type: 'SET_VIEW', payload: 'roadtrips' }) },
     { icon: 'newspaper', label: 'Journal public', active: view === 'social-journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }) },
     { icon: 'trash', label: 'Corbeille', active: view === 'trash', action: () => dispatch({ type: 'SET_VIEW', payload: 'trash' }) },
     { icon: 'thought', label: 'Aide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },

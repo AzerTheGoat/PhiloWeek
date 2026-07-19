@@ -71,6 +71,7 @@ app.use('/api/todos', require('./routes/todos'))
 app.use('/api/questionnaires', require('./routes/questionnaires'))
 app.use('/api/knowledge-graph', require('./routes/knowledgeGraph'))
 app.use('/api/historical-timeline', require('./routes/historicalTimeline'))
+app.use('/api/roadtrips', require('./routes/roadtrips'))
 app.use('/api/social-journal', require('./routes/socialJournal'))
 
 // Serve built React app
