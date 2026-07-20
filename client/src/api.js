@@ -210,3 +210,5 @@ export const getTimerSessions = file_id =>
 export const getTimerStats = () => req('GET', '/timer/stats')
 export const saveTimerSession = data => req('POST', '/timer', data)
 export const deleteTimerSession = id => req('DELETE', `/timer/${id}`)
+export const getAppUsage = day => req('GET', `/timer/app-usage?day=${encodeURIComponent(day)}`)
+export const trackAppUsage = entries => req('POST', '/timer/app-usage', { entries })

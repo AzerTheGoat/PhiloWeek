@@ -114,6 +114,13 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           question_text, answer_text, expected_answer, correct, score, response_ms, user_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
+      const upsertAppUsage = db.prepare(`
+        INSERT INTO app_usage_daily (user_id, entry_date, duration_seconds, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id, entry_date) DO UPDATE SET
+          duration_seconds = MAX(duration_seconds, excluded.duration_seconds),
+          updated_at = excluded.updated_at
+      `)
       const insertHistoricalEvent = db.prepare(
         `INSERT OR IGNORE INTO historical_events (
           id, title, start_label, start_year, start_month, start_day,
@@ -196,6 +203,23 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 Number.isFinite(Number(result.response_ms)) ? Number(result.response_ms) : null,
                 req.user.id,
                 result.created_at || new Date().toISOString()
+              )
+              report.imported++
+            }
+            continue
+          }
+
+          if (jsonSpecial?.philoweek_type === 'app_usage') {
+            const days = Array.isArray(jsonSpecial.days) ? jsonSpecial.days : []
+            for (const day of days) {
+              const entryDate = normalizeDueDate(day.entry_date)
+              const duration = Math.max(0, Math.floor(Number(day.duration_seconds)))
+              if (!entryDate || !Number.isFinite(duration)) continue
+              upsertAppUsage.run(
+                req.user.id,
+                entryDate,
+                duration,
+                normalizeIsoDate(day.updated_at) || new Date().toISOString()
               )
               report.imported++
             }

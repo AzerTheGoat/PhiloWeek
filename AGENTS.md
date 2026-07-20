@@ -56,6 +56,7 @@ file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
 file_revisions — id, file_id, user_id (proprietaire), actor_user_id, revision_no, content, created_at
 file_shares  — id, file_id, owner_id, shared_with_user_id, permission (view/edit), created_at, updated_at
 timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
+app_usage_daily — user_id, entry_date, duration_seconds, updated_at
 voice_notes  — id, file_id, filename, duration_seconds, title, user_id
 quotes       — id, quote, author, source, notes, tags, user_id, created_at, updated_at
 fact_checks  — id, claim, status (to_check/true/false/partial), notes, source, tags, user_id
@@ -126,6 +127,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Créé automatiquement à l'init (`/Journal/`)
 - Entrées : `YYYY-MM-DD.md`
 - Protégé contre la suppression dans `routes/files.js`
+
+## Focus et temps d'utilisation
+
+- La vue `Focus` conserve le chronometre manuel existant et affiche aussi le temps passe dans l'application.
+- Le temps d'utilisation est compte automatiquement uniquement lorsque la page est visible et que sa fenetre a le focus; un bail local evite de compter plusieurs onglets du meme navigateur en double.
+- Une journee d'utilisation va de 03:00 a 02:59 dans le fuseau local du navigateur. Les cumuls sont stockes par utilisateur et date logique dans `app_usage_daily`.
+- Focus affiche aujourd'hui, la semaine en cours, la moyenne hebdomadaire depuis le premier jour suivi, le total et l'historique jour par jour.
+- L'export Obsidian ajoute `_Opuscule/AppUsage.json` avec `philoweek_type: app_usage`; l'import restaure les cumuls quotidiens sans doubler un historique deja present.
 
 ## Thème
 

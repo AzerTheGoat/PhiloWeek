@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 import * as api from '../api'
+import { getLogicalDay } from '../hooks/useAppUsageTracker'
 
 const ACTIVITIES = [
   { id: 'reading', label: 'Lecture', icon: 'journal' },
@@ -17,19 +18,40 @@ export default function Timer() {
   const [activity, setActivity] = useState('thinking')
   const [sessions, setSessions] = useState([])
   const [stats, setStats] = useState({ today_seconds: 0, total_seconds: 0 })
+  const [usageStats, setUsageStats] = useState({
+    today_seconds: 0,
+    week_seconds: 0,
+    average_weekly_seconds: 0,
+    total_seconds: 0,
+    history: [],
+  })
+  const [showAllUsage, setShowAllUsage] = useState(false)
   const [pendingSave, setPendingSave] = useState(false)
   const [sessionNotes, setSessionNotes] = useState('')
   const intervalRef = useRef(null)
 
   useEffect(() => {
     loadData()
+    const refresh = window.setInterval(loadUsage, 30000)
+    return () => window.clearInterval(refresh)
   }, [])
 
   async function loadData() {
     try {
-      const [s, st] = await Promise.all([api.getTimerSessions(), api.getTimerStats()])
+      const [s, st, usage] = await Promise.all([
+        api.getTimerSessions(),
+        api.getTimerStats(),
+        api.getAppUsage(getLogicalDay()),
+      ])
       setSessions(s)
       setStats(st)
+      setUsageStats(usage)
+    } catch (_) {}
+  }
+
+  async function loadUsage() {
+    try {
+      setUsageStats(await api.getAppUsage(getLogicalDay()))
     } catch (_) {}
   }
 
@@ -159,6 +181,52 @@ export default function Timer() {
 
       {!pendingSave && <ActivityPicker activity={activity} setActivity={setActivity} />}
 
+      <section className="app-usage-panel">
+        <div className="app-usage-heading">
+          <div>
+            <h3>Temps dans l'application</h3>
+            <p>Compté uniquement quand l'application est visible et active. La journée change à 03:00.</p>
+          </div>
+          <Icon name="timer" size={20} />
+        </div>
+
+        <div className="timer-stats app-usage-stats">
+          <div className="timer-stat">
+            <span className="stat-label">Aujourd'hui</span>
+            <span className="stat-value">{fmtMin(usageStats.today_seconds)}</span>
+          </div>
+          <div className="timer-stat">
+            <span className="stat-label">Cette semaine</span>
+            <span className="stat-value">{fmtMin(usageStats.week_seconds)}</span>
+          </div>
+          <div className="timer-stat">
+            <span className="stat-label">Moyenne / semaine</span>
+            <span className="stat-value">{fmtMin(usageStats.average_weekly_seconds)}</span>
+          </div>
+          <div className="timer-stat">
+            <span className="stat-label">Total</span>
+            <span className="stat-value">{fmtMin(usageStats.total_seconds)}</span>
+          </div>
+        </div>
+
+        <div className="app-usage-history">
+          <h4>Historique jour par jour</h4>
+          {usageStats.history.length === 0 && <div className="history-empty">Aucun temps enregistré pour le moment</div>}
+          {(showAllUsage ? usageStats.history : usageStats.history.slice(0, 14)).map(day => (
+            <div className="app-usage-row" key={day.entry_date}>
+              <span>{formatUsageDay(day.entry_date, usageStats.today)}</span>
+              <strong>{fmtMin(day.duration_seconds)}</strong>
+            </div>
+          ))}
+          {usageStats.history.length > 14 && (
+            <button type="button" className="btn-ghost app-usage-more" onClick={() => setShowAllUsage(value => !value)}>
+              {showAllUsage ? 'Réduire' : `Tout afficher (${usageStats.history.length} jours)`}
+            </button>
+          )}
+        </div>
+      </section>
+
+      <h3 className="timer-section-title">Sessions chronométrées</h3>
       <div className="timer-stats">
         <div className="timer-stat">
           <span className="stat-label">Aujourd'hui</span>
@@ -204,4 +272,14 @@ function ActivityPicker({ activity, setActivity }) {
       ))}
     </div>
   )
+}
+
+function formatUsageDay(day, today) {
+  if (day === today) return "Aujourd'hui"
+  return new Date(`${day}T12:00:00`).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }

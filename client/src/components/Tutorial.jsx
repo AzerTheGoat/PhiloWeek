@@ -182,7 +182,7 @@ const SECTIONS = [
       {
         icon: 'timer',
         title: 'Timer de travail',
-        text: 'Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion) et consulte tes totaux du jour et l\'historique complet.',
+        text: "Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion). Focus mesure aussi automatiquement le temps où l'application reste visible et active : total, semaine en cours, moyenne hebdomadaire et historique quotidien. Une journée va de 03:00 à 02:59.",
       },
       {
         icon: 'listCheck',

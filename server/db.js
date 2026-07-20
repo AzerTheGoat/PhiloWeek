@@ -520,6 +520,22 @@ const MIGRATIONS = [
     addColumnIfMissing(db, 'road_trip_notes', 'category', "TEXT NOT NULL DEFAULT 'practical'")
     addColumnIfMissing(db, 'road_trip_notes', 'details_json', "TEXT NOT NULL DEFAULT '{}'")
   },
+  // v16 -> v17 : temps d'utilisation automatique de l'application, agrégé
+  // par journée logique (03:00 -> 02:59) et par utilisateur.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS app_usage_daily (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        entry_date TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL DEFAULT 0 CHECK(duration_seconds >= 0),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (user_id, entry_date)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_app_usage_daily_user_date
+        ON app_usage_daily(user_id, entry_date DESC);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

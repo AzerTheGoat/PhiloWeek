@@ -150,6 +150,21 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
+  const appUsage = db.prepare(`
+    SELECT entry_date, duration_seconds, updated_at
+    FROM app_usage_daily
+    WHERE user_id = ?
+    ORDER BY entry_date ASC
+  `).all(req.user.id)
+  if (appUsage.length > 0) {
+    zip.file('_Opuscule/AppUsage.json', JSON.stringify({
+      philoweek_type: 'app_usage',
+      day_boundary_hour: 3,
+      exported: new Date().toISOString(),
+      days: appUsage,
+    }, null, 2))
+  }
+
   const historicalEvents = db.prepare(`
     SELECT * FROM historical_events
     WHERE user_id = ?
