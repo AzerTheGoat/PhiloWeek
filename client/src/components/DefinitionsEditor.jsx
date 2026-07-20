@@ -13,7 +13,6 @@ export default function DefinitionsEditor() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showJson, setShowJson] = useState(false)
-  const [limit, setLimit] = useState(12)
   const [session, setSession] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answer, setAnswer] = useState('')
@@ -132,10 +131,10 @@ export default function DefinitionsEditor() {
       const result = await api.getQuestionnaireSession({
         scope: 'file',
         file_id: currentFile?.id,
-        limit,
+        limit: Math.min(50, Math.max(1, definitions.length)),
       })
       if (!result.questions.length) {
-        toast('Aucune definition a reviser', 'error')
+        toast('Aucune définition à réviser', 'error')
         return
       }
       setSession(result.questions)
@@ -143,11 +142,11 @@ export default function DefinitionsEditor() {
       setAnswer('')
       setRevealed(false)
       setStartedAt(Date.now())
-      toast(`${result.questions.length} definition(s) chargee(s)`)
+      toast(`${result.questions.length} définition(s) chargée(s)`)
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [currentFile?.id, limit, toast])
+  }, [currentFile?.id, definitions.length, toast])
 
   const recordResult = useCallback(async (correct) => {
     if (!currentCard) return
@@ -218,7 +217,10 @@ export default function DefinitionsEditor() {
 
       <div className="questionnaire-toolbar">
         <button type="button" className="btn-primary" onClick={addDefinition}>
-          <Icon name="plus" size={16} /> Mot
+          <Icon name="plus" size={16} /> Définition
+        </button>
+        <button type="button" className="btn-ghost" onClick={startSession} disabled={definitions.length === 0}>
+          <Icon name="book" size={16} /> Réviser
         </button>
         <button type="button" className="btn-ghost" onClick={() => setShowJson(value => !value)}>
           <Icon name="synthesis" size={16} /> {showJson ? 'Fiche' : 'JSON'}
@@ -251,8 +253,15 @@ export default function DefinitionsEditor() {
             </section>
           ) : (
             <>
-              <section className="questionnaire-card definitions-meta-card">
-                <div className="definition-meta-grid">
+              <details className="definitions-meta-card">
+                <summary>
+                  <span>
+                    <strong>{data.title || 'Fiche sans titre'}</strong>
+                    <small>{definitions.length} définition{definitions.length > 1 ? 's' : ''}{data.tags?.length ? ` · ${data.tags.join(', ')}` : ''}</small>
+                  </span>
+                  <span className="definitions-meta-action">Informations de la fiche</span>
+                </summary>
+                <div className="definitions-meta-fields">
                   <label>
                     Titre
                     <input value={data.title || ''} onChange={event => updateMeta('title', event.target.value)} />
@@ -265,65 +274,51 @@ export default function DefinitionsEditor() {
                       placeholder="philo, vocabulaire"
                     />
                   </label>
-                </div>
-                <label className="definition-description-field">
-                  Description
-                  <textarea
-                    value={data.description || ''}
-                    onChange={event => updateMeta('description', event.target.value)}
-                    placeholder="Sujet de cette liste de definitions..."
-                  />
-                </label>
-              </section>
-
-              <section className="questionnaire-card quiz-card">
-                <div className="questionnaire-preview-head">
-                  <div>
-                    <h3>Revision definitions</h3>
-                    <p>Le mot apparait, tu retrouves la definition, puis tu notes juste ou faux.</p>
-                  </div>
-                  {session.length > 0 && <span>{Math.min(currentIndex + 1, session.length)} / {session.length}</span>}
-                </div>
-                <div className="quiz-settings">
-                  <label>
-                    Nombre
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={limit}
-                      onChange={event => setLimit(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
+                  <label className="definition-description-field">
+                    Description
+                    <textarea
+                      value={data.description || ''}
+                      onChange={event => updateMeta('description', event.target.value)}
+                      placeholder="Sujet de cette liste de définitions..."
                     />
                   </label>
                 </div>
-                <button type="button" className="btn-primary quiz-start" onClick={startSession}>
-                  Lancer
-                </button>
+              </details>
+
+              {session.length > 0 && <section className="questionnaire-card quiz-card definitions-quiz-card">
+                <div className="questionnaire-preview-head">
+                  <div>
+                    <h3>Révision des définitions</h3>
+                    <p>Retrouve la définition, puis note ta réponse juste ou fausse.</p>
+                  </div>
+                  <span>{Math.min(currentIndex + 1, session.length)} / {session.length}</span>
+                </div>
                 {done && (
                   <div className="quiz-done">
                     <Icon name="book" size={28} />
-                    <strong>Revision terminee</strong>
-                    <span>Les definitions ratees reviendront plus souvent.</span>
+                    <strong>Révision terminée</strong>
+                    <span>Les définitions ratées reviendront plus souvent.</span>
+                    <button type="button" className="btn-ghost" onClick={startSession}>Recommencer</button>
                   </div>
                 )}
                 {currentCard && !done && (
                   <div className="quiz-live">
                     <span className="quiz-origin">{currentCard.questionnaire_title}</span>
-                    <span className="quiz-type">Definition</span>
+                    <span className="quiz-type">Définition</span>
                     <h4>{currentCard.prompt}</h4>
                     <textarea
                       value={answer}
                       onChange={event => setAnswer(event.target.value)}
-                      placeholder="Ta definition..."
+                      placeholder="Ta définition..."
                     />
                     {!revealed ? (
                       <button type="button" className="btn-ghost" onClick={() => setRevealed(true)}>
-                        Voir la definition
+                        Voir la définition
                       </button>
                     ) : (
                       <div className="quiz-correction">
-                        <strong>Definition</strong>
-                        <p>{currentCard.answer || 'Pas de definition renseignee.'}</p>
+                        <strong>Définition</strong>
+                        <p>{currentCard.answer || 'Pas de définition renseignée.'}</p>
                         {currentCard.explanation && <p>{currentCard.explanation}</p>}
                         <div className="quiz-grade-actions">
                           <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Faux</button>
@@ -333,7 +328,7 @@ export default function DefinitionsEditor() {
                     )}
                   </div>
                 )}
-              </section>
+              </section>}
 
               <section className="definitions-list">
                 {definitions.length === 0 && (
@@ -344,36 +339,38 @@ export default function DefinitionsEditor() {
                 {definitions.map((definition, index) => (
                   <article key={definition.id || index} className="questionnaire-card definition-card">
                     <div className="definition-card-head">
-                      <span>#{index + 1}</span>
-                      <button type="button" className="btn-danger" onClick={() => removeDefinition(index)}>
-                        Supprimer
+                      <span className="definition-number">{index + 1}</span>
+                      <label className="definition-term-field">
+                        <span>Mot ou notion</span>
+                        <input
+                          value={definition.term || ''}
+                          onChange={event => updateDefinition(index, 'term', event.target.value)}
+                          placeholder="Ex. aporie"
+                        />
+                      </label>
+                      <button type="button" className="icon-btn definition-delete" onClick={() => removeDefinition(index)} aria-label={`Supprimer ${definition.term || `la définition ${index + 1}`}`} title="Supprimer">
+                        <Icon name="trash" size={16} />
                       </button>
                     </div>
-                    <label>
-                      Mot
-                      <input
-                        value={definition.term || ''}
-                        onChange={event => updateDefinition(index, 'term', event.target.value)}
-                        placeholder="Ex: aporie"
-                      />
-                    </label>
-                    <label>
-                      Definition
-                      <textarea
-                        value={definition.definition || ''}
-                        onChange={event => updateDefinition(index, 'definition', event.target.value)}
-                        placeholder="Definition a retenir..."
-                      />
-                    </label>
-                    <label>
-                      Exemple / nuance
-                      <textarea
-                        value={definition.example || ''}
-                        onChange={event => updateDefinition(index, 'example', event.target.value)}
-                        placeholder="Exemple, contre-exemple, piege..."
-                      />
-                    </label>
-                    <label>
+                    <div className="definition-card-body">
+                      <label>
+                        Définition
+                        <textarea
+                          value={definition.definition || ''}
+                          onChange={event => updateDefinition(index, 'definition', event.target.value)}
+                          placeholder="Définition à retenir..."
+                        />
+                      </label>
+                      <label>
+                        Exemple / nuance
+                        <textarea
+                          value={definition.example || ''}
+                          onChange={event => updateDefinition(index, 'example', event.target.value)}
+                          placeholder="Exemple, contre-exemple, piège..."
+                        />
+                      </label>
+                    </div>
+                    <label className="definition-tags-field">
                       Tags
                       <input
                         value={(definition.tags || []).join(', ')}
