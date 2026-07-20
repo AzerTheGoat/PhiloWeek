@@ -212,13 +212,13 @@ export function AppProvider({ children }) {
     setTimeout(() => dispatch({ type: 'REMOVE_TOAST', payload: id }), 3500)
   }, [])
 
-  const openFile = useCallback(async (id) => {
+  const openFile = useCallback(async (id, { editorMode } = {}) => {
     const requestId = ++openRequestRef.current
     try {
       const file = await api.getFile(id)
       if (requestId !== openRequestRef.current) return
       fileVersionRef.current[id] = Number(file.content_version || 0)
-      dispatch({ type: 'OPEN_FILE', payload: file })
+      dispatch({ type: 'OPEN_FILE', payload: { ...file, initial_editor_mode: editorMode } })
     } catch (err) {
       if (requestId === openRequestRef.current) {
         dispatch({ type: 'CLEAR_OPEN_FILE' })
@@ -367,7 +367,7 @@ export function AppProvider({ children }) {
           content: header
         })
         await loadTree()
-        dispatch({ type: 'OPEN_FILE', payload: newFile })
+        dispatch({ type: 'OPEN_FILE', payload: { ...newFile, initial_editor_mode: 'split' } })
       } catch (err) {
         toast(err.message, 'error')
       }

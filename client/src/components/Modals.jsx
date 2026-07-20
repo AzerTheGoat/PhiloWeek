@@ -309,7 +309,7 @@ function NewFileModal({ modal, hideModal }) {
         content: `---\ntitle: ${name.trim()}\ntags: []\ncreated: ${new Date().toISOString()}\n---\n\n`
       })
       await loadTree()
-      await openFile(f.id)
+      await openFile(f.id, { editorMode: 'split' })
       hideModal()
       toast(`"${fileName}" créé`)
     } catch (err) {

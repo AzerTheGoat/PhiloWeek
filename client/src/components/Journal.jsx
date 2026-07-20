@@ -61,7 +61,7 @@ export default function Journal() {
           content: header
         })
         await loadTree()
-        await openFile(newFile.id)
+        await openFile(newFile.id, { editorMode: 'split' })
         dispatch({ type: 'SET_VIEW', payload: 'editor' })
       } catch (err) {
         toast(err.message, 'error')

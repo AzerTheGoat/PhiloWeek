@@ -18,7 +18,7 @@ import CloudCollaborationBar from './CloudCollaborationBar'
 const AUTOSAVE_DELAY = 800
 
 function initialMode() {
-  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'split'
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'preview'
 }
 
 export default function Editor() {
@@ -120,6 +120,7 @@ function MarkdownEditor() {
     const newContent = currentFile?.content || ''
     setContent(newContent)
     setPreviewContent(newContent)
+    setMode(currentFile?.initial_editor_mode || initialMode())
     setIsDirty(false)
     // Annule tout autosave en attente : évite qu'une frappe non sauvegardée
     // ré-écrase le contenu qu'on vient de restaurer.
