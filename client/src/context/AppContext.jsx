@@ -1,6 +1,7 @@
 import { useReducer, useCallback, useRef } from 'react'
 import { Ctx } from './AppContextCore'
 import * as api from '../api'
+import { clearReviewSessionMemory } from '../utils/reviewSessionMemory'
 
 function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
@@ -426,6 +427,7 @@ export function AppProvider({ children }) {
 
   const logout = useCallback(async () => {
     await api.authLogout().catch(() => {})
+    clearReviewSessionMemory()
     dispatch({ type: 'LOGOUT' })
   }, [])
 

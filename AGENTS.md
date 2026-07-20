@@ -213,6 +213,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Une note Markdown affiche un bouton `Quiz` quand au moins un questionnaire est lie a cette note.
 - La sidebar contient un bouton global `Reviser` qui ouvre un panneau de selection de notes Markdown et lance les questions des questionnaires lies a ces notes, independamment du fichier ouvert.
 - Pendant une revision globale, le footer affiche seulement `Stop`; l'arret ou la fin de session affiche un score, un mini-rapport et les questions ratees a revoir.
+- Une session de quiz lancee depuis un questionnaire ou depuis une note conserve en memoire, par fichier, la serie tiree, la question courante, la reponse saisie et l'etat de correction quand l'utilisateur change d'onglet ou ouvre une vue Fonction; cette memoire est videe a la deconnexion ou au rechargement de l'application.
 - Les resultats de revision sont stockes dans la table `questionnaire_results` avec date, reponse utilisateur, correction attendue et statut juste/faux.
 - Le moteur de revision augmente le poids des questions ratees ou peu maitrisees, dans l'esprit d'Anki.
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_Opuscule/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
@@ -226,6 +227,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - `DefinitionsEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme fiche de definitions.
 - L'editeur permet d'ajouter, modifier et supprimer les mots sans ecrire le JSON a la main, tout en gardant un mode JSON de secours.
 - Les definitions passent dans le moteur de revision existant : le mot devient la question, la definition la correction, et l'exemple l'explication.
+- Une revision de definitions en cours conserve elle aussi sa progression par fichier pendant la session de l'application.
 - Dans le panneau global `Reviser`, selectionner directement un fichier Definitions lance la revision de ses mots; les resultats sont stockes dans `questionnaire_results` comme les quiz.
 - Les champs `definition` et `example` acceptent les liens wiki `[[Nom du fichier|Partie]]`; les liens sont cliquables dans la carte et ouvrent le titre Markdown correspondant dans une note.
 - Une note Markdown peut cibler une definition precise avec `[[Nom de la fiche|Terme]]`; la fiche JSON s'ouvre et centre la carte dont le mot correspond a `Terme`.

@@ -14,6 +14,7 @@ import { isDefinitionsFile } from '../utils/definitionsFile'
 import { isSpreadsheetFile } from '../utils/spreadsheetFile'
 import { normalizeWikiPart } from '../utils/wikiLinks'
 import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
+import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
 import * as api from '../api'
 import CloudCollaborationBar from './CloudCollaborationBar'
 
@@ -405,16 +406,32 @@ function LinkedQuizLauncher({ currentFile }) {
   const [answer, setAnswer] = useState('')
   const [revealed, setRevealed] = useState(false)
   const [startedAt, setStartedAt] = useState(Date.now())
+  const reviewStateRef = useRef(null)
+
+  reviewStateRef.current = { session, currentIndex, answer, revealed }
 
   useEffect(() => {
     let cancelled = false
     setLinked([])
-    setSession([])
     if (!currentFile?.id) return
     api.getLinkedQuestionnaires(currentFile.id)
       .then(rows => { if (!cancelled) setLinked(rows) })
       .catch(() => { if (!cancelled) setLinked([]) })
     return () => { cancelled = true }
+  }, [currentFile?.id])
+
+  useEffect(() => {
+    const fileId = currentFile?.id
+    if (!fileId) return undefined
+
+    const saved = loadReviewSession('linked-quiz', fileId)
+    setSession(saved?.session || [])
+    setCurrentIndex(saved?.currentIndex || 0)
+    setAnswer(saved?.answer || '')
+    setRevealed(Boolean(saved?.revealed))
+    setStartedAt(Date.now())
+
+    return () => saveReviewSession('linked-quiz', fileId, reviewStateRef.current)
   }, [currentFile?.id])
 
   const startQuiz = useCallback(async () => {

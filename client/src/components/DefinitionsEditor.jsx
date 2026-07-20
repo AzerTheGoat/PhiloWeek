@@ -6,6 +6,7 @@ import Icon from './Icons'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
 import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
+import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
 
 const AUTOSAVE_DELAY = 800
 
@@ -24,16 +25,29 @@ export default function DefinitionsEditor() {
   const definitionsListRef = useRef(null)
   const jsonPaneRef = useRef(null)
   const previewPaneRef = useRef(null)
+  const reviewStateRef = useRef(null)
+
+  reviewStateRef.current = { session, currentIndex, answer, revealed }
 
   useEffect(() => {
     setContent(currentFile?.content || '')
     setDirty(false)
     clearTimeout(saveTimerRef.current)
-    setSession([])
-    setCurrentIndex(0)
-    setAnswer('')
-    setRevealed(false)
   }, [currentFile])
+
+  useEffect(() => {
+    const fileId = currentFile?.id
+    if (!fileId) return undefined
+
+    const saved = loadReviewSession('definitions', fileId)
+    setSession(saved?.session || [])
+    setCurrentIndex(saved?.currentIndex || 0)
+    setAnswer(saved?.answer || '')
+    setRevealed(Boolean(saved?.revealed))
+    setStartedAt(Date.now())
+
+    return () => saveReviewSession('definitions', fileId, reviewStateRef.current)
+  }, [currentFile?.id])
 
   useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
