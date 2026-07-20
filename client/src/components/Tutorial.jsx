@@ -40,6 +40,11 @@ const SECTIONS = [
         text: "Chaque onglet mémorise sa position de lecture et d'édition. Quand tu reviens sur un fichier, il se replace automatiquement à la ligne quittée.",
       },
       {
+        icon: 'compass',
+        title: 'Fichiers et pages Fonction',
+        text: "Les pages ouvertes depuis Fonctions ont aussi leur onglet. L'onglet réellement affiché est le seul marqué actif; ferme une page ou reviens à un fichier depuis la même barre.",
+      },
+      {
         icon: 'graph',
         title: 'Liens [[wiki]] et #tags',
         text: "Tape [[ dans une note pour lier une autre note (autocomplete). Les #tags dans le texte ou le frontmatter YAML sont indexés automatiquement.",

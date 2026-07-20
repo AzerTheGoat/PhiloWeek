@@ -9,6 +9,7 @@ function isMobileViewport() {
 const init = {
   tree: [],
   tabs: [],
+  viewTabs: [],
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
@@ -93,14 +94,21 @@ function reducer(state, action) {
         sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
       }
     }
-    case 'SET_VIEW': return {
-      ...state,
-      view: action.payload,
-      modal: null,
-      contextMenu: null,
-      showFilePicker: false,
-      showQuizLauncher: false,
-      sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+    case 'SET_VIEW': {
+      const nextView = action.payload
+      const viewTabs = nextView !== 'editor' && !state.viewTabs.includes(nextView)
+        ? [...state.viewTabs, nextView]
+        : state.viewTabs
+      return {
+        ...state,
+        view: nextView,
+        viewTabs,
+        modal: null,
+        contextMenu: null,
+        showFilePicker: false,
+        showQuizLauncher: false,
+        sidebarOpen: isMobileViewport() ? false : state.sidebarOpen,
+      }
     }
     case 'SET_THEME': {
       localStorage.setItem('pw-theme', action.payload)
@@ -127,9 +135,19 @@ function reducer(state, action) {
       if (state.openFileId !== action.payload) return { ...state, tabs }
       return { ...state, tabs, openFile: null, openFileId: null }
     }
+    case 'CLOSE_VIEW_TAB': {
+      const viewTabs = state.viewTabs.filter(view => view !== action.payload)
+      if (state.view !== action.payload) return { ...state, viewTabs }
+      return {
+        ...state,
+        viewTabs,
+        view: viewTabs[viewTabs.length - 1] || 'editor',
+      }
+    }
     case 'CLOSE_ALL_TABS': return {
       ...state,
       tabs: [],
+      viewTabs: [],
       openFile: null,
       openFileId: null,
       view: 'editor',
@@ -318,11 +336,19 @@ export function AppProvider({ children }) {
 
   const closeTab = useCallback(async (id) => {
     const index = state.tabs.findIndex(tab => tab.id === id)
-    const isActive = state.openFileId === id
+    const isActive = state.view === 'editor' && state.openFileId === id
     const nextTab = isActive ? (state.tabs[index + 1] || state.tabs[index - 1]) : null
     dispatch({ type: 'CLOSE_TAB', payload: id })
     if (nextTab) await openFile(nextTab.id)
-  }, [openFile, state.openFileId, state.tabs])
+  }, [openFile, state.openFileId, state.tabs, state.view])
+
+  const closeViewTab = useCallback(async (view) => {
+    const remainingViews = state.viewTabs.filter(item => item !== view)
+    const shouldRestoreFile = state.view === view && remainingViews.length === 0 && !state.openFile && state.tabs.length > 0
+    const fallbackFile = shouldRestoreFile ? state.tabs[state.tabs.length - 1] : null
+    dispatch({ type: 'CLOSE_VIEW_TAB', payload: view })
+    if (fallbackFile) await openFile(fallbackFile.id)
+  }, [openFile, state.openFile, state.tabs, state.view, state.viewTabs])
 
   const closeAllTabs = useCallback(() => {
     dispatch({ type: 'CLOSE_ALL_TABS' })
@@ -410,6 +436,7 @@ export function AppProvider({ children }) {
     loadTree,
     openFile,
     closeTab,
+    closeViewTab,
     closeAllTabs,
     saveFile,
     undoFile: id => stepFileHistory(id, 'undo'),

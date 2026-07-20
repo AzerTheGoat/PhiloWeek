@@ -240,6 +240,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
 - Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
 - La position de defilement est memorisee en memoire par fichier et par panneau pendant la session : edition, apercu Markdown, questionnaires, definitions, tableurs et lecture seule reprennent a l'endroit quitte lors d'un changement d'onglet. Les graphes gardent leur propre vue persistante.
+- Les vues ouvertes depuis le panneau `Fonctions` possedent aussi des onglets fermables dans la meme barre. Quand une vue Fonction est affichee, aucun onglet de fichier ne doit rester marque actif; cliquer un onglet de fichier revient a l'editeur.
 
 ## Frise historique
 

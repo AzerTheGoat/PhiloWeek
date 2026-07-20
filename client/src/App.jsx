@@ -158,9 +158,9 @@ function AppShell() {
 }
 
 function FileTabs() {
-  const { tabs, openFileId, openFile, closeTab, closeAllTabs, showContextMenu } = useApp()
+  const { tabs, viewTabs, view, openFileId, openFile, closeTab, closeViewTab, closeAllTabs, showContextMenu, dispatch } = useApp()
 
-  if (!tabs.length) return null
+  if (!tabs.length && !viewTabs.length) return null
 
   const openTabMenu = (event) => {
     event.preventDefault()
@@ -178,8 +178,8 @@ function FileTabs() {
           <div
             key={tab.id}
             role="tab"
-            aria-selected={tab.id === openFileId}
-            className={`file-tab ${tab.id === openFileId ? 'active' : ''}`}
+            aria-selected={view === 'editor' && tab.id === openFileId}
+            className={`file-tab ${view === 'editor' && tab.id === openFileId ? 'active' : ''}`}
             title={tab.name}
           >
             <button
@@ -204,6 +204,39 @@ function FileTabs() {
             </button>
           </div>
         ))}
+        {viewTabs.map(viewKey => {
+          const viewTab = getViewTab(viewKey)
+          return (
+            <div
+              key={`view:${viewKey}`}
+              role="tab"
+              aria-selected={view === viewKey}
+              className={`file-tab view-tab ${view === viewKey ? 'active' : ''}`}
+              title={viewTab.label}
+            >
+              <button
+                type="button"
+                className="file-tab-main"
+                onClick={() => dispatch({ type: 'SET_VIEW', payload: viewKey })}
+              >
+                <Icon name={viewTab.icon} size={14} />
+                <span>{viewTab.label}</span>
+              </button>
+              <button
+                type="button"
+                className="file-tab-close"
+                title="Fermer l'onglet"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  closeViewTab(viewKey)
+                }}
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+          )
+        })}
       </div>
       <button
         type="button"
@@ -216,6 +249,26 @@ function FileTabs() {
       </button>
     </div>
   )
+}
+
+const VIEW_TABS = {
+  timer: { label: 'Focus', icon: 'timer' },
+  journal: { label: 'Journal', icon: 'journal' },
+  inbox: { label: 'Boîte à idées', icon: 'idea' },
+  life: { label: 'Citations', icon: 'quote' },
+  todos: { label: 'Tâches', icon: 'listCheck' },
+  agenda: { label: 'Agenda', icon: 'calendar' },
+  'life-grid': { label: 'Vie perso', icon: 'life' },
+  'knowledge-graph': { label: 'Base de liens', icon: 'database' },
+  timeline: { label: 'Frise historique', icon: 'timeline' },
+  roadtrips: { label: 'Carnet de voyage', icon: 'map' },
+  'social-journal': { label: 'Journal public', icon: 'newspaper' },
+  tutorial: { label: 'Aide', icon: 'thought' },
+  trash: { label: 'Corbeille', icon: 'trash' },
+}
+
+function getViewTab(view) {
+  return VIEW_TABS[view] || { label: view, icon: 'compass' }
 }
 
 function formatTabName(name) {
