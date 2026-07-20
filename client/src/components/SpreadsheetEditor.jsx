@@ -17,6 +17,7 @@ import {
   serializeSpreadsheet,
   toAddress,
 } from '../utils/spreadsheetFile'
+import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 
 const AUTOSAVE_DELAY = 650
 const MAX_VISIBLE_CELLS = 10000
@@ -59,6 +60,8 @@ export default function SpreadsheetEditor({ readOnly = false }) {
   const selection = normalizeSelection(activeCell, selectionEnd)
   const activeAddress = toAddress(activeCell.row, activeCell.col)
   const activeRaw = sheet?.cells?.[activeAddress]?.input ?? ''
+
+  useFileScrollRestoration(openFileId, 'spreadsheet-grid', gridRef)
 
   useEffect(() => {
     const previousId = previousFileIdRef.current

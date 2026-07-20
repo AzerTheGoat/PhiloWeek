@@ -239,6 +239,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees, questionnaires JSON, definitions JSON et tableurs Excel.
 - Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
 - Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
+- La position de defilement est memorisee en memoire par fichier et par panneau pendant la session : edition, apercu Markdown, questionnaires, definitions, tableurs et lecture seule reprennent a l'endroit quitte lors d'un changement d'onglet. Les graphes gardent leur propre vue persistante.
 
 ## Frise historique
 

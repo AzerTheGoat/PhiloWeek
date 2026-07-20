@@ -35,6 +35,11 @@ const SECTIONS = [
         text: "Les fichiers existants s'ouvrent en aperçu Markdown. Les nouvelles notes s'ouvrent en Split pour écrire et voir le rendu en même temps.",
       },
       {
+        icon: 'file',
+        title: 'Reprendre où tu étais',
+        text: "Chaque onglet mémorise sa position de lecture et d'édition. Quand tu reviens sur un fichier, il se replace automatiquement à la ligne quittée.",
+      },
+      {
         icon: 'graph',
         title: 'Liens [[wiki]] et #tags',
         text: "Tape [[ dans une note pour lier une autre note (autocomplete). Les #tags dans le texte ou le frontmatter YAML sont indexés automatiquement.",

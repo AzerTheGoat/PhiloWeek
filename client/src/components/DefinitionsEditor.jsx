@@ -5,6 +5,7 @@ import { buildFileNameIndex, normalizeWikiPart, parseWikiLinks, resolveWikiTarge
 import Icon from './Icons'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
+import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 
 const AUTOSAVE_DELAY = 800
 
@@ -21,6 +22,8 @@ export default function DefinitionsEditor() {
   const [startedAt, setStartedAt] = useState(Date.now())
   const saveTimerRef = useRef(null)
   const definitionsListRef = useRef(null)
+  const jsonPaneRef = useRef(null)
+  const previewPaneRef = useRef(null)
 
   useEffect(() => {
     setContent(currentFile?.content || '')
@@ -214,6 +217,9 @@ export default function DefinitionsEditor() {
 
   const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: dirty })
 
+  useFileScrollRestoration(openFileId, 'definitions-json', jsonPaneRef, showJson)
+  useFileScrollRestoration(openFileId, 'definitions-preview', previewPaneRef, true, !focusedPart)
+
   if (!currentFile) return null
 
   return (
@@ -249,6 +255,7 @@ export default function DefinitionsEditor() {
         {showJson && (
           <div className="questionnaire-json-pane">
             <textarea
+              ref={jsonPaneRef}
               value={content}
               onChange={handleRawChange}
               className="questionnaire-textarea"
@@ -258,7 +265,7 @@ export default function DefinitionsEditor() {
           </div>
         )}
 
-        <div className="questionnaire-preview-pane">
+        <div className="questionnaire-preview-pane" ref={previewPaneRef}>
           {parsed.error ? (
             <section className="questionnaire-card is-error">
               <strong>JSON invalide</strong>

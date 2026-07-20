@@ -4,6 +4,7 @@ import { parseQuestionnaireJson } from '../utils/questionnaireFile'
 import Icon from './Icons'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
+import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 
 const AUTOSAVE_DELAY = 800
 
@@ -23,6 +24,8 @@ export default function QuestionnaireEditor() {
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [sessionStartedAt, setSessionStartedAt] = useState(Date.now())
   const saveTimerRef = useRef(null)
+  const jsonPaneRef = useRef(null)
+  const previewPaneRef = useRef(null)
 
   useEffect(() => {
     setContent(currentFile?.content || '')
@@ -199,6 +202,9 @@ export default function QuestionnaireEditor() {
 
   const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: dirty })
 
+  useFileScrollRestoration(openFileId, 'questionnaire-json', jsonPaneRef, mode !== 'preview')
+  useFileScrollRestoration(openFileId, 'questionnaire-preview', previewPaneRef, mode !== 'edit')
+
   if (!currentFile) return null
 
   return (
@@ -231,6 +237,7 @@ export default function QuestionnaireEditor() {
         {mode !== 'preview' && (
           <div className="questionnaire-json-pane">
             <textarea
+              ref={jsonPaneRef}
               value={content}
               onChange={handleChange}
               className="questionnaire-textarea"
@@ -241,7 +248,7 @@ export default function QuestionnaireEditor() {
         )}
 
         {mode !== 'edit' && (
-          <div className="questionnaire-preview-pane">
+          <div className="questionnaire-preview-pane" ref={previewPaneRef}>
             <QuestionnairePreview parsed={parsed} />
             <SourceFilesPanel
               files={fileOptions}

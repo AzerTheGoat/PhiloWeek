@@ -13,6 +13,7 @@ import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import { isDefinitionsFile } from '../utils/definitionsFile'
 import { isSpreadsheetFile } from '../utils/spreadsheetFile'
 import { normalizeWikiPart } from '../utils/wikiLinks'
+import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 import * as api from '../api'
 import CloudCollaborationBar from './CloudCollaborationBar'
 
@@ -35,6 +36,8 @@ export default function Editor() {
 }
 
 function SharedFileViewer({ file }) {
+  const bodyRef = useRef(null)
+  useFileScrollRestoration(file?.id, 'shared-viewer', bodyRef)
   const isJson = /\.json$/i.test(file.name || '')
   let formatted = file.content || ''
   if (isJson) {
@@ -46,7 +49,7 @@ function SharedFileViewer({ file }) {
         <h2 className="editor-filename">{file.name.replace(/\.(md|json|xlsx)$/i, '')}</h2>
         <span className="shared-readonly-badge"><Icon name="eye" size={14} /> Lecture seule</span>
       </div>
-      <div className="shared-file-viewer-body">
+      <div className="shared-file-viewer-body" ref={bodyRef}>
         {isJson ? <pre>{formatted}</pre> : <Preview content={file.content || ''} />}
       </div>
     </div>
@@ -326,6 +329,9 @@ function MarkdownEditor() {
   }, [])
 
   const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: isDirty })
+
+  useFileScrollRestoration(openFileId, 'markdown-editor', textareaRef, mode !== 'preview')
+  useFileScrollRestoration(openFileId, 'markdown-preview', previewPaneRef, mode !== 'edit', !currentFile?.initial_focus_part)
 
   if (!currentFile) return null
 
