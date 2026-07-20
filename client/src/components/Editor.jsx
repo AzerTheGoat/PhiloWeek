@@ -18,7 +18,7 @@ import CloudCollaborationBar from './CloudCollaborationBar'
 const AUTOSAVE_DELAY = 800
 
 function initialMode() {
-  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'preview'
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 'edit' : 'split'
 }
 
 export default function Editor() {

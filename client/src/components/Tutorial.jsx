@@ -32,7 +32,7 @@ const SECTIONS = [
       {
         icon: 'edit',
         title: 'Trois vues : Éditer / Split / Aperçu',
-        text: "Bascule entre écriture pure, vue partagée, ou aperçu Markdown rendu. Le mode par défaut à l'ouverture est l'Aperçu.",
+        text: "Bascule entre écriture pure, vue partagée, ou aperçu Markdown rendu. Le mode par défaut à l'ouverture est Split.",
       },
       {
         icon: 'graph',
