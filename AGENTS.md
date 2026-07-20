@@ -227,6 +227,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'editeur permet d'ajouter, modifier et supprimer les mots sans ecrire le JSON a la main, tout en gardant un mode JSON de secours.
 - Les definitions passent dans le moteur de revision existant : le mot devient la question, la definition la correction, et l'exemple l'explication.
 - Dans le panneau global `Reviser`, selectionner directement un fichier Definitions lance la revision de ses mots; les resultats sont stockes dans `questionnaire_results` comme les quiz.
+- Les champs `definition` et `example` acceptent les liens wiki `[[Nom du fichier|Partie]]`; les liens sont cliquables dans la carte et ouvrent le titre Markdown correspondant dans une note.
+- Une note Markdown peut cibler une definition precise avec `[[Nom de la fiche|Terme]]`; la fiche JSON s'ouvre et centre la carte dont le mot correspond a `Terme`.
+- La resolution des liens sans extension couvre les fichiers `.md`, `.json` et `.xlsx`; la partie apres `|` sert a la fois de libelle et de destination interne.
 - L'export/import Obsidian inclut les fichiers Definitions tels quels, puisqu'ils restent des fichiers `.json` standards.
 
 ## Onglets de fichiers

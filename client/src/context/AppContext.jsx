@@ -212,13 +212,17 @@ export function AppProvider({ children }) {
     setTimeout(() => dispatch({ type: 'REMOVE_TOAST', payload: id }), 3500)
   }, [])
 
-  const openFile = useCallback(async (id, { editorMode } = {}) => {
+  const openFile = useCallback(async (id, { editorMode, focusPart } = {}) => {
     const requestId = ++openRequestRef.current
     try {
       const file = await api.getFile(id)
       if (requestId !== openRequestRef.current) return
       fileVersionRef.current[id] = Number(file.content_version || 0)
-      dispatch({ type: 'OPEN_FILE', payload: { ...file, initial_editor_mode: editorMode } })
+      dispatch({ type: 'OPEN_FILE', payload: {
+        ...file,
+        initial_editor_mode: editorMode,
+        initial_focus_part: focusPart,
+      } })
     } catch (err) {
       if (requestId === openRequestRef.current) {
         dispatch({ type: 'CLEAR_OPEN_FILE' })

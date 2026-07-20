@@ -149,6 +149,11 @@ const SECTIONS = [
         title: 'Réviser',
         text: "Sélectionne des notes sources, choisis un nombre de questions, et lance une session : les questions liées sont piochées au hasard, tes réponses sont notées et gardées en historique.",
       },
+      {
+        icon: 'abc',
+        title: 'Relier notes et définitions',
+        text: "Utilise [[Nom du fichier|Partie]] dans une définition ou une note. Le lien ouvre le fichier puis vise la définition portant ce nom ou le titre Markdown correspondant.",
+      },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import { normalizeTagsInput, parseDefinitionsJson } from '../utils/definitionsFile'
+import { buildFileNameIndex, normalizeWikiPart, parseWikiLinks, resolveWikiTarget } from '../utils/wikiLinks'
 import Icon from './Icons'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
@@ -8,7 +9,7 @@ import * as api from '../api'
 const AUTOSAVE_DELAY = 800
 
 export default function DefinitionsEditor() {
-  const { currentFile, openFileId, saveFile, toast } = useApp()
+  const { currentFile, openFileId, saveFile, toast, fileNames, openFile } = useApp()
   const [content, setContent] = useState(currentFile?.content || '')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -19,6 +20,7 @@ export default function DefinitionsEditor() {
   const [revealed, setRevealed] = useState(false)
   const [startedAt, setStartedAt] = useState(Date.now())
   const saveTimerRef = useRef(null)
+  const definitionsListRef = useRef(null)
 
   useEffect(() => {
     setContent(currentFile?.content || '')
@@ -42,8 +44,19 @@ export default function DefinitionsEditor() {
 
   const data = parsed.data || {}
   const definitions = data.definitions || []
+  const focusedPart = normalizeWikiPart(currentFile?.initial_focus_part)
   const currentCard = session[currentIndex] || null
   const done = session.length > 0 && currentIndex >= session.length
+
+  useEffect(() => {
+    if (!focusedPart) return undefined
+    const frame = requestAnimationFrame(() => {
+      const target = [...(definitionsListRef.current?.querySelectorAll('[data-definition-target]') || [])]
+        .find(card => card.dataset.definitionTarget === focusedPart || card.dataset.definitionId === focusedPart)
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [currentFile, definitions.length, focusedPart])
 
   const triggerSave = useCallback((value) => {
     clearTimeout(saveTimerRef.current)
@@ -330,14 +343,19 @@ export default function DefinitionsEditor() {
                 )}
               </section>}
 
-              <section className="definitions-list">
+              <section className="definitions-list" ref={definitionsListRef}>
                 {definitions.length === 0 && (
                   <div className="questionnaire-card">
                     <p className="questionnaire-muted">Ajoute un premier mot.</p>
                   </div>
                 )}
                 {definitions.map((definition, index) => (
-                  <article key={definition.id || index} className="questionnaire-card definition-card">
+                  <article
+                    key={definition.id || index}
+                    className={`questionnaire-card definition-card ${focusedPart && (normalizeWikiPart(definition.term) === focusedPart || normalizeWikiPart(definition.id) === focusedPart) ? 'is-linked-target' : ''}`}
+                    data-definition-target={normalizeWikiPart(definition.term)}
+                    data-definition-id={normalizeWikiPart(definition.id)}
+                  >
                     <div className="definition-card-head">
                       <span className="definition-number">{index + 1}</span>
                       <label className="definition-term-field">
@@ -358,7 +376,7 @@ export default function DefinitionsEditor() {
                         <textarea
                           value={definition.definition || ''}
                           onChange={event => updateDefinition(index, 'definition', event.target.value)}
-                          placeholder="Définition à retenir..."
+                          placeholder="Définition à retenir… Lien : [[fichier|partie]]"
                         />
                       </label>
                       <label>
@@ -366,7 +384,7 @@ export default function DefinitionsEditor() {
                         <textarea
                           value={definition.example || ''}
                           onChange={event => updateDefinition(index, 'example', event.target.value)}
-                          placeholder="Exemple, contre-exemple, piège..."
+                          placeholder="Exemple, nuance ou [[fichier|partie]]…"
                         />
                       </label>
                     </div>
@@ -378,6 +396,11 @@ export default function DefinitionsEditor() {
                         placeholder="logique, grec"
                       />
                     </label>
+                    <DefinitionWikiLinks
+                      definition={definition}
+                      fileNames={fileNames}
+                      openFile={openFile}
+                    />
                   </article>
                 ))}
               </section>
@@ -385,6 +408,37 @@ export default function DefinitionsEditor() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function DefinitionWikiLinks({ definition, fileNames, openFile }) {
+  const links = useMemo(
+    () => parseWikiLinks(`${definition.definition || ''}\n${definition.example || ''}`),
+    [definition.definition, definition.example]
+  )
+  const fileIndex = useMemo(() => buildFileNameIndex(fileNames), [fileNames])
+
+  if (links.length === 0) return null
+
+  return (
+    <div className="definition-wiki-links" aria-label="Liens de cette définition">
+      <span>Liens</span>
+      {links.map(link => {
+        const fileId = resolveWikiTarget(fileIndex, link.target)
+        return (
+          <button
+            key={`${link.target}|${link.part}`}
+            type="button"
+            className={`wiki-link ${fileId ? 'resolved' : 'unresolved'}`}
+            disabled={!fileId}
+            onClick={() => fileId && openFile(fileId, { focusPart: link.part || undefined })}
+            title={fileId ? `Ouvrir ${link.target}${link.part ? `, partie ${link.part}` : ''}` : `Fichier introuvable : ${link.target}`}
+          >
+            {link.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -3230,6 +3230,13 @@ kbd {
 .wiki-link:hover { border-bottom-style: solid }
 .wiki-link.unresolved { color: var(--text-3); border-color: var(--text-3) }
 
+.markdown-preview .wiki-focus-target {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent);
+  transition: background 0.45s ease, box-shadow 0.45s ease;
+}
+
 .preview-empty { color: var(--text-3); font-style: italic }
 
 /* Graph editor */
@@ -5430,6 +5437,12 @@ kbd {
   flex-direction: column;
   gap: 12px;
   padding: 14px 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.definition-card.is-linked-target {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 .definition-card-head {
@@ -5470,6 +5483,35 @@ kbd {
 }
 
 .definition-tags-field input { padding-block: 7px; }
+
+.definition-wiki-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.definition-wiki-links > span {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.definition-wiki-links .wiki-link {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size: 11px;
+}
+
+.definition-wiki-links .wiki-link:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
 
 .definitions-quiz-card { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
 

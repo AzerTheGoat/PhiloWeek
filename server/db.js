@@ -625,14 +625,24 @@ function updateLinks(db, fileId, content, userId) {
   )
 
   for (const linkText of linkTexts) {
-    const nameWithExt = linkText.endsWith('.md') ? linkText : linkText + '.md'
+    const candidates = wikiTargetCandidates(linkText)
+    const placeholders = candidates.map(() => '?').join(', ')
     // Filtré par user_id : un lien [[Nom]] ne doit jamais se résoudre vers
     // le fichier d'un autre compte, même en cas d'homonymie.
     const target = db.prepare(
-      'SELECT id FROM files WHERE (name = ? OR name = ?) AND user_id IS ? AND deleted_at IS NULL LIMIT 1'
-    ).get(nameWithExt, linkText, userId ?? null)
+      `SELECT id FROM files
+       WHERE lower(name) IN (${placeholders}) AND user_id IS ? AND deleted_at IS NULL
+       ORDER BY CASE WHEN lower(name) = ? THEN 0 ELSE 1 END
+       LIMIT 1`
+    ).get(...candidates, userId ?? null, linkText.toLocaleLowerCase())
     if (target) insertLink.run(fileId, target.id, linkText)
   }
+}
+
+function wikiTargetCandidates(value) {
+  const target = String(value || '').trim().toLocaleLowerCase()
+  if (/\.(md|json|xlsx)$/i.test(target)) return [target]
+  return [target, `${target}.md`, `${target}.json`, `${target}.xlsx`]
 }
 
 function updateAllLinks(db, userId) {

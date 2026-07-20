@@ -716,8 +716,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     const allFiles = db.prepare("SELECT id, name, content FROM files WHERE type = 'file' AND user_id = ? AND deleted_at IS NULL").all(req.user.id)
     const nameToId = {}
     allFiles.forEach(f => {
-      nameToId[f.name] = f.id
-      nameToId[f.name.replace(/\.md$/i, '')] = f.id
+      const name = String(f.name || '').toLocaleLowerCase()
+      nameToId[name] = f.id
+      const baseName = name.replace(/\.(md|json|xlsx)$/i, '')
+      if (!nameToId[baseName]) nameToId[baseName] = f.id
     })
 
     const linkTx = db.transaction(() => {
@@ -733,7 +735,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         linkRegex.lastIndex = 0
         while ((m = linkRegex.exec(content)) !== null) {
           const linkText = m[1].trim()
-          const targetId = nameToId[linkText] || nameToId[linkText + '.md']
+          const targetId = nameToId[linkText.toLocaleLowerCase()]
           if (targetId && targetId !== file.id) {
             try { insertLink.run(file.id, targetId, linkText); report.linksResolved++ }
             catch (_) {}
