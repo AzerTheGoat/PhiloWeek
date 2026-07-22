@@ -193,6 +193,23 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   })
   assert.equal(response.status, 201, await response.clone().text())
   assert.equal((await response.json()).cover_image_data, null)
+
+  response = await request('POST', '/api/historical-timeline', {
+    title: 'Repere avec image distante',
+    start: '1789-07-14',
+    image_data: 'https://images.example.com/bastille.webp',
+  })
+  assert.equal(response.status, 201, await response.clone().text())
+  const eventWithRemoteImage = await response.json()
+  assert.equal(eventWithRemoteImage.image_data, 'https://images.example.com/bastille.webp')
+
+  response = await request('POST', '/api/historical-timeline', {
+    title: 'Repere avec image HTTP refusee',
+    start: '1792-09-21',
+    image_data: 'http://images.example.com/insecure.jpg',
+  })
+  assert.equal(response.status, 201, await response.clone().text())
+  assert.equal((await response.json()).image_data, null)
   db.close()
 })
 

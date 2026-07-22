@@ -569,16 +569,16 @@ Le frontend historique affecte directement `marked.parse(md)` à `innerHTML` san
 preview.innerHTML = DOMPurify.sanitize(marked.parse(md))
 ```
 
-### SEC-18 — Images distantes dans les articles : balises de suivi côté lecteur
+### SEC-18 — Images distantes dans les articles et la frise : balises de suivi côté lecteur
 
 - **OWASP 2021 :** A04 — Insecure Design
 - **Sévérité :** **Faible**
-- **Fichiers/lignes :** `server/routes/socialJournal.js:302-326`, `server/index.js:39`, `client/src/components/PublicArticle.jsx:103-129`
+- **Fichiers/lignes :** `server/imageValue.js`, `server/routes/socialJournal.js`, `server/routes/historicalTimeline.js`, `server/index.js`, `client/src/components/PublicArticle.jsx`, `client/src/components/HistoricalTimeline.jsx`
 - **Confiance :** élevée
 
 **Risque et exploitation**
 
-Un auteur peut publier une image de couverture ou une image Markdown distante en HTTPS. La CSP autorise ce schéma pour préserver cette fonctionnalité du journal. À l'ouverture de l'article public, le navigateur du lecteur contacte le serveur de l'auteur, révélant au minimum IP, user-agent et heure de lecture. Le rendu impose désormais `referrerPolicy="no-referrer"`, mais cela ne supprime pas le tracking réseau. Les rendus de notes privées continuent de remplacer les images distantes par un avertissement.
+Un auteur peut publier une image de couverture, une image Markdown ou une image de repère historique distante en HTTPS. La CSP autorise ce schéma pour préserver le journal et la frise commune. À l'ouverture du contenu, le navigateur du lecteur contacte le serveur de l'image, révélant au minimum IP, user-agent et heure de lecture. Le rendu impose `referrerPolicy="no-referrer"`, mais cela ne supprime pas le tracking réseau. Les rendus de notes privées continuent de remplacer les images distantes par un avertissement.
 
 **Remédiation indicative**
 
@@ -612,7 +612,7 @@ const safeSrc = `/api/media-proxy/${approvedMediaId}`
 | SEC-15 Journalisation de sécurité absente | backend global | Moyenne |
 | SEC-16 Gestionnaire d'erreur global absent | `server/index.js` | Faible |
 | SEC-17 XSS latent dans l'ancien frontend | `static/` | Faible |
-| SEC-18 Tracking par images distantes | journal public | Faible |
+| SEC-18 Tracking par images distantes | journal public et frise | Faible |
 
 ## 6. Plan d'actions priorisé
 

@@ -396,7 +396,7 @@ export default function HistoricalTimeline() {
         <div className="timeline-focus-card">
           {focused ? (
             <>
-              {focused.image_data && <img src={focused.image_data} alt="" />}
+              {focused.image_data && <img src={focused.image_data} alt="" referrerPolicy="no-referrer" />}
               <div>
                 <span>{formatSpan(focused)}</span>
                 <h2>{focused.title}</h2>
@@ -487,7 +487,7 @@ export default function HistoricalTimeline() {
                   {item.event.end_year !== null && (
                     <div className="timeline-duration" style={{ background: item.event.color || COLORS[0] }} />
                   )}
-                  {item.event.image_data && <img src={item.event.image_data} alt="" />}
+                  {item.event.image_data && <img src={item.event.image_data} alt="" loading="lazy" referrerPolicy="no-referrer" />}
                   {item.event.linked_articles?.length > 0 && (
                     <span className="timeline-article-badge">{item.event.linked_articles.length} article{item.event.linked_articles.length > 1 ? 's' : ''}</span>
                   )}
@@ -566,7 +566,7 @@ export default function HistoricalTimeline() {
             </div>
             {form.image_data && (
               <div className="timeline-image-preview">
-                <img src={form.image_data} alt="" />
+                <img src={form.image_data} alt="" referrerPolicy="no-referrer" />
                 <button type="button" className="icon-btn" onClick={() => setForm({ ...form, image_data: '' })}>
                   <Icon name="close" size={14} />
                 </button>
@@ -731,7 +731,7 @@ function TimelineImportReview({ items, sourceName, busy, onUpdate, onToggle, onR
               </div>
               {item.image_data && (
                 <div className="timeline-image-preview">
-                  <img src={item.image_data} alt="" />
+                  <img src={item.image_data} alt="" loading="lazy" referrerPolicy="no-referrer" />
                   <button type="button" className="icon-btn" onClick={() => onUpdate(item.client_id, { image_data: '' })}>
                     <Icon name="close" size={14} />
                   </button>

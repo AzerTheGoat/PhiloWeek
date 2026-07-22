@@ -1,6 +1,7 @@
 const express = require('express')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
+const { normalizeImageValue } = require('../imageValue')
 
 const router = express.Router()
 
@@ -147,7 +148,7 @@ function normalizePayload(body = {}) {
     description: emptyToNull(body.description),
     category: emptyToNull(body.category),
     color: normalizeColor(body.color),
-    image_data: normalizeImage(body.image_data),
+    image_data: normalizeImageValue(body.image_data),
     image_caption: emptyToNull(body.image_caption),
     tags: normalizeTags(body.tags),
   }
@@ -191,14 +192,6 @@ function dateValue(parts) {
 function normalizeColor(value) {
   const color = String(value || '').trim()
   return /^#[0-9a-f]{6}$/i.test(color) ? color : '#6ba3e8'
-}
-
-function normalizeImage(value) {
-  const text = String(value || '').trim()
-  if (!text) return null
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
-  // Autorise aussi une URL http(s) directe (image distante).
-  return null
 }
 
 function normalizeTags(value) {

@@ -1,6 +1,7 @@
 const express = require('express')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
+const { normalizeImageValue } = require('../imageValue')
 
 const router = express.Router()
 
@@ -307,7 +308,7 @@ function normalizeArticlePayload(body = {}) {
     content: String(body.content || '').trim(),
     status,
     published_on: normalizeDate(body.published_on) || new Date().toISOString().slice(0, 10),
-    cover_image_data: normalizeImage(body.cover_image_data),
+    cover_image_data: normalizeImageValue(body.cover_image_data),
     tags: normalizeTags(body.tags),
     event_id: emptyToNull(body.event_id),
   }
@@ -332,19 +333,6 @@ function eventExists(db, id) {
 function normalizeDate(value) {
   const text = String(value || '').trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null
-}
-
-function normalizeImage(value) {
-  const text = String(value || '').trim()
-  if (!text) return null
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
-  if (text.length <= 2048) {
-    try {
-      const url = new URL(text)
-      if (url.protocol === 'https:' && !url.username && !url.password) return url.href
-    } catch (_) {}
-  }
-  return null
 }
 
 function normalizeTags(value) {

@@ -13,6 +13,7 @@ const { syncGeneratedQuizzes } = require('../generatedQuizzes')
 const { readBoundedZip } = require('../safeZip')
 const { assertUserStorageQuota, securityLog } = require('../securityControls')
 const { createEncryptedFolder, encryptText, evictFolderKey } = require('../vaultCrypto')
+const { normalizeImageValue } = require('../imageValue')
 
 const ROADTRIP_PHOTO_EXT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' }
 
@@ -271,7 +272,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 event.description || null,
                 event.category || null,
                 normalizeColor(event.color),
-                normalizeImage(event.image_data),
+                normalizeImageValue(event.image_data),
                 event.image_caption || null,
                 normalizeJsonArray(event.tags),
                 req.user.id,
@@ -304,7 +305,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 status,
                 normalizeDueDate(article.published_on) || now.slice(0, 10),
                 status === 'published' ? (normalizeIsoDate(article.published_at) || now) : null,
-                normalizeImage(article.cover_image_data),
+                normalizeImageValue(article.cover_image_data),
                 normalizeJsonArray(article.tags),
                 eventId,
                 req.user.id,
@@ -1031,13 +1032,6 @@ function normalizeIsoDate(value) {
 function normalizeColor(value) {
   const color = String(value || '').trim()
   return /^#[0-9a-f]{6}$/i.test(color) ? color : '#6ba3e8'
-}
-
-function normalizeImage(value) {
-  const text = String(value || '').trim()
-  if (!text) return null
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
-  return null
 }
 
 function normalizeJsonArray(value) {
