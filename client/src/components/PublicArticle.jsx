@@ -100,14 +100,14 @@ export default function PublicArticle({ articleId }) {
 }
 
 function PublicArticleView({ article }) {
-  const html = useMemo(() => sanitizeHtml(marked(article.content || '')), [article.content])
+  const html = useMemo(() => sanitizeHtml(marked(article.content || ''), { allowRemoteImages: true }), [article.content])
   const comments = article.comments || []
 
   return (
     <article className="article-view public-article-view">
       {article.cover_image_data && (
         <div className="article-cover-frame">
-          <img className="article-cover" src={article.cover_image_data} alt="" />
+          <img className="article-cover" src={article.cover_image_data} alt="" referrerPolicy="no-referrer" />
         </div>
       )}
       <div className="article-view-head">

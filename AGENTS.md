@@ -237,10 +237,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Un questionnaire JSON utilise `philoweek_type: questionnaire`, `version`, `id`, `title`, `description`, `tags` et un tableau `questions`.
 - Une question supporte au minimum `id`, `type`, `prompt`, `answer`, `explanation` et `tags`; `type` peut etre `open`, `mcq` ou `true_false`.
 - Les revisions restent auto-evaluees par l'utilisateur en `Juste/Faux`; le poids de tirage privilegie les questions avec historique faible, dernier score faux ou erreurs repetees.
+- Dans l'apercu d'un questionnaire, la liaison des notes et le lancement de la revision restent deux boutons compacts, sans cartes de configuration permanentes. `Lier des notes` ouvre la modal de selection; `Commencer une revision` tire directement jusqu'a 12 questions du fichier courant.
+- Sous `768px`, tous les parcours de revision (questionnaire, definitions, quiz lie a une note et revision globale) utilisent une carte memoire plein format : la saisie libre est masquee, l'utilisateur reflechit mentalement, affiche la solution, puis choisit `A revoir` ou `Je savais`. Ces deux choix alimentent exactement le meme historique juste/faux et la meme ponderation que sur ordinateur.
 - Un questionnaire peut etre lie a des notes Markdown avec `source_paths`; ces chemins sont preferes aux IDs pour rester compatibles avec export/import.
 - La liaison des fichiers d'un questionnaire se fait via une modal de selection avec recherche, arbre de dossiers, recapitulatif et validation explicite.
 - `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
-- L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus un bouton de revision random; il s'ouvre par defaut en `Apercu`.
+- L'editeur questionnaire propose les modes `Editer`, `Split` et `Apercu`, plus le bouton compact `Commencer une revision`; il s'ouvre par defaut en `Apercu`.
 - Une note Markdown affiche un bouton `Quiz` quand au moins un questionnaire est lie a cette note.
 - La sidebar contient un bouton global `Reviser` qui ouvre un panneau de selection de notes Markdown et lance les questions des questionnaires lies a ces notes, independamment du fichier ouvert.
 - Pendant une revision globale, le footer affiche seulement `Stop`; l'arret ou la fin de session affiche un score, un mini-rapport et les questions ratees a revoir.
@@ -305,6 +307,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les articles sont stockes dans `articles` avec un statut `draft` ou `published`; seuls les articles publies sont lisibles par tous les comptes.
 - Un brouillon reste visible seulement par son auteur dans l'onglet `Mes articles`.
 - Chaque article affiche son auteur (`users.username`), sa date de journal (`published_on`), ses tags, son accroche, son contenu Markdown et une image de couverture optionnelle.
+- Les couvertures et images Markdown d'article peuvent utiliser une URL HTTPS. Le rendu ajoute `referrerPolicy: no-referrer`, mais l'hote de l'image voit encore l'IP du lecteur; le tutoriel et la page Securite doivent recommander un fichier local pour les contenus sensibles.
 - Chaque article publie dispose d'un lien public `/articles/:id` copiable depuis l'interface; ce lien est lisible sans compte mais ne permet aucune action (pas de like, commentaire, edition ou suppression) et ne donne jamais acces aux brouillons.
 - Un article peut etre lie a une carte de la frise via `articles.event_id`; la frise affiche alors les articles publies associes au repere et permet de les ouvrir dans le journal public.
 - Le journal public propose un onglet `Aujourd hui` pour l'article du jour, un `Fil` commun et `Mes articles` pour retrouver ses publications et brouillons.

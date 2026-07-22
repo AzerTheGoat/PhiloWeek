@@ -24,7 +24,7 @@
 | SEC-07 | Corrigé | Changement de mot de passe : révocation de toutes les sessions, puis émission d'une nouvelle session. |
 | SEC-08 | Corrigé | Import des interactions sociales limité aux articles effectivement importés ou publiés et accessibles. |
 | SEC-09 | Corrigé | Contrôle `requireFileAccess` sur les identifiants de fichiers des routes audio, timer et questionnaires. |
-| SEC-10 | Corrigé | DOMPurify remplace le sanitizer artisanal; CSP renforcée et images distantes bloquées. |
+| SEC-10 | Corrigé | DOMPurify remplace le sanitizer artisanal; CSP stricte et images distantes bloquées par défaut hors journal public. |
 | SEC-11 | Corrigé | scrypt asynchrone partagé dans une file de concurrence bornée, plus rate limit d'ouverture du coffre. |
 | SEC-12 | Corrigé | `trust proxy` activé uniquement sur Railway. |
 | SEC-13 | Corrigé | Dépendances runtime mises à niveau; `npm audit` courant ne signale aucun avis. |
@@ -32,7 +32,7 @@
 | SEC-15 | Partiellement opérationnel | Événements de sécurité JSON et identifiants de requête ajoutés. La centralisation, rétention et alerte restent à configurer dans l'hébergement. |
 | SEC-16 | Corrigé | 404 API et gestionnaire global d'erreurs sans fuite de stack, avec identifiant de corrélation. |
 | SEC-17 | Corrigé | Les rendus HTML historiques dormants utilisent désormais du texte brut. |
-| SEC-18 | Corrigé | Images HTTP(S) rejetées dans les contenus importés et bloquées par la CSP. |
+| SEC-18 | Risque accepté et atténué | Le journal autorise volontairement les images HTTPS; le referrer est supprimé et l'interface informe que l'hôte distant voit encore l'IP. Les notes privées les bloquent. |
 
 ### Validation après correction
 
@@ -578,7 +578,7 @@ preview.innerHTML = DOMPurify.sanitize(marked.parse(md))
 
 **Risque et exploitation**
 
-Un auteur peut publier une image de couverture ou une image Markdown distante en HTTP(S). La CSP autorise ces origines. À l'ouverture de l'article public, le navigateur du lecteur contacte le serveur de l'auteur, révélant au minimum IP, user-agent et heure de lecture. Helmet réduit la fuite de referrer, mais pas le tracking réseau. Ce comportement peut être indésirable pour un journal social.
+Un auteur peut publier une image de couverture ou une image Markdown distante en HTTPS. La CSP autorise ce schéma pour préserver cette fonctionnalité du journal. À l'ouverture de l'article public, le navigateur du lecteur contacte le serveur de l'auteur, révélant au minimum IP, user-agent et heure de lecture. Le rendu impose désormais `referrerPolicy="no-referrer"`, mais cela ne supprime pas le tracking réseau. Les rendus de notes privées continuent de remplacer les images distantes par un avertissement.
 
 **Remédiation indicative**
 

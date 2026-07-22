@@ -14,7 +14,7 @@ const PROTECTIONS = [
   {
     icon: 'file',
     title: 'Contenus affichés avec précaution',
-    text: 'Le HTML des notes est nettoyé avant affichage. Les scripts, cadres, formulaires et images distantes sont bloqués pour limiter les injections et les pixels de suivi.',
+    text: 'Le HTML des notes est nettoyé avant affichage. Scripts, cadres et formulaires sont bloqués. Les notes privées refusent les images distantes; le journal public accepte les images HTTPS sans transmettre l’adresse de la page.',
   },
   {
     icon: 'upload',

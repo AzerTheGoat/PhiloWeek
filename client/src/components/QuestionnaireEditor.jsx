@@ -8,6 +8,7 @@ import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
 
 const AUTOSAVE_DELAY = 800
+const REVIEW_LIMIT = 12
 
 export default function QuestionnaireEditor() {
   const { currentFile, openFileId, saveFile, tree, toast } = useApp()
@@ -15,9 +16,6 @@ export default function QuestionnaireEditor() {
   const [mode, setMode] = useState('preview')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [scope, setScope] = useState('file')
-  const [folderIds, setFolderIds] = useState(new Set())
-  const [limit, setLimit] = useState(12)
   const [session, setSession] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answer, setAnswer] = useState('')
@@ -61,7 +59,6 @@ export default function QuestionnaireEditor() {
     }
   }, [content])
 
-  const folderOptions = useMemo(() => collectFolders(tree), [tree])
   const fileOptions = useMemo(() => collectMarkdownFiles(tree), [tree])
   const selectedSourcePaths = useMemo(
     () => new Set((parsed.data?.source_paths || []).map(normalizePath)),
@@ -102,19 +99,12 @@ export default function QuestionnaireEditor() {
     }
   }, [content, toast, triggerSave])
 
-  const startSession = useCallback(async (options = {}) => {
-    const sessionScope = options.scope || scope
-    const hasLinkedFiles = selectedSourcePaths.size > 0
-    if (options.requireLinkedFiles && !hasLinkedFiles) {
-      toast('Lie au moins un fichier avant de lancer ce questionnaire', 'error')
-      return
-    }
+  const startSession = useCallback(async () => {
     try {
       const result = await api.getQuestionnaireSession({
-        scope: sessionScope,
-        folder_ids: Array.from(folderIds),
+        scope: 'file',
         file_id: currentFile?.id,
-        limit,
+        limit: REVIEW_LIMIT,
       })
       if (!result.questions.length) {
         toast('Aucune question trouvee pour cette selection', 'error')
@@ -125,11 +115,12 @@ export default function QuestionnaireEditor() {
       setAnswer('')
       setRevealed(false)
       setSessionStartedAt(Date.now())
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) setMode('preview')
       toast(`${result.questions.length} question(s) chargee(s)`)
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [currentFile?.id, folderIds, limit, scope, selectedSourcePaths.size, toast])
+  }, [currentFile?.id, toast])
 
   const recordResult = useCallback(async (correct) => {
     if (!currentQuestion) return
@@ -160,15 +151,6 @@ export default function QuestionnaireEditor() {
       toast(err.message, 'error')
     }
   }, [answer, currentIndex, currentQuestion, session.length, sessionStartedAt, toast])
-
-  const toggleFolder = useCallback((id) => {
-    setFolderIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
 
   const saveSourceFiles = useCallback((selectedFiles) => {
     if (parsed.error) {
@@ -222,7 +204,7 @@ export default function QuestionnaireEditor() {
   if (!currentFile) return null
 
   return (
-    <div className="questionnaire-editor">
+    <div className={`questionnaire-editor ${session.length > 0 ? 'is-reviewing' : ''}`}>
       <div className="editor-titlebar">
         <h2 className="editor-filename">{currentFile.name.replace(/\.json$/i, '')}</h2>
         <div className="editor-meta">
@@ -242,9 +224,6 @@ export default function QuestionnaireEditor() {
         <button type="button" className="btn-ghost" onClick={formatJson}>
           <Icon name="synthesis" size={16} /> Formater JSON
         </button>
-        <button type="button" className="btn-primary" onClick={startSession}>
-          <Icon name="question" size={16} /> Questionnaire random
-        </button>
       </div>
 
       <div className={`questionnaire-body mode-${mode}`}>
@@ -263,21 +242,12 @@ export default function QuestionnaireEditor() {
 
         {mode !== 'edit' && (
           <div className="questionnaire-preview-pane" ref={previewPaneRef}>
-            <QuestionnairePreview parsed={parsed} />
             <SourceFilesPanel
               files={fileOptions}
               selectedSourcePaths={selectedSourcePaths}
               onOpen={() => setSourceModalOpen(true)}
-              onStart={() => startSession({ scope: 'file', requireLinkedFiles: true })}
             />
             <QuizPanel
-              scope={scope}
-              setScope={setScope}
-              folderOptions={folderOptions}
-              folderIds={folderIds}
-              toggleFolder={toggleFolder}
-              limit={limit}
-              setLimit={setLimit}
               startSession={startSession}
               session={session}
               currentIndex={currentIndex}
@@ -288,6 +258,7 @@ export default function QuestionnaireEditor() {
               setRevealed={setRevealed}
               recordResult={recordResult}
             />
+            <QuestionnairePreview parsed={parsed} />
           </div>
         )}
       </div>
@@ -340,36 +311,13 @@ function QuestionnairePreview({ parsed }) {
   )
 }
 
-function SourceFilesPanel({ files, selectedSourcePaths, onOpen, onStart }) {
+function SourceFilesPanel({ files, selectedSourcePaths, onOpen }) {
   const selectedFiles = files.filter(file => selectedSourcePaths.has(normalizePath(file.path)))
   return (
-    <section className="questionnaire-card source-files-card">
-      <div className="questionnaire-preview-head">
-        <div>
-          <h3>Fichiers lies</h3>
-          <p>Ces notes Markdown seront considerees comme le sujet de ce questionnaire.</p>
-        </div>
-        <span>{selectedFiles.length} / {files.length}</span>
-      </div>
-      <div className="source-files-summary">
-        {selectedFiles.length === 0 ? (
-          <p className="questionnaire-muted">Aucun fichier lie pour l'instant.</p>
-        ) : (
-          selectedFiles.slice(0, 5).map(file => (
-            <span key={file.id}>{file.path.replace(/\.md$/i, '')}</span>
-          ))
-        )}
-        {selectedFiles.length > 5 && <em>+ {selectedFiles.length - 5} autre(s)</em>}
-      </div>
-      <div className="source-files-actions">
-        <button type="button" className="btn-ghost" onClick={onOpen}>
-          <Icon name="folder" size={16} /> Gerer
-        </button>
-        <button type="button" className="btn-primary" onClick={onStart} disabled={selectedFiles.length === 0}>
-          <Icon name="question" size={16} /> Lancer avec ces fichiers
-        </button>
-      </div>
-    </section>
+    <button type="button" className="btn-ghost questionnaire-quick-action" onClick={onOpen}>
+      <Icon name="folder" size={16} />
+      {selectedFiles.length > 0 ? `Notes liées · ${selectedFiles.length}` : 'Lier des notes'}
+    </button>
   )
 }
 
@@ -556,13 +504,6 @@ function SourceTreeNode({ node, draft, onToggleFile, onSelectFolder, depth }) {
 }
 
 function QuizPanel({
-  scope,
-  setScope,
-  folderOptions,
-  folderIds,
-  toggleFolder,
-  limit,
-  setLimit,
   startSession,
   session,
   currentIndex,
@@ -576,61 +517,35 @@ function QuizPanel({
   const done = session.length > 0 && currentIndex >= session.length
   const choices = getQuestionChoices(currentQuestion)
 
+  if (session.length === 0) {
+    return (
+      <button type="button" className="btn-primary questionnaire-quick-action" onClick={startSession}>
+        <Icon name="play" size={17} /> Commencer une révision
+      </button>
+    )
+  }
+
   return (
-    <section className="questionnaire-card quiz-card">
+    <section className="questionnaire-card quiz-card has-session">
       <div className="questionnaire-preview-head">
         <div>
           <h3>Revision random</h3>
           <p>Les questions ratees reviennent plus souvent.</p>
         </div>
-        {session.length > 0 && <span>{Math.min(currentIndex + 1, session.length)} / {session.length}</span>}
+        <span>{Math.min(currentIndex + 1, session.length)} / {session.length}</span>
       </div>
-
-      <div className="quiz-settings">
-        <label>
-          Source
-          <select value={scope} onChange={event => setScope(event.target.value)}>
-            <option value="file">Ce questionnaire</option>
-            <option value="all">Tout le repo</option>
-            <option value="folders">Dossiers choisis</option>
-          </select>
-        </label>
-        <label>
-          Nombre
-          <input type="number" min="1" max="50" value={limit} onChange={event => setLimit(event.target.value)} />
-        </label>
-      </div>
-
-      {scope === 'folders' && (
-        <div className="quiz-folder-list">
-          {folderOptions.length === 0 && <span>Aucun dossier disponible.</span>}
-          {folderOptions.map(folder => (
-            <label key={folder.id}>
-              <input
-                type="checkbox"
-                checked={folderIds.has(folder.id)}
-                onChange={() => toggleFolder(folder.id)}
-              />
-              {folder.path}
-            </label>
-          ))}
-        </div>
-      )}
-
-      <button type="button" className="btn-primary quiz-start" onClick={startSession}>
-        Lancer
-      </button>
 
       {done && (
         <div className="quiz-done">
           <Icon name="question" size={28} />
           <strong>Session terminee</strong>
           <span>Relance une session pour recalculer les priorites.</span>
+          <button type="button" className="btn-primary" onClick={startSession}>Recommencer</button>
         </div>
       )}
 
       {currentQuestion && !done && (
-        <div className="quiz-live">
+        <div className={`quiz-live quiz-flashcard ${revealed ? 'is-revealed' : ''}`}>
           <span className="quiz-origin">{currentQuestion.questionnaire_title}</span>
           <span className="quiz-type">{getQuestionTypeLabel(currentQuestion.type)}</span>
           <h4>{currentQuestion.prompt}</h4>
@@ -649,22 +564,26 @@ function QuizPanel({
             </div>
           )}
           <textarea
+            className="quiz-answer-field"
             value={answer}
             onChange={event => setAnswer(event.target.value)}
             placeholder="Ta reponse..."
           />
           {!revealed ? (
-            <button type="button" className="btn-ghost" onClick={() => setRevealed(true)}>
-              Voir la correction
-            </button>
+            <>
+              <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>
+              <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
+                <Icon name="eye" size={18} /> Afficher la solution
+              </button>
+            </>
           ) : (
             <div className="quiz-correction">
               <strong>Correction</strong>
               <p>{currentQuestion.answer || 'Pas de correction renseignee.'}</p>
               {currentQuestion.explanation && <p>{currentQuestion.explanation}</p>}
               <div className="quiz-grade-actions">
-                <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Faux</button>
-                <button type="button" className="btn-primary" onClick={() => recordResult(true)}>Juste</button>
+                <button type="button" className="btn-danger quiz-grade-no" onClick={() => recordResult(false)}><Icon name="close" size={18} /> À revoir</button>
+                <button type="button" className="btn-primary quiz-grade-ok" onClick={() => recordResult(true)}><Icon name="check" size={18} /> Je savais</button>
               </div>
             </div>
           )}
@@ -672,21 +591,6 @@ function QuizPanel({
       )}
     </section>
   )
-}
-
-function collectFolders(tree) {
-  const folders = []
-  function walk(nodes, prefix = '') {
-    nodes.forEach(node => {
-      if (node.type === 'folder') {
-        const path = prefix ? `${prefix}/${node.name}` : node.name
-        folders.push({ id: node.id, path })
-        walk(node.children || [], path)
-      }
-    })
-  }
-  walk(tree || [])
-  return folders
 }
 
 function collectMarkdownFiles(tree, prefix = '') {

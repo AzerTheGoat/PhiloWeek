@@ -153,7 +153,7 @@ export default function GlobalQuizLauncher() {
             <QuizSourceTree nodes={tree} selectedIds={selectedIds} onToggle={handleToggle} />
           </div>
         ) : (
-          <div className="global-quiz-live">
+          <div className={`global-quiz-live ${!done ? 'quiz-flashcard' : ''} ${revealed && !done ? 'is-revealed' : ''}`}>
             {done ? (
               <div className="quiz-done global-quiz-report">
                 <Icon name="question" size={28} />
@@ -209,22 +209,26 @@ export default function GlobalQuizLauncher() {
                   </div>
                 )}
                 <textarea
+                  className="quiz-answer-field"
                   value={answer}
                   onChange={event => setAnswer(event.target.value)}
                   placeholder="Ta reponse..."
                 />
                 {!revealed ? (
-                  <button type="button" className="btn-ghost" onClick={() => setRevealed(true)}>
-                    Voir la correction
-                  </button>
+                  <>
+                    <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>
+                    <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
+                      <Icon name="eye" size={18} /> Afficher la solution
+                    </button>
+                  </>
                 ) : (
                   <div className="quiz-correction">
                     <strong>Correction</strong>
                     <p>{currentQuestion.answer || 'Pas de correction renseignee.'}</p>
                     {currentQuestion.explanation && <p>{currentQuestion.explanation}</p>}
                     <div className="quiz-grade-actions">
-                      <button type="button" className="btn-danger" onClick={() => recordResult(false)}>Faux</button>
-                      <button type="button" className="btn-primary" onClick={() => recordResult(true)}>Juste</button>
+                      <button type="button" className="btn-danger quiz-grade-no" onClick={() => recordResult(false)}><Icon name="close" size={18} /> À revoir</button>
+                      <button type="button" className="btn-primary quiz-grade-ok" onClick={() => recordResult(true)}><Icon name="check" size={18} /> Je savais</button>
                     </div>
                   </div>
                 )}

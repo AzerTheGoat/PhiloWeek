@@ -162,7 +162,7 @@ const SECTIONS = [
       {
         icon: 'play',
         title: 'Réviser',
-        text: "Sélectionne des notes sources, choisis un nombre de questions, et lance une session : les questions liées sont piochées au hasard, tes réponses sont notées et gardées en historique.",
+        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, réfléchis, affiche la solution, puis choisis À revoir ou Je savais. Ton auto-évaluation est gardée en historique.",
       },
       {
         icon: 'timer',
@@ -236,8 +236,8 @@ const SECTIONS = [
       },
       {
         icon: 'link',
-        title: 'Image locale protégée',
-        text: "Pour l'image d'un repère ou la couverture d'un article, choisis un fichier local. Les images distantes sont bloquées afin qu'un site tiers ne puisse pas suivre les lectures avec un pixel invisible.",
+        title: 'Images locales ou HTTPS',
+        text: "Pour l'image d'un repère ou la couverture d'un article, utilise un fichier local ou une URL HTTPS. Opuscule masque l'adresse de la page au serveur d'image, mais celui-ci reçoit toujours l'adresse IP du lecteur : privilégie un fichier local pour la confidentialité.",
       },
     ],
   },

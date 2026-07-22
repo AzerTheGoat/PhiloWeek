@@ -338,6 +338,12 @@ function normalizeImage(value) {
   const text = String(value || '').trim()
   if (!text) return null
   if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
+  if (text.length <= 2048) {
+    try {
+      const url = new URL(text)
+      if (url.protocol === 'https:' && !url.username && !url.password) return url.href
+    } catch (_) {}
+  }
   return null
 }
 

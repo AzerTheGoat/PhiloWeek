@@ -26,7 +26,10 @@ app.use(helmet({
   // donc `script-src 'self'` suffit et bloque tout script inline / handler
   // on* / URL javascript: injecté via une note Markdown (défense en
   // profondeur en plus du nettoyage HTML côté client).
-  // Les images distantes sont bloquées pour éviter le pistage par pixel :
+  // Les images HTTPS restent autorisées pour le journal public. Le rendu
+  // d'article supprime le referrer et le sanitizer continue de bloquer les
+  // images distantes dans les notes privées. Une CSP ne pouvant pas varier
+  // par composant, `https:` doit néanmoins figurer ici.
   //   - images locales et images base64 (data:) de la frise
   //   - favicon data: dans index.html
   //   - lecture audio des notes vocales (blob:)
@@ -36,7 +39,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'blob:'],
+      imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
       mediaSrc: ["'self'", 'blob:'],
       fontSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],

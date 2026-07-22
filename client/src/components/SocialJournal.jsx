@@ -352,12 +352,12 @@ export default function SocialJournal() {
 }
 
 function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, setComment, onComment, onRemoveComment }) {
-  const html = useMemo(() => sanitizeHtml(marked(article.content || '')), [article.content])
+  const html = useMemo(() => sanitizeHtml(marked(article.content || ''), { allowRemoteImages: true }), [article.content])
   return (
     <article className="article-view">
       {article.cover_image_data && (
         <div className="article-cover-frame">
-          <img className="article-cover" src={article.cover_image_data} alt="" />
+          <img className="article-cover" src={article.cover_image_data} alt="" referrerPolicy="no-referrer" />
         </div>
       )}
       <div className="article-view-head">
@@ -413,7 +413,7 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
 }
 
 function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onCover, onCoverUrl }) {
-  const preview = useMemo(() => sanitizeHtml(marked(form.content || '')), [form.content])
+  const preview = useMemo(() => sanitizeHtml(marked(form.content || ''), { allowRemoteImages: true }), [form.content])
   return (
     <form className="article-form" onSubmit={onSubmit}>
       <div className="article-form-head">
@@ -465,7 +465,7 @@ function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onC
       </div>
       {form.cover_image_data && (
         <div className="article-cover-preview">
-          <img src={form.cover_image_data} alt="" />
+          <img src={form.cover_image_data} alt="" referrerPolicy="no-referrer" />
           <button type="button" onClick={() => setForm({ ...form, cover_image_data: '' })}>Retirer</button>
         </div>
       )}
@@ -488,7 +488,7 @@ function ArticleMedia({ src, className = '' }) {
   return (
     <div className={`${className} ${src ? 'has-image' : 'no-image'}`}>
       {src
-        ? <img src={src} alt="" loading="lazy" />
+        ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" />
         : <Icon name="newspaper" size={22} />}
     </div>
   )

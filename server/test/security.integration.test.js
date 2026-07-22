@@ -173,6 +173,26 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   assert.equal(restoredNote.content, null)
   assert.ok(restoredNote.encrypted_content)
   assert.equal(restoredNote.encrypted_content.includes(secret), false)
+
+  response = await request('POST', '/api/social-journal/articles', {
+    title: 'Article avec image distante',
+    content: '![Illustration](https://images.example.com/article.webp)',
+    status: 'published',
+    cover_image_data: 'https://images.example.com/cover.jpg',
+  })
+  assert.equal(response.status, 201, await response.clone().text())
+  assert.match(response.headers.get('content-security-policy') || '', /img-src[^;]*https:/)
+  const articleWithRemoteImage = await response.json()
+  assert.equal(articleWithRemoteImage.cover_image_data, 'https://images.example.com/cover.jpg')
+
+  response = await request('POST', '/api/social-journal/articles', {
+    title: 'Article avec image HTTP refusée',
+    content: 'Contenu',
+    status: 'draft',
+    cover_image_data: 'http://images.example.com/insecure.jpg',
+  })
+  assert.equal(response.status, 201, await response.clone().text())
+  assert.equal((await response.json()).cover_image_data, null)
   db.close()
 })
 
