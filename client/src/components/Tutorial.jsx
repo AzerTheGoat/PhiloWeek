@@ -152,7 +152,7 @@ const SECTIONS = [
       {
         icon: 'copy',
         title: 'Générer depuis une note',
-        text: "Dans une note Markdown, « Créer quiz » sauvegarde la note, crée son questionnaire dans le dossier miroir Quiz générés et copie un prompt pédagogique complet. Colle ce prompt dans le LLM de ton choix, puis colle uniquement son JSON dans le quiz déjà ouvert. Les questions générées doivent intégrer leur propre contexte pour rester compréhensibles lors d'une révision aléatoire bien plus tard. Le quiz suit automatiquement les renommages et déplacements de la note.",
+        text: "Dans une note Markdown, « Créer quiz » sauvegarde la note, crée son questionnaire dans le dossier miroir Quiz générés et copie un prompt pédagogique complet. Colle ce prompt dans le LLM de ton choix, puis colle uniquement son JSON dans le quiz déjà ouvert. Chaque question générée commence par un court contexte qui rappelle la situation et ses prémisses, puis pose la question sans livrer la conclusion : elle reste ainsi compréhensible lors d'une révision aléatoire bien plus tard. Le quiz suit automatiquement les renommages et déplacements de la note.",
       },
       {
         icon: 'thought',

@@ -27,10 +27,17 @@ METHODE DE CONCEPTION
 CONTEXTE POUR UNE REVISION ALEATOIRE ET DIFFEREE
 - Le questionnaire sera utilise plusieurs jours ou plusieurs mois plus tard. Ses questions pourront etre tirees au hasard et melangees avec celles d'autres notes.
 - Chaque prompt doit donc etre entierement comprehensible tout seul, sans avoir relu la note juste avant et sans dependre du titre du questionnaire affiche par l'interface.
-- Donne dans le prompt le minimum de contexte necessaire pour identifier le cadre : nom de la note ou de l'oeuvre, auteur ou acteur concerne, periode, lieu, notion, argument ou passage vise. Pour un passage precis, ajoute une courte citation ou une paraphrase distinctive si elle aide a identifier ce qui est interroge.
-- Ce contexte sert uniquement a situer la question : il ne doit pas reveler la reponse ni transformer un exercice de rappel en simple repetition de l'enonce.
+- Chaque prompt doit contenir deux parties dans la meme chaine : d'abord "Contexte :" avec 1 a 3 phrases factuelles, puis "Question :" avec la tache de rappel ou de raisonnement. N'ajoute pas de champ JSON context separe.
+- Le contexte doit rappeler la situation concrete, les premisses de l'argument, la comparaison, la citation ou l'exemple necessaire pour reconstruire le probleme. Mentionner seulement le titre de la note, le nom d'une notion ou l'existence d'un exemple ne suffit pas.
+- Donne assez d'elements pour qu'une personne qui n'a aucun souvenir recent de la note comprenne ce dont il est question. Privilegie l'intelligibilite plutot qu'un contexte artificiellement court.
+- Le contexte peut fournir les donnees et indices necessaires au raisonnement, mais il ne doit pas enoncer la conclusion, la distinction, la cause ou la definition exacte que la question demande de retrouver.
 - N'utilise jamais seul des renvois vagues comme "selon le texte", "dans la note", "l'auteur", "cette idee", "ce passage", "la section 7" ou "ci-dessus". Nomme toujours explicitement leur referent dans la meme question.
-- Teste mentalement chaque prompt en l'isolant du reste du JSON : un utilisateur qui le decouvre au hasard doit savoir exactement quel sujet, quelle source ou quelle position il doit rappeler.
+- Teste mentalement chaque prompt en masquant answer, explanation, le titre du quiz et le reste du JSON : un utilisateur qui le decouvre au hasard doit comprendre la situation et savoir exactement quel raisonnement ou souvenir est demande. Si ce test echoue, reecris la question ou choisis un autre angle.
+
+EXEMPLE DE CONTEXTUALISATION ATTENDUE
+- Insuffisant : "Quelle difference la note etablit-elle entre desir et volonte, a partir de l'exemple 'Je veux reformer la sante' ?" Nommer l'exemple ne rappelle pas son raisonnement et laisse l'utilisateur perdu.
+- Attendu : "Contexte : une personne affirme 'Je veux reformer la sante', mais ne precise encore ni priorites, ni moyens, ni calendrier. La note rapproche cette formule de l'envie d'acheter une montre sans avoir choisi de modele, de budget ou de caracteristiques. Question : quelle difference entre desir et volonte cette comparaison permet-elle de comprendre ?"
+- Dans l'exemple attendu, les faits utiles sont presents, mais la conclusion a rappeler n'est pas formulee a la place de l'utilisateur.
 
 REGLES DE QUALITE
 - Une seule competence ou idee principale par question.
@@ -67,7 +74,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q1",
       "type": "open",
-      "prompt": "Question autonome avec sa source ou son contexte utile, sans donner la reponse ?",
+      "prompt": "Contexte : 1 a 3 phrases rappelant la situation et les premisses utiles sans donner la conclusion. Question : tache precise de rappel ou de raisonnement ?",
       "answer": "Elements indispensables de la reponse attendue.",
       "explanation": "Feedback explicatif et nuance utile.",
       "tags": ["notion"]
@@ -75,7 +82,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q2",
       "type": "mcq",
-      "prompt": "Question autonome et contextualisee avec une seule meilleure reponse ?",
+      "prompt": "Contexte : situation autonome et donnees utiles. Question : question contextualisee avec une seule meilleure reponse ?",
       "choices": ["Choix A", "Choix B", "Choix C"],
       "answer": "Le texte exact d'un des trois choix",
       "explanation": "Justification et correction des confusions.",
@@ -84,7 +91,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q3",
       "type": "true_false",
-      "prompt": "Affirmation contextualisee et sans ambiguite.",
+      "prompt": "Contexte : cadre factuel necessaire. Question : affirmation precise a juger, sans ambiguite.",
       "answer": "Vrai",
       "explanation": "Justification ou rectification precise.",
       "tags": ["notion"]

@@ -23,7 +23,7 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
     {
       "id": "q1",
       "type": "open",
-      "prompt": "Question claire",
+      "prompt": "Contexte : situation et premisses utiles. Question : question claire",
       "answer": "Reponse attendue",
       "explanation": "Pourquoi cette reponse est juste",
       "tags": []
@@ -31,7 +31,7 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
     {
       "id": "q2",
       "type": "mcq",
-      "prompt": "Question a choix multiple",
+      "prompt": "Contexte : situation et donnees utiles. Question : question a choix multiple",
       "choices": ["Option A", "Option B", "Option C"],
       "answer": "Option A",
       "explanation": "Pourquoi cette option est juste",
@@ -40,7 +40,7 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
     {
       "id": "q3",
       "type": "true_false",
-      "prompt": "Affirmation a juger",
+      "prompt": "Contexte : cadre factuel necessaire. Question : affirmation a juger",
       "answer": "Vrai",
       "explanation": "Pourquoi c'est vrai ou faux",
       "tags": []
@@ -50,7 +50,14 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
 
 Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec des reponses precises et des explications courtes.
 
-Les questions seront tirees au hasard plusieurs jours ou plusieurs mois plus tard et pourront etre melangees avec celles d'autres notes. Chaque prompt doit etre comprehensible tout seul, sans avoir relu les notes et sans dependre du titre affiche par l'interface. Integre le minimum de contexte necessaire : titre de la note ou de l'oeuvre, auteur ou acteur, periode, lieu, notion, argument ou passage vise. Une courte citation ou paraphrase distinctive peut situer un passage, mais ne doit pas reveler la reponse. N'utilise jamais seul des renvois vagues comme "selon le texte", "dans la note", "l'auteur", "cette idee", "ce passage", "la section 7" ou "ci-dessus" : nomme le referent dans la question.`,
+Les questions seront tirees au hasard plusieurs jours ou plusieurs mois plus tard et pourront etre melangees avec celles d'autres notes. Chaque prompt doit etre comprehensible tout seul, sans avoir relu les notes et sans dependre du titre affiche par l'interface.
+
+Chaque prompt doit contenir, dans la meme chaine, "Contexte :" puis "Question :". Le contexte comporte 1 a 3 phrases factuelles qui rappellent la situation concrete, les premisses d'un argument, la comparaison, la citation ou l'exemple necessaire. Mentionner seulement le titre, une notion ou "a partir de l'exemple X" ne constitue pas un contexte. Donne assez d'elements pour une personne qui n'a aucun souvenir recent des notes. Ces elements peuvent servir d'indices au raisonnement, mais ne doivent pas formuler la conclusion, la distinction, la cause ou la definition demandee.
+
+Exemple insuffisant : "Quelle difference la note etablit-elle entre desir et volonte, a partir de l'exemple 'Je veux reformer la sante' ?"
+Exemple attendu : "Contexte : une personne affirme 'Je veux reformer la sante', mais ne precise encore ni priorites, ni moyens, ni calendrier. La note rapproche cette formule de l'envie d'acheter une montre sans modele, budget ou caracteristiques definis. Question : quelle difference entre desir et volonte cette comparaison permet-elle de comprendre ?"
+
+N'utilise jamais seul des renvois vagues comme "selon le texte", "dans la note", "l'auteur", "cette idee", "ce passage", "la section 7" ou "ci-dessus". Avant de rendre le JSON, relis chaque prompt en masquant la reponse, l'explication, le titre et les autres questions : s'il ne permet pas de comprendre la situation et la tache, reecris-le.`,
   },
   socratique: {
     label: 'Analyse socratique',
