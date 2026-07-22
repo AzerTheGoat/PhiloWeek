@@ -24,6 +24,14 @@ METHODE DE CONCEPTION
 4. Privilegie les questions ouvertes pour le rappel actif. Utilise aussi des QCM et vrai/faux lorsque ces formats sont reellement pertinents.
 5. Chaque correction doit etre autonome, concise et assez precise pour servir de feedback apres une erreur. L'explication indique pourquoi la reponse est juste et, si utile, pourquoi une confusion est tentante.
 
+CONTEXTE POUR UNE REVISION ALEATOIRE ET DIFFEREE
+- Le questionnaire sera utilise plusieurs jours ou plusieurs mois plus tard. Ses questions pourront etre tirees au hasard et melangees avec celles d'autres notes.
+- Chaque prompt doit donc etre entierement comprehensible tout seul, sans avoir relu la note juste avant et sans dependre du titre du questionnaire affiche par l'interface.
+- Donne dans le prompt le minimum de contexte necessaire pour identifier le cadre : nom de la note ou de l'oeuvre, auteur ou acteur concerne, periode, lieu, notion, argument ou passage vise. Pour un passage precis, ajoute une courte citation ou une paraphrase distinctive si elle aide a identifier ce qui est interroge.
+- Ce contexte sert uniquement a situer la question : il ne doit pas reveler la reponse ni transformer un exercice de rappel en simple repetition de l'enonce.
+- N'utilise jamais seul des renvois vagues comme "selon le texte", "dans la note", "l'auteur", "cette idee", "ce passage", "la section 7" ou "ci-dessus". Nomme toujours explicitement leur referent dans la meme question.
+- Teste mentalement chaque prompt en l'isolant du reste du JSON : un utilisateur qui le decouvre au hasard doit savoir exactement quel sujet, quelle source ou quelle position il doit rappeler.
+
 REGLES DE QUALITE
 - Une seule competence ou idee principale par question.
 - Formulation claire, sans double negation, sans piege lexical, sans "toutes les reponses" ni "aucune des reponses".
@@ -59,7 +67,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q1",
       "type": "open",
-      "prompt": "Question claire ?",
+      "prompt": "Question autonome avec sa source ou son contexte utile, sans donner la reponse ?",
       "answer": "Elements indispensables de la reponse attendue.",
       "explanation": "Feedback explicatif et nuance utile.",
       "tags": ["notion"]
@@ -67,7 +75,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q2",
       "type": "mcq",
-      "prompt": "Question avec une seule meilleure reponse ?",
+      "prompt": "Question autonome et contextualisee avec une seule meilleure reponse ?",
       "choices": ["Choix A", "Choix B", "Choix C"],
       "answer": "Le texte exact d'un des trois choix",
       "explanation": "Justification et correction des confusions.",
@@ -76,7 +84,7 @@ FORMAT DE SORTIE OBLIGATOIRE
     {
       "id": "q3",
       "type": "true_false",
-      "prompt": "Affirmation sans ambiguite.",
+      "prompt": "Affirmation contextualisee et sans ambiguite.",
       "answer": "Vrai",
       "explanation": "Justification ou rectification precise.",
       "tags": ["notion"]

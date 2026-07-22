@@ -152,7 +152,7 @@ const SECTIONS = [
       {
         icon: 'copy',
         title: 'Générer depuis une note',
-        text: "Dans une note Markdown, « Créer quiz » sauvegarde la note, crée son questionnaire dans le dossier miroir Quiz générés et copie un prompt pédagogique complet. Colle ce prompt dans le LLM de ton choix, puis colle uniquement son JSON dans le quiz déjà ouvert. Le quiz suit automatiquement les renommages et déplacements de la note.",
+        text: "Dans une note Markdown, « Créer quiz » sauvegarde la note, crée son questionnaire dans le dossier miroir Quiz générés et copie un prompt pédagogique complet. Colle ce prompt dans le LLM de ton choix, puis colle uniquement son JSON dans le quiz déjà ouvert. Les questions générées doivent intégrer leur propre contexte pour rester compréhensibles lors d'une révision aléatoire bien plus tard. Le quiz suit automatiquement les renommages et déplacements de la note.",
       },
       {
         icon: 'thought',
@@ -162,7 +162,7 @@ const SECTIONS = [
       {
         icon: 'play',
         title: 'Réviser',
-        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, la carte et sa solution défilent verticalement : lis tout, puis choisis À revoir ou Je savais. Ton auto-évaluation est gardée en historique.",
+        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, seul le texte de la carte défile : Afficher la solution, puis À revoir et Je savais, restent accessibles en bas. Ton auto-évaluation est gardée en historique.",
       },
       {
         icon: 'timer',
@@ -187,7 +187,7 @@ const SECTIONS = [
       {
         icon: 'timer',
         title: 'Timer de travail',
-        text: "Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion). Focus mesure aussi automatiquement le temps où l'application reste visible et active : total, semaine en cours, moyenne hebdomadaire et historique quotidien. Une journée va de 03:00 à 02:59.",
+        text: "Chronomètre tes sessions par activité (lecture, visionnage, écriture, réflexion). Focus mesure aussi automatiquement le temps où l'application reste visible et active. Son tableau de bord affiche aujourd'hui, la semaine, le mois, le total et une courbe commutable sur 30 jours ou 12 mois, avec les historiques quotidiens et mensuels. Une journée va de 03:00 à 02:59.",
       },
       {
         icon: 'listCheck',

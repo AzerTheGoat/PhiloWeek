@@ -3,6 +3,7 @@ const router = express.Router()
 const { getDb } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const { requireFileAccess } = require('../fileAccess')
+const { summarizeAppUsage } = require('../appUsage')
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -39,22 +40,10 @@ router.get('/app-usage', (req, res) => {
     ORDER BY entry_date DESC
   `).all(req.user.id)
 
-  const totalSeconds = history.reduce((sum, row) => sum + Number(row.duration_seconds || 0), 0)
-  const todaySeconds = history.find(row => row.entry_date === today)?.duration_seconds || 0
-  const weekStart = startOfIsoWeek(today)
-  const weekSeconds = history
-    .filter(row => row.entry_date >= weekStart && row.entry_date <= today)
-    .reduce((sum, row) => sum + Number(row.duration_seconds || 0), 0)
-  const firstDay = history.length > 0 ? history[history.length - 1].entry_date : today
-  const elapsedWeeks = Math.max(1, Math.ceil((daysBetween(firstDay, today) + 1) / 7))
-
   res.json({
     day_boundary_hour: 3,
     today,
-    today_seconds: Number(todaySeconds),
-    week_seconds: weekSeconds,
-    average_weekly_seconds: Math.round(totalSeconds / elapsedWeeks),
-    total_seconds: totalSeconds,
+    ...summarizeAppUsage(history, today),
     history,
   })
 })
@@ -127,15 +116,4 @@ function isValidDay(day) {
   if (!DAY_RE.test(day)) return false
   const date = parseDay(day)
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day
-}
-
-function startOfIsoWeek(day) {
-  const date = parseDay(day)
-  const offset = (date.getUTCDay() + 6) % 7
-  date.setUTCDate(date.getUTCDate() - offset)
-  return date.toISOString().slice(0, 10)
-}
-
-function daysBetween(from, to) {
-  return Math.max(0, Math.floor((parseDay(to) - parseDay(from)) / 86400000))
 }

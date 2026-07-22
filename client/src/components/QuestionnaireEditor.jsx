@@ -546,47 +546,55 @@ function QuizPanel({
 
       {currentQuestion && !done && (
         <div className={`quiz-live quiz-flashcard ${revealed ? 'is-revealed' : ''}`}>
-          <span className="quiz-origin">{currentQuestion.questionnaire_title}</span>
-          <span className="quiz-type">{getQuestionTypeLabel(currentQuestion.type)}</span>
-          <h4>{currentQuestion.prompt}</h4>
-          {choices.length > 0 && (
-            <div className="quiz-choices">
-              {choices.map(choice => (
-                <button
-                  key={choice}
-                  type="button"
-                  className={answer === choice ? 'active' : ''}
-                  onClick={() => setAnswer(choice)}
-                >
-                  {choice}
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            className="quiz-answer-field"
-            value={answer}
-            onChange={event => setAnswer(event.target.value)}
-            placeholder="Ta reponse..."
-          />
-          {!revealed ? (
-            <>
-              <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>
-              <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
-                <Icon name="eye" size={18} /> Afficher la solution
-              </button>
-            </>
-          ) : (
-            <div className="quiz-correction">
+          <div className="quiz-flashcard-scroll">
+            <span className="quiz-origin">{currentQuestion.questionnaire_title}</span>
+            <span className="quiz-type">{getQuestionTypeLabel(currentQuestion.type)}</span>
+            <h4>{currentQuestion.prompt}</h4>
+            {!revealed && choices.length > 0 && (
+              <div className="quiz-choices">
+                {choices.map(choice => (
+                  <button
+                    key={choice}
+                    type="button"
+                    className={answer === choice ? 'active' : ''}
+                    onClick={() => setAnswer(choice)}
+                  >
+                    {choice}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!revealed && (
+              <textarea
+                className="quiz-answer-field"
+                value={answer}
+                onChange={event => setAnswer(event.target.value)}
+                placeholder="Ta reponse..."
+              />
+            )}
+            {revealed && (
+              <div className="quiz-correction">
               <strong>Correction</strong>
               <p>{currentQuestion.answer || 'Pas de correction renseignee.'}</p>
               {currentQuestion.explanation && <p>{currentQuestion.explanation}</p>}
+              </div>
+            )}
+          </div>
+          <div className="quiz-flashcard-actions">
+            {!revealed ? (
+              <>
+                <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>
+                <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
+                  <Icon name="eye" size={18} /> Afficher la solution
+                </button>
+              </>
+            ) : (
               <div className="quiz-grade-actions">
                 <button type="button" className="btn-danger quiz-grade-no" onClick={() => recordResult(false)}><Icon name="close" size={18} /> À revoir</button>
                 <button type="button" className="btn-primary quiz-grade-ok" onClick={() => recordResult(true)}><Icon name="check" size={18} /> Je savais</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </section>

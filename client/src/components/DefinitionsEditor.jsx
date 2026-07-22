@@ -338,33 +338,41 @@ export default function DefinitionsEditor() {
                 )}
                 {currentCard && !done && (
                   <div className={`quiz-live quiz-flashcard ${revealed ? 'is-revealed' : ''}`}>
-                    <span className="quiz-origin">{currentCard.questionnaire_title}</span>
-                    <span className="quiz-type">Définition</span>
-                    <h4>{currentCard.prompt}</h4>
-                    <textarea
-                      className="quiz-answer-field"
-                      value={answer}
-                      onChange={event => setAnswer(event.target.value)}
-                      placeholder="Ta définition..."
-                    />
-                    {!revealed ? (
-                      <>
-                        <span className="quiz-mental-hint">Pense à la définition, puis retourne la carte.</span>
-                        <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
-                          <Icon name="eye" size={18} /> Afficher la solution
-                        </button>
-                      </>
-                    ) : (
-                      <div className="quiz-correction">
+                    <div className="quiz-flashcard-scroll">
+                      <span className="quiz-origin">{currentCard.questionnaire_title}</span>
+                      <span className="quiz-type">Définition</span>
+                      <h4>{currentCard.prompt}</h4>
+                      {!revealed && (
+                        <textarea
+                          className="quiz-answer-field"
+                          value={answer}
+                          onChange={event => setAnswer(event.target.value)}
+                          placeholder="Ta définition..."
+                        />
+                      )}
+                      {revealed && (
+                        <div className="quiz-correction">
                         <strong>Définition</strong>
                         <p>{currentCard.answer || 'Pas de définition renseignée.'}</p>
                         {currentCard.explanation && <p>{currentCard.explanation}</p>}
+                        </div>
+                      )}
+                    </div>
+                    <div className="quiz-flashcard-actions">
+                      {!revealed ? (
+                        <>
+                          <span className="quiz-mental-hint">Pense à la définition, puis retourne la carte.</span>
+                          <button type="button" className="btn-primary quiz-reveal-btn" onClick={() => setRevealed(true)}>
+                            <Icon name="eye" size={18} /> Afficher la solution
+                          </button>
+                        </>
+                      ) : (
                         <div className="quiz-grade-actions">
                           <button type="button" className="btn-danger quiz-grade-no" onClick={() => recordResult(false)}><Icon name="close" size={18} /> À revoir</button>
                           <button type="button" className="btn-primary quiz-grade-ok" onClick={() => recordResult(true)}><Icon name="check" size={18} /> Je savais</button>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </section>}

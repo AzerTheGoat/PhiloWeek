@@ -48,7 +48,9 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format :
   ]
 }
 
-Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec des reponses precises et des explications courtes.`,
+Fais un melange de questions open, mcq et true_false, utiles pour reviser, avec des reponses precises et des explications courtes.
+
+Les questions seront tirees au hasard plusieurs jours ou plusieurs mois plus tard et pourront etre melangees avec celles d'autres notes. Chaque prompt doit etre comprehensible tout seul, sans avoir relu les notes et sans dependre du titre affiche par l'interface. Integre le minimum de contexte necessaire : titre de la note ou de l'oeuvre, auteur ou acteur, periode, lieu, notion, argument ou passage vise. Une courte citation ou paraphrase distinctive peut situer un passage, mais ne doit pas reveler la reponse. N'utilise jamais seul des renvois vagues comme "selon le texte", "dans la note", "l'auteur", "cette idee", "ce passage", "la section 7" ou "ci-dessus" : nomme le referent dans la question.`,
   },
   socratique: {
     label: 'Analyse socratique',

@@ -134,7 +134,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La vue `Focus` conserve le chronometre manuel existant et affiche aussi le temps passe dans l'application.
 - Le temps d'utilisation est compte automatiquement uniquement lorsque la page est visible et que sa fenetre a le focus; un bail local evite de compter plusieurs onglets du meme navigateur en double.
 - Une journee d'utilisation va de 03:00 a 02:59 dans le fuseau local du navigateur. Les cumuls sont stockes par utilisateur et date logique dans `app_usage_daily`.
-- Focus affiche aujourd'hui, la semaine en cours, la moyenne hebdomadaire depuis le premier jour suivi, le total et l'historique jour par jour.
+- Focus affiche un tableau de bord avec aujourd'hui, la semaine en cours, le mois en cours, la moyenne quotidienne du mois, la moyenne hebdomadaire depuis le premier jour suivi et le total. Une courbe bascule entre les 30 derniers jours et les 12 derniers mois; les historiques restent consultables jour par jour et mois par mois.
 - L'export Obsidian ajoute `_Opuscule/AppUsage.json` avec `philoweek_type: app_usage`; l'import restaure les cumuls quotidiens sans doubler un historique deja present.
 
 ## Thème
@@ -239,6 +239,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les revisions restent auto-evaluees par l'utilisateur en `Juste/Faux`; le poids de tirage privilegie les questions avec historique faible, dernier score faux ou erreurs repetees.
 - Dans l'apercu d'un questionnaire, la liaison des notes et le lancement de la revision restent deux boutons compacts, sans cartes de configuration permanentes. `Lier des notes` ouvre la modal de selection; `Commencer une revision` tire directement jusqu'a 12 questions du fichier courant.
 - Sous `768px`, tous les parcours de revision (questionnaire, definitions, quiz lie a une note et revision globale) utilisent une carte memoire plein format : la saisie libre est masquee, l'utilisateur reflechit mentalement, affiche la solution, puis choisit `A revoir` ou `Je savais`. Ces deux choix alimentent exactement le meme historique juste/faux et la meme ponderation que sur ordinateur.
+- Sur mobile, seule la zone de contenu de la carte de revision defile; `Afficher la solution`, puis `A revoir` et `Je savais`, restent fixes en bas de la carte. La typographie des questions et corrections est compacte pour les ecrans de type iPhone 14.
 - Un questionnaire peut etre lie a des notes Markdown avec `source_paths`; ces chemins sont preferes aux IDs pour rester compatibles avec export/import.
 - La liaison des fichiers d'un questionnaire se fait via une modal de selection avec recherche, arbre de dossiers, recapitulatif et validation explicite.
 - `QuestionnaireEditor.jsx` remplace l'editeur Markdown quand un fichier `.json` est reconnu comme questionnaire.
@@ -257,6 +258,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - Le header de chaque note Markdown editable contient `Creer quiz`; l'action sauvegarde d'abord la note, cree ou retrouve son questionnaire miroir, copie un prompt complet pour un LLM externe et ouvre le fichier JSON cible.
 - Le prompt ne fait aucun appel fournisseur. Il exige un JSON Opuscule strict, fonde uniquement sur la note, avec rappel actif, niveaux cognitifs varies, feedback explicatif et distracteurs plausibles. Pour les sujets politiques ou controverses, il distingue faits, jugements normatifs, interpretations et causalites, conserve les attributions et n'invente pas de certitude.
+- Chaque question generee doit rester comprehensible seule lors d'un tirage aleatoire plusieurs jours ou mois plus tard : son enonce nomme la source, l'acteur, la notion ou le passage utile et evite les renvois vagues comme `selon le texte`, sans donner la reponse dans le contexte.
 - Les quiz automatiques vivent sous le dossier racine `Quiz générés`. Une note `Cours/Politique/Institutions.md` correspond a `Quiz générés/Cours/Politique/Institutions.json`.
 - La table `generated_quizzes` conserve le lien stable entre la note et le quiz. Renommer ou deplacer la note, ou l'un de ses dossiers parents, reconstruit le chemin miroir, met a jour `source_paths`, `source_file_ids` et `generated_from`, puis supprime les anciens dossiers miroirs devenus vides.
 - Un quiz automatique reste editable dans son contenu mais ne peut pas etre renomme ou deplace manuellement, car son emplacement appartient a la note source.
@@ -323,7 +325,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
 - Les vues Editeur, Journal, Timer, Inbox, Todo et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
 - Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.
-- Toute carte de revision mobile doit defiler verticalement lorsque la question, la correction ou l'explication depasse la hauteur disponible; aucune action de notation ne doit etre coupee.
+- Toute carte de revision mobile doit faire defiler verticalement sa zone de contenu lorsque la question, la correction ou l'explication depasse la hauteur disponible; les actions restent fixes et ne doivent jamais etre coupees.
 
 ## Historique des fichiers et corbeille
 
