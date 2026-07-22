@@ -38,7 +38,10 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   const [password, setPassword] = useState('')
 
   const isFolder = node.type === 'folder' || node.type === 'locked_folder'
-  const isLocked = node.type === 'locked_folder'
+  const isEncrypted = Boolean(node.is_encrypted)
+  const isLegacyLocked = node.type === 'locked_folder'
+  const isLocked = isLegacyLocked || Boolean(node.is_locked)
+  const isInsideEncrypted = Boolean(node.encrypted_folder_id)
   const isOwner = node.is_owner !== false
   const canEdit = node.can_edit !== false
   const isActive = node.id === openFileId
@@ -122,6 +125,17 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     }
   }, [canReceiveDrop, dragState, loadTree, node.id, node.name, setDragState, setDropTargetId, toast])
 
+  const handleSessionLock = useCallback(async () => {
+    try {
+      await api.lockEncryptedFolder(node.id)
+      setExpanded(false)
+      await loadTree()
+      toast('Dossier verrouillé dans cette session')
+    } catch (error) {
+      toast(error.message, 'error')
+    }
+  }, [loadTree, node.id, toast])
+
   const handleContextMenu = useCallback((e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -134,10 +148,12 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           canEdit && !isLocked && { icon: '▦', label: 'Nouveau tableur Excel ici', action: () => showModal('new-spreadsheet', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '📁', label: 'Nouveau dossier ici', action: () => showModal('new-folder', { parent_id: node.id }) },
           canEdit && !isLocked && isOwner && { separator: true },
-          isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
+          isOwner && !isInsideEncrypted && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
           isOwner && { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
-          isOwner && !isLocked && { icon: '🔒', label: 'Verrouiller…', action: () => showModal('lock-folder', { id: node.id }) },
-          isOwner && isLocked && { icon: '🔓', label: 'Déverrouiller…', action: () => setUnlocking(true) },
+          isOwner && !isInsideEncrypted && !isLocked && { icon: '🛡', label: 'Activer le chiffrement…', action: () => showModal('lock-folder', { id: node.id }) },
+          isOwner && isEncrypted && !isLocked && { icon: '🔒', label: 'Verrouiller maintenant', action: handleSessionLock },
+          isOwner && isEncrypted && !isLocked && { icon: '○', label: 'Désactiver le chiffrement…', danger: true, action: () => showModal('decrypt-folder', { id: node.id }) },
+          isOwner && isLocked && { icon: '🔓', label: isEncrypted ? 'Ouvrir le dossier chiffré…' : 'Déverrouiller l’ancien dossier…', action: () => setUnlocking(true) },
           isOwner && { separator: true },
           isOwner && { icon: '🗑', label: 'Mettre à la corbeille', danger: true, action: () => handleDelete() },
         ].filter(Boolean)
@@ -148,12 +164,12 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           isOwner && { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
           isOwner && { icon: '▦', label: 'Nouveau tableur Excel a cote', action: () => showModal('new-spreadsheet', { parent_id: node.parent_id || null }) },
           isOwner && { separator: true },
-          isOwner && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
+          isOwner && !isInsideEncrypted && { icon: '☁', label: 'Partager…', action: () => showModal('share-file', node) },
           isOwner && { icon: '✏', label: 'Renommer', action: () => setRenaming(true) },
           isOwner && { icon: '🗑', label: 'Mettre à la corbeille', danger: true, action: () => handleDelete() },
         ].filter(Boolean)
     if (items.length) showContextMenu(e.clientX, e.clientY, items)
-  }, [canEdit, isFolder, isLocked, isOwner, node, showModal, showContextMenu])
+  }, [canEdit, handleSessionLock, isEncrypted, isFolder, isInsideEncrypted, isLocked, isOwner, node, showModal, showContextMenu])
 
   const handleDelete = useCallback(async () => {
     const descendantCount = isFolder ? collectDescendantIds(node).length : 0
@@ -184,16 +200,17 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
   const handleUnlock = useCallback(async (e) => {
     e.preventDefault()
     try {
-      await api.unlockFolder(node.id, password)
+      if (isEncrypted) await api.openEncryptedFolder(node.id, password)
+      else await api.unlockFolder(node.id, password)
       await loadTree()
       setExpanded(true)
       setUnlocking(false)
-      toast('Dossier déverrouillé')
-    } catch {
-      toast('Mot de passe incorrect', 'error')
+      toast(isEncrypted ? 'Dossier chiffré ouvert pour cette session' : 'Ancien dossier déverrouillé')
+    } catch (error) {
+      toast(error.message || 'Ouverture impossible', 'error')
     }
     setPassword('')
-  }, [node.id, password, loadTree, toast])
+  }, [isEncrypted, node.id, password, loadTree, toast])
 
   const icon = isLocked ? '🔒' : isFolder ? (expanded ? '▾' : '▸') : /\.xlsx$/i.test(node.name || '') ? '▦' : '📄'
 
@@ -229,6 +246,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
         >
           <span className="file-icon">{icon}</span>
           <span className="file-name">{node.name.replace(/\.(md|json|xlsx)$/i, '')}</span>
+          {isEncrypted && <span className="file-encrypted-badge" title={isLocked ? 'Chiffré et verrouillé' : 'Chiffré en base, ouvert dans cette session'}>🛡</span>}
           {node.shared_root && <span className="file-shared-badge" title={`Partagé par ${node.owner_username}`}>☁</span>}
         </div>
       )}

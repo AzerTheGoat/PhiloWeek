@@ -27,7 +27,15 @@ export default function Sidebar() {
     if (!file) return
     setImporting(true)
     try {
-      const result = await api.importObsidian(file)
+      let result
+      try {
+        result = await api.importObsidian(file)
+      } catch (error) {
+        if (error.code !== 'VAULT_PASSWORD_REQUIRED_FOR_IMPORT') throw error
+        const password = window.prompt('Ce ZIP contient des dossiers chiffrés. Mot de passe du coffre :')
+        if (!password) throw new Error('Import annulé : mot de passe du coffre requis')
+        result = await api.importObsidian(file, 'rename', password)
+      }
       await loadTree()
       toast(`Import terminé : ${result.report.imported} fichiers, ${result.report.linksResolved} liens résolus`)
     } catch (err) {
@@ -49,7 +57,7 @@ export default function Sidebar() {
       { label: 'Nouveau dossier', action: () => showModal('new-folder', {}) },
       { separator: true },
       { label: 'Importer (.zip)', action: () => importInputRef.current?.click() },
-      { label: 'Exporter', action: () => api.exportObsidian() },
+      { label: 'Exporter', action: () => showModal('export-vault', {}) },
     ])
   }, [showModal, showContextMenu])
 
@@ -85,7 +93,7 @@ export default function Sidebar() {
   const toolActions = [
     { icon: 'play', label: 'Réviser', action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }) },
     { icon: 'copy', label: 'Copier notes', action: () => dispatch({ type: 'TOGGLE_FILE_PICKER' }) },
-    { icon: 'download', label: 'Exporter', action: api.exportObsidian },
+    { icon: 'download', label: 'Exporter', action: () => showModal('export-vault', {}) },
     { icon: 'upload', label: importing ? 'Import...' : 'Importer', action: () => importInputRef.current?.click() },
     { icon: theme === 'dark' ? 'sun' : 'moon', label: theme === 'dark' ? 'Clair' : 'Sombre', action: () => dispatch({ type: 'SET_THEME', payload: theme === 'dark' ? 'light' : 'dark' }) },
     { icon: 'compass', label: 'Compte', action: () => showModal('account', {}) },

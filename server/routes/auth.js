@@ -4,9 +4,10 @@ const rateLimit = require('express-rate-limit')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { hashPassword, verifyPassword } = require('../auth/password')
-const { createSession, destroySession, resolveSession, SESSION_TTL_MS } = require('../auth/session')
+const { createSession, destroySession, destroyUserSessions, resolveSession, SESSION_TTL_MS } = require('../auth/session')
 const { SESSION_COOKIE } = require('../auth/middleware')
 const { isRailway } = require('../paths')
+const { securityLog } = require('../securityControls')
 
 const USERNAME_RE = /^[a-zA-Z0-9_-]{3,32}$/
 // Secure sur Railway (HTTPS) et sur toute prod (NODE_ENV=production).
@@ -28,7 +29,7 @@ function validatePassword(password) {
   return null
 }
 
-router.post('/register', registerLimiter, (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const { username, password } = req.body || {}
   if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
     return res.status(400).json({ error: "Nom d'utilisateur invalide (3-32 caractères, lettres/chiffres/_/-)" })
@@ -45,7 +46,7 @@ router.post('/register', registerLimiter, (req, res) => {
   const now = new Date().toISOString()
   try {
     db.prepare('INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, username, hashPassword(password), now, now)
+      .run(id, username, await hashPassword(password), now, now)
   } catch (err) {
     // Filet si deux inscriptions concurrentes passent le check ci-dessus
     // en même temps : la contrainte UNIQUE SQLite tranche ici.
@@ -56,9 +57,10 @@ router.post('/register', registerLimiter, (req, res) => {
   const token = createSession(id, req.headers['user-agent'])
   res.cookie(SESSION_COOKIE, token, { ...COOKIE_OPTS, maxAge: SESSION_TTL_MS })
   res.status(201).json({ id, username })
+  securityLog('auth.register.succeeded', req, { created_user_id: id }, 'info')
 })
 
-router.post('/login', loginLimiter, (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const GENERIC_ERROR = { error: 'Identifiants invalides' }
   const { username, password } = req.body || {}
   if (typeof username !== 'string' || typeof password !== 'string') return res.status(401).json(GENERIC_ERROR)
@@ -67,21 +69,27 @@ router.post('/login', loginLimiter, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username)
   let validPassword = false
   if (user) {
-    validPassword = verifyPassword(password, user.password_hash)
+    validPassword = await verifyPassword(password, user.password_hash)
   } else {
-    verifyPassword(password, DUMMY_HASH) // temps constant même si le compte n'existe pas
+    await verifyPassword(password, await DUMMY_HASH) // temps constant même si le compte n'existe pas
   }
-  if (!user || !validPassword) return res.status(401).json(GENERIC_ERROR)
+  if (!user || !validPassword) {
+    securityLog('auth.login.failed', req, { username_hash: require('crypto').createHash('sha256').update(String(username)).digest('hex').slice(0, 16) })
+    return res.status(401).json(GENERIC_ERROR)
+  }
 
   const token = createSession(user.id, req.headers['user-agent'])
   res.cookie(SESSION_COOKIE, token, { ...COOKIE_OPTS, maxAge: SESSION_TTL_MS })
+  securityLog('auth.login.succeeded', req, { user_id: user.id }, 'info')
   res.json({ id: user.id, username: user.username })
 })
 
 router.post('/logout', (req, res) => {
+  const authed = resolveSession(req.cookies?.[SESSION_COOKIE])
   destroySession(req.cookies?.[SESSION_COOKIE])
   res.clearCookie(SESSION_COOKIE, COOKIE_OPTS)
   res.json({ ok: true })
+  if (authed) securityLog('auth.logout', req, { user_id: authed.id, session_id: authed.session_id }, 'info')
 })
 
 router.get('/me', (req, res) => {
@@ -90,22 +98,26 @@ router.get('/me', (req, res) => {
   res.json(user)
 })
 
-router.patch('/password', (req, res) => {
+router.patch('/password', async (req, res) => {
   const authed = resolveSession(req.cookies?.[SESSION_COOKIE])
   if (!authed) return res.status(401).json({ error: 'Non authentifié' })
 
   const { currentPassword, newPassword } = req.body || {}
   const db = getDb()
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(authed.id)
-  if (!verifyPassword(currentPassword, user.password_hash)) {
+  if (!await verifyPassword(currentPassword, user.password_hash)) {
     return res.status(401).json({ error: 'Mot de passe actuel incorrect' })
   }
   const pwError = validatePassword(newPassword, user.username)
   if (pwError) return res.status(400).json({ error: pwError })
 
   db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
-    .run(hashPassword(newPassword), new Date().toISOString(), user.id)
-  res.json({ ok: true })
+    .run(await hashPassword(newPassword), new Date().toISOString(), user.id)
+  destroyUserSessions(user.id)
+  const token = createSession(user.id, req.headers['user-agent'])
+  res.cookie(SESSION_COOKIE, token, { ...COOKIE_OPTS, maxAge: SESSION_TTL_MS })
+  res.json({ ok: true, sessions_revoked: true })
+  securityLog('auth.password.changed', req, { user_id: user.id, sessions_revoked: true }, 'info')
 })
 
 module.exports = router

@@ -50,7 +50,7 @@ PhiloWeek/
 ## Base de données (tables)
 
 ```sql
-files        — id, parent_id, name, type, content, password_hash, encrypted_content, sort_order, user_id
+files        — id, parent_id, name, type, content, encrypted_content, is_encrypted, encrypted_folder_id, sort_order, user_id
 file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
 file_revisions — id, file_id, user_id (proprietaire), actor_user_id, revision_no, content, created_at
@@ -148,7 +148,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Toutes les routes Express sont **async/await** (db sqlite est asynchrone)
 - La DB est initialisée au démarrage via `initDb()`, pas besoin de migrations manuelles
 - Le dossier `Journal` est protégé (ne pas supprimer, ne pas renommer)
-- Les dossiers verrouillés (`locked_folder`) : contenu chiffré AES-256 côté serveur
+- `locked_folder` est un ancien format maintenu uniquement pour permettre sa migration; ne pas créer de nouveau dossier dans ce format.
 - `insertRef` dans AppContext : ref vers la fonction "insérer dans la note" de l'éditeur
 
 ## Fonctionnalites IA
@@ -163,7 +163,20 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Supprimer un dossier non vide doit demander une confirmation explicite indiquant que tous ses enfants seront supprimes; le backend refuse aussi la suppression sans `confirm_children=1`.
 - Le dossier `Journal` racine ne doit pas être déplaçable.
 - Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
-- Les dossiers verrouillés ne peuvent pas recevoir de nouveaux fichiers tant qu'ils ne sont pas déverrouillés.
+- Un dossier chiffré fermé dans la session ne peut recevoir aucun nouveau fichier tant qu'il n'est pas ouvert.
+
+## Dossiers chiffrés et verrouillage de session
+
+- Le chiffrement persistant et le verrouillage temporaire sont deux états indépendants. `files.is_encrypted` marque uniquement la racine chiffrée; tous ses descendants portent `encrypted_folder_id`.
+- Activer le chiffrement parcourt tout le sous-arbre, y compris la corbeille et `file_revisions`. Le contenu en clair est remplacé par une enveloppe AES-256-GCM; les tags et liens dérivés sont retirés tant que le sous-arbre est chiffré.
+- Le compte utilise un seul mot de passe de coffre, distinct du mot de passe de connexion. Il dérive une KEK avec scrypt; chaque dossier possède une FDK aléatoire distincte et chaque contenu une DEK aléatoire distincte.
+- Ouvrir un dossier conserve sa FDK uniquement en mémoire pour le couple session+dossier pendant 15 minutes renouvelables. Cela ne réécrit jamais le contenu en clair dans SQLite.
+- « Verrouiller maintenant » retire seulement la FDK de la session. « Désactiver le chiffrement » est une autre action qui redemande le mot de passe et réécrit explicitement le sous-arbre en clair.
+- L'interface affiche toujours un petit bouclier sur un dossier chiffré; un cadenas fermé indique en plus que le dossier est fermé dans la session.
+- Les partages et les déplacements à travers la frontière d'un dossier chiffré sont refusés. Il faut désactiver le chiffrement avant de partager ou de sortir le sous-arbre.
+- Changer le mot de passe du coffre réenveloppe les FDK sans rechiffrer toutes les notes, puis ferme tous les dossiers chiffrés du compte.
+- L'export Obsidian redemande le mot de passe si nécessaire et produit un ZIP en clair, avec `_Opuscule/EncryptedFolders.json` pour restaurer l'état. L'import redemande le mot de passe et rechiffre ces chemins immédiatement.
+- Perdre le mot de passe du coffre rend les dossiers chiffrés irrécupérables. Aucun mot de passe ni clé en clair ne doit être journalisé, stocké en cookie ou dans `localStorage`.
 
 ## Vie intérieure : citations
 
@@ -304,7 +317,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Chaque fichier edite par l'application (note Markdown, graphe d'idees, questionnaire JSON, definitions JSON et tableur Excel) garde un historique persistant de ses sauvegardes logiques.
 - Les boutons Annuler/Retablir sont disponibles dans le header de chaque editeur; les raccourcis sont `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` et `Ctrl/Cmd+Y`.
 - Une nouvelle modification apres une annulation efface la branche de retablissement; les 100 versions les plus recentes sont conservees par fichier.
-- Verrouiller un dossier efface l'historique en clair de ses enfants afin de ne pas contourner le chiffrement; un nouvel historique commence apres deverrouillage.
+- Activer le chiffrement chiffre aussi toutes les revisions existantes et futures; ouvrir ou verrouiller la session ne supprime pas cet historique.
 - Supprimer un fichier ou un dossier le place dans la corbeille avec tout son sous-arbre. Les elements restent restaurables pendant 30 jours, puis sont purges automatiquement.
 - La vue `Corbeille` permet de restaurer, supprimer definitivement un element ou vider toute la corbeille apres confirmation explicite.
 - L'export Obsidian ajoute `_Opuscule/FileHistory.json` et `_Opuscule/Trash.json`; l'import restaure l'historique et la corbeille en remappant les identifiants de fichiers.
@@ -314,7 +327,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Un fichier ou dossier appartient toujours a un proprietaire (`files.user_id`). Le partage donne acces a la meme donnee, sans creer de copie.
 - Le partage se fait avec le `username` exact d'un compte existant et un droit `view` (lecture seule) ou `edit` (modification du contenu).
 - Partager un dossier partage tout son sous-arbre actuel et futur. Les droits sont herites; en cas de partages imbriques, le droit le plus permissif s'applique.
-- Un collaborateur `edit` peut modifier les fichiers et creer dans un dossier partage. Seul le proprietaire peut renommer, deplacer, supprimer, verrouiller ou repartager.
+- Un collaborateur `edit` peut modifier les fichiers et creer dans un dossier partage. Seul le proprietaire peut renommer, deplacer, supprimer, chiffrer ou repartager.
 - Les fichiers partages apparaissent comme racines dediees dans l'arbre avec le nom du proprietaire et un badge cloud. Un retrait de partage les fait disparaitre au prochain rafraichissement cloud.
 - `files.content_version` est un verrou optimiste obligatoire pour toute sauvegarde de contenu et tout undo/redo. Une version obsolete renvoie `FILE_VERSION_CONFLICT`; le client propose explicitement de charger le cloud ou de conserver sa version.
 - Meme apres le choix de conserver la version locale, le serveur revérifie la version courante : une troisieme modification concurrente provoque un nouveau conflit au lieu d'etre ecrasee.

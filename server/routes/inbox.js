@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { getDb } = require('../db')
 const { requireFileAccess } = require('../fileAccess')
+const { encryptCurrentFileContent, encryptRevisionContent, materializeFile } = require('../vaultCrypto')
 const { v4: uuidv4 } = require('uuid')
 
 // N'accepte que des URL http(s). Bloque javascript:, data:, file:, etc.
@@ -108,7 +109,9 @@ router.post('/ideas/:id/send-to-file', (req, res) => {
 
   const accessCheck = requireFileAccess(db, fileId, req.user.id, 'edit')
   if (accessCheck.error) return res.status(accessCheck.status).json({ error: accessCheck.error })
-  const file = accessCheck.access.file
+  let file
+  try { file = materializeFile(db, accessCheck.access.file, req.user.session_id) }
+  catch (error) { return res.status(error.status || 423).json({ error: error.message, code: error.code }) }
   if (file.type !== 'file') return res.status(400).json({ error: 'La cible doit etre un fichier' })
 
   const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -119,21 +122,44 @@ router.post('/ideas/:id/send-to-file', (req, res) => {
   const now = new Date().toISOString()
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM file_revisions WHERE file_id = ? AND revision_no > ?').run(fileId, Number(file.history_revision || 0))
-    db.prepare(
-      'INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, file.user_id, Number(file.history_revision || 0), file.content || '', file.updated_at || now)
-    db.prepare(
-      'INSERT INTO file_revisions (file_id, user_id, revision_no, content, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, file.user_id, nextRevision, newContent, now)
+    const currentEncrypted = file.encrypted_folder_id
+      ? encryptRevisionContent(fileId, Number(file.history_revision || 0), file.content || '', file.encrypted_folder_id, req.user.session_id)
+      : null
+    const nextEncrypted = file.encrypted_folder_id
+      ? encryptRevisionContent(fileId, nextRevision, newContent, file.encrypted_folder_id, req.user.session_id)
+      : null
+    const insertRevision = db.prepare(`
+      INSERT OR IGNORE INTO file_revisions (
+        file_id, user_id, revision_no, content, encrypted_content, encrypted_folder_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+    insertRevision.run(
+      fileId, file.user_id, Number(file.history_revision || 0), file.encrypted_folder_id ? '' : (file.content || ''),
+      currentEncrypted, file.encrypted_folder_id || null, file.updated_at || now
+    )
+    insertRevision.run(
+      fileId, file.user_id, nextRevision, file.encrypted_folder_id ? '' : newContent,
+      nextEncrypted, file.encrypted_folder_id || null, now
+    )
     db.prepare('UPDATE file_revisions SET actor_user_id = ? WHERE file_id = ? AND revision_no IN (?, ?)')
       .run(req.user.id, fileId, Number(file.history_revision || 0), nextRevision)
-    db.prepare('UPDATE files SET content = ?, history_revision = ?, content_version = content_version + 1, last_edited_by = ?, updated_at = ? WHERE id = ?')
-      .run(newContent, nextRevision, req.user.id, now, fileId)
+    if (file.encrypted_folder_id) {
+      db.prepare(`
+        UPDATE files SET content = NULL, encrypted_content = ?, history_revision = ?,
+          content_version = content_version + 1, last_edited_by = ?, updated_at = ? WHERE id = ?
+      `).run(
+        encryptCurrentFileContent(fileId, newContent, file.encrypted_folder_id, req.user.session_id),
+        nextRevision, req.user.id, now, fileId
+      )
+    } else {
+      db.prepare('UPDATE files SET content = ?, history_revision = ?, content_version = content_version + 1, last_edited_by = ?, updated_at = ? WHERE id = ?')
+        .run(newContent, nextRevision, req.user.id, now, fileId)
+    }
     db.prepare('DELETE FROM inbox_ideas WHERE id = ?').run(req.params.id)
   })
   tx()
 
-  res.json({ ok: true, file: db.prepare('SELECT * FROM files WHERE id = ?').get(fileId) })
+  res.json({ ok: true, file: { id: fileId, content_version: Number(file.content_version || 0) + 1 } })
 })
 
 module.exports = router

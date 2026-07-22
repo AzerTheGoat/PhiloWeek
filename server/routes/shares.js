@@ -2,6 +2,7 @@ const express = require('express')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { requireFileAccess } = require('../fileAccess')
+const { securityLog } = require('../securityControls')
 
 const router = express.Router()
 const PRESENCE_TTL_MS = 45 * 1000
@@ -72,8 +73,8 @@ router.post('/:fileId', (req, res) => {
   const db = getDb()
   const check = requireFileAccess(db, req.params.fileId, req.user.id, 'owner')
   if (check.error) return res.status(check.status).json({ error: check.error })
-  if (check.access.file.type === 'locked_folder') {
-    return res.status(409).json({ error: 'Deverrouille le dossier avant de le partager' })
+  if (check.access.file.type === 'locked_folder' || check.access.file.encrypted_folder_id || check.access.file.is_encrypted) {
+    return res.status(409).json({ error: 'Un élément chiffré ne peut pas être partagé' })
   }
   const username = String(req.body?.username || '').trim()
   const permission = req.body?.permission === 'edit' ? 'edit' : 'view'
@@ -100,6 +101,7 @@ router.post('/:fileId', (req, res) => {
     FROM file_shares s JOIN users u ON u.id = s.shared_with_user_id
     WHERE s.file_id = ? AND s.shared_with_user_id = ?
   `).get(req.params.fileId, target.id)
+  securityLog('share.upserted', req, { file_id: req.params.fileId, recipient_id: target.id, permission }, 'info')
   res.status(existing ? 200 : 201).json(saved)
 })
 
@@ -113,6 +115,7 @@ router.patch('/:fileId/:shareId', (req, res) => {
     WHERE id = ? AND file_id = ? AND owner_id = ?
   `).run(permission, new Date().toISOString(), req.params.shareId, req.params.fileId, req.user.id)
   if (!result.changes) return res.status(404).json({ error: 'Partage introuvable' })
+  securityLog('share.permission_changed', req, { file_id: req.params.fileId, share_id: req.params.shareId, permission }, 'info')
   res.json({ ok: true, permission })
 })
 
@@ -124,6 +127,7 @@ router.delete('/:fileId/:shareId', (req, res) => {
     'DELETE FROM file_shares WHERE id = ? AND file_id = ? AND owner_id = ?'
   ).run(req.params.shareId, req.params.fileId, req.user.id)
   if (!result.changes) return res.status(404).json({ error: 'Partage introuvable' })
+  securityLog('share.removed', req, { file_id: req.params.fileId, share_id: req.params.shareId }, 'info')
   res.json({ ok: true })
 })
 

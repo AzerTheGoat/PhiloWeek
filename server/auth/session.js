@@ -37,16 +37,27 @@ function resolveSession(token) {
     return null
   }
   db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(new Date().toISOString(), session.session_id)
-  return { id: session.user_id, username: session.username }
+  return { id: session.user_id, username: session.username, session_id: session.session_id }
 }
 
 function destroySession(token) {
   if (!token) return
-  getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token))
+  const db = getDb()
+  const row = db.prepare('SELECT id FROM sessions WHERE token_hash = ?').get(hashToken(token))
+  db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token))
+  if (row?.id) require('../vaultCrypto').clearSessionFolderKeys(row.id)
+}
+
+function destroyUserSessions(userId) {
+  const db = getDb()
+  const ids = db.prepare('SELECT id FROM sessions WHERE user_id = ?').all(userId)
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+  const vault = require('../vaultCrypto')
+  for (const row of ids) vault.clearSessionFolderKeys(row.id)
 }
 
 function pruneExpiredSessions() {
   getDb().prepare('DELETE FROM sessions WHERE expires_at < ?').run(new Date().toISOString())
 }
 
-module.exports = { createSession, resolveSession, destroySession, pruneExpiredSessions, SESSION_TTL_MS }
+module.exports = { createSession, resolveSession, destroySession, destroyUserSessions, pruneExpiredSessions, SESSION_TTL_MS }

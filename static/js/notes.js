@@ -75,9 +75,9 @@ function updateNotePreview() {
   const md = el('note-content').value;
   const preview = el('note-preview');
   if (!md.trim()) {
-    preview.innerHTML = '<p class="preview-placeholder"><em>Preview will appear here…</em></p>';
+    preview.textContent = 'Preview will appear here…';
   } else {
-    preview.innerHTML = marked.parse(md);
+    preview.textContent = md;
   }
 }
 

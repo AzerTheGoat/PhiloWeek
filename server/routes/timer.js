@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { getDb } = require('../db')
 const { v4: uuidv4 } = require('uuid')
+const { requireFileAccess } = require('../fileAccess')
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -89,6 +90,10 @@ router.post('/', (req, res) => {
   const { file_id, duration_seconds, activity_type, notes } = req.body
   if (!duration_seconds || duration_seconds < 1) {
     return res.status(400).json({ error: 'duration_seconds required' })
+  }
+  if (file_id) {
+    const access = requireFileAccess(db, file_id, req.user.id, 'read')
+    if (access.error) return res.status(404).json({ error: 'Fichier introuvable' })
   }
   const id = uuidv4()
   db.prepare(

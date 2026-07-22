@@ -81,7 +81,10 @@ async function spreadsheetToXlsxBuffer(content) {
       if (!point || point.row > sourceSheet.rowCount || point.col > sourceSheet.columnCount) continue
       const cell = worksheet.getCell(address)
       const input = sourceCell?.input ?? ''
-      if (typeof input === 'string' && input.startsWith('=')) cell.value = { formula: input.slice(1) }
+      if (typeof input === 'string' && input.startsWith('=')) {
+        const formula = input.slice(1)
+        cell.value = isSafeExcelFormula(formula) ? { formula } : `'${input}`
+      }
       else if (sourceCell?.style?.numberFormat === 'date' && typeof input === 'string' && validDate(input)) cell.value = validDate(input)
       else cell.value = input
       applyExcelStyle(cell, sourceCell?.style || {})
@@ -324,6 +327,29 @@ function parseAddress(address) {
   const match = String(address || '').match(/^([A-Z]{1,3})(\d+)$/i)
   if (!match) return null
   return { col: columnToNumber(match[1]), row: Number(match[2]) }
+}
+
+const SAFE_FORMULA_FUNCTIONS = new Set([
+  'SUM', 'SOMME', 'AVERAGE', 'MOYENNE', 'MIN', 'MAX', 'COUNT', 'NB',
+  'COUNTA', 'NBVAL', 'IF', 'SI', 'AND', 'ET', 'OR', 'OU', 'NOT', 'NON',
+  'ROUND', 'ARRONDI', 'ROUNDUP', 'ARRONDI.SUP', 'ROUNDDOWN', 'ARRONDI.INF',
+  'ABS', 'SQRT', 'RACINE', 'POWER', 'PUISSANCE', 'MOD', 'CONCAT',
+  'CONCATENATE', 'CONCATENER', 'LEFT', 'GAUCHE', 'RIGHT', 'DROITE', 'MID',
+  'STXT', 'LEN', 'NBCAR', 'LOWER', 'MINUSCULE', 'UPPER', 'MAJUSCULE',
+  'TRIM', 'SUPPRESPACE', 'TODAY', 'AUJOURDHUI', 'DATE', 'YEAR', 'ANNEE',
+  'MONTH', 'MOIS', 'DAY', 'JOUR', 'COUNTIF', 'NB.SI', 'SUMIF', 'SOMME.SI',
+])
+
+function isSafeExcelFormula(formula) {
+  const value = String(formula || '')
+  if (!value || value.length > 8192) return false
+  if (/\[|\]|https?:|file:|\\\\|\||\b(DDE|WEBSERVICE|HYPERLINK|RTD|CALL|EXEC|REGISTER)\b/i.test(value)) return false
+  const functionPattern = /([A-Za-zÀ-ÿ.]+)\s*\(/g
+  let match
+  while ((match = functionPattern.exec(value)) !== null) {
+    if (!SAFE_FORMULA_FUNCTIONS.has(match[1].toUpperCase())) return false
+  }
+  return true
 }
 
 function toAddress(row, col) { return `${numberToColumn(col)}${row}` }

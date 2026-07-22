@@ -9527,3 +9527,21 @@ kbd {
   .rt-note-links { align-items: flex-start; flex-wrap: wrap; }
   .rt-note-links span { width: 100%; margin-left: 0; }
 }
+.file-encrypted-badge {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 1;
+  opacity: .82;
+}
+
+.modal-divider {
+  width: 100%;
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.modal-body h4 {
+  margin: 0;
+  color: var(--text);
+}

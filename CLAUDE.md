@@ -242,5 +242,5 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La DB est initialisée au démarrage via `initDb()` (sauvegarde auto + migrations `user_version`) ; chemins de données via `server/paths.js`, jamais en dur
 - Persistance en prod = **Volume Railway** obligatoire (`RAILWAY.md`), sinon perte de données à chaque deploy
 - Le dossier `Journal` n'est plus protégé ni auto-créé (voir section "Dossier Journal" plus haut)
-- Les dossiers verrouillés (`locked_folder`) : contenu chiffré AES-256 côté serveur
+- `locked_folder` est un format historique. Le coffre actuel sépare le chiffrement persistant récursif (`is_encrypted`/`encrypted_folder_id`) du verrouillage temporaire par session; voir `AGENTS.md`.
 - `insertRef` dans AppContext : ref vers la fonction "insérer dans la note" de l'éditeur

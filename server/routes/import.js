@@ -1,19 +1,31 @@
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
-const JSZip = require('jszip')
 const matter = require('gray-matter')
 const fs = require('fs')
 const path = require('path')
+const os = require('os')
 const { getDb, updateTags } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const { ROADTRIP_PHOTOS_DIR } = require('../paths')
 const { xlsxBufferToSpreadsheetContent } = require('../spreadsheetXlsx')
 const { syncGeneratedQuizzes } = require('../generatedQuizzes')
+const { readBoundedZip } = require('../safeZip')
+const { assertUserStorageQuota, securityLog } = require('../securityControls')
+const { createEncryptedFolder, encryptText, evictFolderKey } = require('../vaultCrypto')
 
 const ROADTRIP_PHOTO_EXT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' }
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } })
+const IMPORT_TMP_DIR = path.join(os.tmpdir(), 'opuscule-imports')
+if (!fs.existsSync(IMPORT_TMP_DIR)) fs.mkdirSync(IMPORT_TMP_DIR, { recursive: true })
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: IMPORT_TMP_DIR,
+    filename: (_req, _file, callback) => callback(null, `${uuidv4()}.zip`),
+  }),
+  limits: { fileSize: 100 * 1024 * 1024, files: 1, fields: 10 },
+  fileFilter: (_req, file, callback) => callback(null, /\.zip$/i.test(file.originalname || '')),
+})
 
 router.post('/obsidian', upload.single('vault'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
@@ -23,26 +35,23 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
   const report = { imported: 0, skipped: 0, linksResolved: 0, linksBroken: 0, errors: [] }
 
   try {
-    const zip = await JSZip.loadAsync(req.file.buffer)
-
-    // Phase 1: collect supported entries (sorted shallowest first)
-    const importEntries = []
-    const roadtripPhotoEntries = []
-    zip.forEach((relativePath, entry) => {
-      if (entry.dir || relativePath.startsWith('__MACOSX')) return
-      if (/^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(relativePath)) {
-        roadtripPhotoEntries.push({ relativePath, entry })
-      } else if (/\.(md|json|xlsx)$/i.test(relativePath)) {
-        importEntries.push({ relativePath, entry })
-      }
+    assertUserStorageQuota(db, req.user.id, req.file.size)
+    const entries = await readBoundedZip(req.file.path, {
+      accept: relativePath => !relativePath.startsWith('__MACOSX') && (
+        /^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(relativePath) ||
+        /\.(md|json|xlsx)$/i.test(relativePath)
+      ),
     })
-    importEntries.sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
+    const importEntries = entries
+      .filter(entry => /\.(md|json|xlsx)$/i.test(entry.relativePath) && !/^_Opuscule\/roadtrip-photos\//i.test(entry.relativePath))
+      .sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
+    const roadtripPhotoEntries = entries.filter(entry => /^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(entry.relativePath))
 
     // Décompresse les binaires photos des road trips (clé = nom de fichier d'origine).
     const roadtripPhotoBuffers = new Map()
-    for (const { relativePath, entry } of roadtripPhotoEntries) {
+    for (const { relativePath, buffer } of roadtripPhotoEntries) {
       try {
-        roadtripPhotoBuffers.set(relativePath.split('/').pop(), await entry.async('nodebuffer'))
+        roadtripPhotoBuffers.set(relativePath.split('/').pop(), buffer)
       } catch (err) {
         report.errors.push(`${relativePath}: ${err.message}`)
       }
@@ -50,15 +59,25 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     // Phase 2: decompress all files asynchronously (before touching the DB)
     const decompressed = []
-    for (const { relativePath, entry } of importEntries) {
+    for (const { relativePath, buffer } of importEntries) {
       try {
         const rawContent = /\.xlsx$/i.test(relativePath)
-          ? await xlsxBufferToSpreadsheetContent(await entry.async('nodebuffer'), relativePath.split('/').pop().replace(/\.xlsx$/i, ''))
-          : await entry.async('text')
+          ? await xlsxBufferToSpreadsheetContent(buffer, relativePath.split('/').pop().replace(/\.xlsx$/i, ''))
+          : buffer.toString('utf8')
         decompressed.push({ relativePath, rawContent })
       } catch (err) {
         report.errors.push(`${relativePath}: ${err.message}`)
       }
+    }
+
+    const encryptedFoldersPayload = decompressed
+      .map(entry => safeJson(entry.rawContent))
+      .find(value => value?.philoweek_type === 'encrypted_folders') || null
+    if (Array.isArray(encryptedFoldersPayload?.folders) && encryptedFoldersPayload.folders.length > 0 && !req.body.vault_password) {
+      const error = new Error('Ce ZIP contient des dossiers chiffrés. Saisis le mot de passe du coffre pour les restaurer chiffrés.')
+      error.status = 409
+      error.code = 'VAULT_PASSWORD_REQUIRED_FOR_IMPORT'
+      throw error
     }
 
     // Phase 3: all DB writes in a single transaction (fast)
@@ -191,6 +210,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             generatedQuizzesPayload = jsonSpecial
             continue
           }
+          if (jsonSpecial?.philoweek_type === 'encrypted_folders') continue
           if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
             const results = Array.isArray(jsonSpecial.results) ? jsonSpecial.results : []
             for (const result of results) {
@@ -273,10 +293,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
               if (!title || !content) continue
               const id = article.id || uuidv4()
               const status = article.status === 'published' ? 'published' : 'draft'
-              const eventId = article.event_id && db.prepare('SELECT 1 FROM historical_events WHERE id = ?').get(article.event_id)
+              const eventId = article.event_id && db.prepare('SELECT 1 FROM historical_events WHERE id = ? AND user_id = ?').get(article.event_id, req.user.id)
                 ? article.event_id
                 : null
-              insertArticle.run(
+              const inserted = insertArticle.run(
                 id,
                 title,
                 article.excerpt || null,
@@ -291,8 +311,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 normalizeIsoDate(article.created_at) || now,
                 normalizeIsoDate(article.updated_at) || now
               )
-              importedArticleIds.add(id)
-              report.imported++
+              if (inserted.changes === 1) {
+                importedArticleIds.add(id)
+                report.imported++
+              }
             }
 
             const comments = Array.isArray(jsonSpecial.comments) ? jsonSpecial.comments : []
@@ -300,7 +322,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
               const body = String(comment.body || '').trim()
               if (!comment.article_id || !body) continue
               const articleExists = importedArticleIds.has(comment.article_id) ||
-                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(comment.article_id)
+                db.prepare("SELECT 1 FROM articles WHERE id = ? AND status = 'published'").get(comment.article_id)
               if (!articleExists) continue
               insertArticleComment.run(
                 comment.id || uuidv4(),
@@ -317,7 +339,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             for (const reaction of reactions) {
               if (!reaction.article_id) continue
               const articleExists = importedArticleIds.has(reaction.article_id) ||
-                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(reaction.article_id)
+                db.prepare("SELECT 1 FROM articles WHERE id = ? AND status = 'published'").get(reaction.article_id)
               if (!articleExists) continue
               insertArticleReaction.run(
                 reaction.article_id,
@@ -331,7 +353,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             for (const read of reads) {
               if (!read.article_id) continue
               const articleExists = importedArticleIds.has(read.article_id) ||
-                db.prepare('SELECT 1 FROM articles WHERE id = ?').get(read.article_id)
+                db.prepare("SELECT 1 FROM articles WHERE id = ? AND status = 'published'").get(read.article_id)
               if (!articleExists) continue
               insertArticleRead.run(
                 read.id || uuidv4(),
@@ -755,6 +777,32 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     importTx()
 
+    if (Array.isArray(encryptedFoldersPayload?.folders)) {
+      let restoredEncryptedFolders = 0
+      for (const item of encryptedFoldersPayload.folders) {
+        const folderId = pathToId[String(item?.path || '')]
+        if (!folderId) {
+          report.errors.push(`Dossier chiffré introuvable après import : ${String(item?.path || '')}`)
+          continue
+        }
+        try {
+          await encryptImportedFolder(db, folderId, req.user.id, req.user.session_id, req.body.vault_password)
+          restoredEncryptedFolders++
+          report.imported++
+        } catch (error) {
+          report.errors.push(`Chiffrement ${String(item?.path || '')}: ${error.message}`)
+        }
+      }
+      if (restoredEncryptedFolders > 0) {
+        try {
+          db.pragma('wal_checkpoint(TRUNCATE)')
+          db.exec('VACUUM')
+        } catch (error) {
+          report.errors.push(`Nettoyage des anciennes pages SQLite : ${error.message}`)
+        }
+      }
+    }
+
     // Écrit les binaires des photos road trips sur le volume persistant (après commit DB).
     if (roadtripPhotoWrites.length > 0) {
       try { if (!fs.existsSync(ROADTRIP_PHOTOS_DIR)) fs.mkdirSync(ROADTRIP_PHOTOS_DIR, { recursive: true }) } catch (_) {}
@@ -800,14 +848,82 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
     linkTx()
 
+    securityLog('import.obsidian.succeeded', req, {
+      imported: report.imported,
+      skipped: report.skipped,
+      errors: report.errors.length,
+      upload_bytes: req.file.size,
+    }, 'info')
     res.json({ ok: true, report })
   } catch (err) {
     console.error('Import error:', err)
-    res.status(500).json({ error: "Import impossible. Le fichier n'a pas pu être traité." })
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Import impossible. Le fichier n'a pas pu être traité.",
+      code: err.code,
+    })
+  } finally {
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path) } catch (_) {}
+    }
   }
 })
 
+router.use((err, _req, res, next) => {
+  if (!(err instanceof multer.MulterError)) return next(err)
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Le ZIP dépasse la limite de 100 Mo' })
+  res.status(400).json({ error: 'Import ZIP invalide' })
+})
+
 module.exports = router
+
+async function encryptImportedFolder(db, folderId, userId, sessionId, password) {
+  const folder = db.prepare("SELECT * FROM files WHERE id = ? AND user_id = ? AND type = 'folder'").get(folderId, userId)
+  if (!folder || folder.is_encrypted || folder.encrypted_folder_id) throw new Error('Dossier non chiffrable')
+  let folderKey
+  try {
+    folderKey = await createEncryptedFolder(db, folderId, userId, sessionId, password)
+    const rows = db.prepare(`
+      WITH RECURSIVE subtree(id) AS (
+        SELECT id FROM files WHERE id = ? AND user_id = ?
+        UNION ALL
+        SELECT child.id FROM files child JOIN subtree parent ON child.parent_id = parent.id
+        WHERE child.user_id = ?
+      )
+      SELECT * FROM files WHERE id IN (SELECT id FROM subtree)
+    `).all(folderId, userId, userId)
+    db.transaction(() => {
+      for (const row of rows) {
+        if (row.type === 'file') {
+          db.prepare(`
+            UPDATE files SET content = NULL, encrypted_content = ?, encrypted_folder_id = ?,
+              content_version = content_version + 1 WHERE id = ?
+          `).run(encryptText(row.content || '', folderKey, `file:${row.id}`), folderId, row.id)
+          const revisions = db.prepare('SELECT * FROM file_revisions WHERE file_id = ?').all(row.id)
+          for (const revision of revisions) {
+            db.prepare(`
+              UPDATE file_revisions SET content = '', encrypted_content = ?, encrypted_folder_id = ? WHERE id = ?
+            `).run(
+              encryptText(revision.content || '', folderKey, `revision:${row.id}:${revision.revision_no}`),
+              folderId,
+              revision.id
+            )
+          }
+          db.prepare('DELETE FROM file_tags WHERE file_id = ?').run(row.id)
+          db.prepare('DELETE FROM file_links WHERE source_id = ? OR target_id = ?').run(row.id, row.id)
+        } else {
+          db.prepare('UPDATE files SET encrypted_folder_id = ? WHERE id = ?').run(folderId, row.id)
+        }
+      }
+      db.prepare('UPDATE files SET is_encrypted = 1, encrypted_folder_id = ? WHERE id = ?').run(folderId, folderId)
+    })()
+  } catch (error) {
+    db.prepare('DELETE FROM encrypted_folders WHERE folder_id = ? AND user_id = ?').run(folderId, userId)
+    evictFolderKey(sessionId, folderId)
+    throw error
+  } finally {
+    folderKey?.fill(0)
+  }
+}
 
 function safeMatter(rawContent) {
   try { return matter(rawContent) }
@@ -921,8 +1037,6 @@ function normalizeImage(value) {
   const text = String(value || '').trim()
   if (!text) return null
   if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
-  // Autorise aussi une URL http(s) directe (image distante).
-  if (/^https?:\/\/\S+$/i.test(text) && text.length <= 2048) return text
   return null
 }
 

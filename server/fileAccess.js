@@ -58,8 +58,9 @@ function getFileAccess(db, fileId, userId, { includeDeleted = false } = {}) {
 
 function decorateFileAccess(access) {
   if (!access) return null
+  const { password_hash: _passwordHash, encrypted_content: _encryptedContent, ...safeFile } = access.file
   return {
-    ...access.file,
+    ...safeFile,
     access: {
       permission: access.permission,
       is_owner: access.isOwner,

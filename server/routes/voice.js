@@ -6,6 +6,8 @@ const fs = require('fs')
 const { getDb } = require('../db')
 const { RECORDINGS_DIR } = require('../paths')
 const { v4: uuidv4 } = require('uuid')
+const { requireFileAccess } = require('../fileAccess')
+const { assertUserStorageQuota, costlyOperationLimiter } = require('../securityControls')
 
 if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true })
 
@@ -39,10 +41,22 @@ router.get('/', (req, res) => {
   res.json(rows)
 })
 
-router.post('/', upload.single('audio'), (req, res) => {
+router.post('/', costlyOperationLimiter, upload.single('audio'), (req, res) => {
   const db = getDb()
   const { file_id, duration, title } = req.body
   if (!req.file) return res.status(400).json({ error: 'No audio file' })
+  try { assertUserStorageQuota(db, req.user.id, req.file.size) }
+  catch (error) {
+    try { fs.unlinkSync(req.file.path) } catch (_) {}
+    return res.status(error.status || 413).json({ error: error.message, code: error.code })
+  }
+  if (file_id) {
+    const access = requireFileAccess(db, file_id, req.user.id, 'read')
+    if (access.error) {
+      try { fs.unlinkSync(req.file.path) } catch (_) {}
+      return res.status(404).json({ error: 'Fichier introuvable' })
+    }
+  }
 
   const id = uuidv4()
   db.prepare(
@@ -58,6 +72,15 @@ router.delete('/:id', (req, res) => {
   try { fs.unlinkSync(path.join(RECORDINGS_DIR, note.filename)) } catch (_) {}
   db.prepare('DELETE FROM voice_notes WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
+})
+
+router.use((err, req, res, next) => {
+  if (!(err instanceof multer.MulterError)) return next(err)
+  const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400
+  res.status(status).json({
+    error: err.code === 'LIMIT_FILE_SIZE' ? 'Enregistrement trop volumineux (50 Mo maximum)' : 'Upload audio invalide',
+    code: err.code,
+  })
 })
 
 module.exports = router

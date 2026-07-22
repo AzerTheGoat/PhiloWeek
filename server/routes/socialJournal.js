@@ -338,8 +338,6 @@ function normalizeImage(value) {
   const text = String(value || '').trim()
   if (!text) return null
   if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(text)) return text
-  // Autorise aussi une URL http(s) directe (image distante).
-  if (/^https?:\/\/\S+$/i.test(text) && text.length <= 2048) return text
   return null
 }
 

@@ -17,12 +17,12 @@ const SECTIONS = [
       {
         icon: 'plus',
         title: 'Clic droit = menu contextuel',
-        text: "Clic droit sur un dossier/fichier : nouvelle note, graphe, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, verrouiller ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
+        text: "Clic droit sur un dossier/fichier : nouvelle note, graphe, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, chiffrer ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
       },
       {
         icon: 'close',
-        title: 'Dossier verrouillé',
-        text: "Protège un dossier avec un mot de passe. Le contenu est chiffré (AES-256) côté serveur — illisible sans le mot de passe, même dans la base de données.",
+        title: 'Chiffrement et verrouillage',
+        text: "« Chiffrer » protège récursivement le dossier, ses fichiers et leur historique dans SQLite. Le petit bouclier reste visible même quand le dossier est ouvert. « Verrouiller maintenant » ferme seulement l'accès dans ta session : les données, elles, ne cessent jamais d'être chiffrées. Sans le mot de passe du coffre, elles sont irrécupérables.",
       },
     ],
   },
@@ -236,8 +236,8 @@ const SECTIONS = [
       },
       {
         icon: 'link',
-        title: 'Image : fichier ou lien',
-        text: "Pour l'image d'un repère (comme pour la couverture d'un article), choisis un fichier local OU « Coller un lien » pour utiliser directement l'URL d'une image trouvée sur internet.",
+        title: 'Image locale protégée',
+        text: "Pour l'image d'un repère ou la couverture d'un article, choisis un fichier local. Les images distantes sont bloquées afin qu'un site tiers ne puisse pas suivre les lectures avec un pixel invisible.",
       },
     ],
   },
@@ -337,12 +337,12 @@ const SECTIONS = [
       {
         icon: 'download',
         title: 'Export Obsidian (.zip)',
-        text: 'Télécharge toutes tes notes en ZIP, compatible Obsidian, avec frontmatter YAML. C\'est ton filet de sécurité manuel.',
+        text: "Télécharge toutes tes notes en ZIP compatible Obsidian. Si des dossiers sont chiffrés, leur mot de passe est redemandé. Attention : pour rester lisible par Obsidian, le ZIP contient alors ces notes en clair; conserve-le dans un emplacement lui-même chiffré.",
       },
       {
         icon: 'upload',
         title: 'Import (.zip)',
-        text: 'Réintègre un export précédent (ou un vault Obsidian) : les fichiers, dossiers et liens [[wiki]] sont reconstruits.',
+        text: "Réintègre un export précédent (ou un vault Obsidian) : fichiers, dossiers et liens [[wiki]] sont reconstruits. Le manifeste restaure les dossiers chiffrés et redemande le mot de passe du coffre avant de les rechiffrer en base.",
       },
     ],
   },
@@ -357,7 +357,7 @@ const SECTIONS = [
       {
         icon: 'edit',
         title: 'Changer de mot de passe',
-        text: "Depuis le bouton Compte de la barre latérale, renseigne ton mot de passe actuel puis le nouveau. Il n'y a pas de récupération par e-mail : garde-le en lieu sûr.",
+        text: "Depuis Compte, change séparément le mot de passe de connexion et celui du coffre chiffré. Changer le mot de passe de connexion révoque les autres sessions. Il n'y a pas de récupération par e-mail : garde ces secrets en lieu sûr.",
       },
     ],
   },

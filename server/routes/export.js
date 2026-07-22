@@ -7,12 +7,35 @@ const path = require('path')
 const { getDb } = require('../db')
 const { ROADTRIP_PHOTOS_DIR } = require('../paths')
 const { spreadsheetToXlsxBuffer } = require('../spreadsheetXlsx')
+const { loadFolderKeysForOperation, materializeFile, materializeRevision } = require('../vaultCrypto')
+const { securityLog } = require('../securityControls')
 
-router.get('/obsidian', async (req, res) => {
+router.all('/obsidian', async (req, res) => {
+  const exportFolderKeys = new Map()
   try {
     const db = getDb()
     const zip = new JSZip()
-    const allFiles = db.prepare('SELECT * FROM files WHERE user_id = ? AND deleted_at IS NULL ORDER BY type DESC, sort_order, name').all(req.user.id)
+    const encryptedFolders = db.prepare('SELECT folder_id FROM encrypted_folders WHERE user_id = ?').all(req.user.id)
+    if (encryptedFolders.length > 0) {
+      const password = req.method === 'POST' ? req.body?.password : null
+      if (!password) {
+        return res.status(409).json({
+          error: 'Le mot de passe du coffre est requis pour produire un export Obsidian en clair.',
+          code: 'VAULT_PASSWORD_REQUIRED',
+          encrypted_folders: encryptedFolders.length,
+        })
+      }
+      const keys = await loadFolderKeysForOperation(
+        db,
+        req.user.id,
+        password,
+        encryptedFolders.map(folder => folder.folder_id)
+      )
+      for (const [folderId, key] of keys) exportFolderKeys.set(folderId, key)
+    }
+    const allFiles = db.prepare(
+      'SELECT * FROM files WHERE user_id = ? AND deleted_at IS NULL ORDER BY type DESC, sort_order, name'
+    ).all(req.user.id).map(file => materializeFile(db, file, req.user.session_id, exportFolderKeys))
 
   const pathMap = {}
   function getPath(id) {
@@ -69,6 +92,18 @@ router.get('/obsidian', async (req, res) => {
     } else {
       zip.file(originalPath, rawContent)
     }
+  }
+
+  if (encryptedFolders.length > 0) {
+    zip.file('_Opuscule/EncryptedFolders.json', JSON.stringify({
+      philoweek_type: 'encrypted_folders',
+      version: 1,
+      exported: new Date().toISOString(),
+      folders: encryptedFolders
+        .map(({ folder_id }) => pathMap[folder_id])
+        .filter(Boolean)
+        .map(folderPath => ({ path: folderPath })),
+    }, null, 2))
   }
 
   const spreadsheetFiles = allFiles.filter(file => file.type === 'file' && /\.xlsx$/i.test(file.name || ''))
@@ -228,13 +263,18 @@ router.get('/obsidian', async (req, res) => {
   }
 
   const activeRevisions = db.prepare(`
-    SELECT r.file_id, r.revision_no, r.content, r.created_at, actor.username AS actor_username
+    SELECT r.*, actor.username AS actor_username
     FROM file_revisions r
     JOIN files f ON f.id = r.file_id
     LEFT JOIN users actor ON actor.id = r.actor_user_id
     WHERE r.user_id = ? AND f.deleted_at IS NULL
     ORDER BY r.file_id, r.revision_no
-  `).all(req.user.id)
+  `).all(req.user.id).map(revision => materializeRevision(
+    revision,
+    req.user.session_id,
+    revision.encrypted_folder_id,
+    exportFolderKeys
+  ))
   if (activeRevisions.length > 0) {
     zip.file('_Opuscule/FileHistory.json', JSON.stringify({
       philoweek_type: 'file_history',
@@ -253,27 +293,29 @@ router.get('/obsidian', async (req, res) => {
   }
 
   const trashedFiles = db.prepare(`
-    SELECT f.id, f.parent_id, f.name, f.type, f.content, f.password_hash, f.encrypted_content,
+    SELECT f.*,
       f.created_at, f.updated_at, f.sort_order, f.deleted_at, f.history_revision, f.content_version,
       editor.username AS last_edited_by_username
     FROM files f
     LEFT JOIN users editor ON editor.id = f.last_edited_by
     WHERE f.user_id = ? AND f.deleted_at IS NOT NULL
     ORDER BY f.deleted_at ASC, f.type DESC, f.name ASC
-  `).all(req.user.id)
+  `).all(req.user.id).map(file => materializeFile(db, file, req.user.session_id, exportFolderKeys))
   if (trashedFiles.length > 0) {
     const trashedIds = new Set(trashedFiles.map(file => file.id))
     const revisions = db.prepare(`
-      SELECT r.file_id, r.revision_no, r.content, r.created_at, actor.username AS actor_username
+      SELECT r.*, actor.username AS actor_username
       FROM file_revisions r
       LEFT JOIN users actor ON actor.id = r.actor_user_id
       WHERE r.user_id = ? ORDER BY r.file_id, r.revision_no
-    `).all(req.user.id).filter(revision => trashedIds.has(revision.file_id))
+    `).all(req.user.id)
+      .filter(revision => trashedIds.has(revision.file_id))
+      .map(revision => materializeRevision(revision, req.user.session_id, revision.encrypted_folder_id, exportFolderKeys))
     zip.file('_Opuscule/Trash.json', JSON.stringify({
       philoweek_type: 'trash',
       exported: new Date().toISOString(),
       active_parents: Object.fromEntries(allFiles.map(file => [file.id, pathMap[file.id] || file.name])),
-      files: trashedFiles,
+      files: trashedFiles.map(stripCryptoFields),
       revisions,
     }, null, 2))
   }
@@ -326,13 +368,30 @@ router.get('/obsidian', async (req, res) => {
   const date = new Date().toISOString().slice(0, 10)
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="opuscule-vault-${date}.zip"`)
-    res.send(buffer)
+  securityLog('export.obsidian.succeeded', req, { bytes: buffer.length, encrypted_folders: encryptedFolders.length }, 'info')
+  res.send(buffer)
   } catch (err) {
     console.error('Export Obsidian error:', err)
     if (res.headersSent) return res.end()
-    res.status(500).json({ error: "Export impossible. Un fichier n'a pas pu etre prepare." })
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Export impossible. Un fichier n'a pas pu etre prepare.",
+      code: err.code,
+    })
+  } finally {
+    for (const key of exportFolderKeys.values()) key.fill(0)
   }
 })
+
+function stripCryptoFields(file) {
+  const {
+    password_hash: _passwordHash,
+    encrypted_content: _encryptedContent,
+    encrypted_folder_id: _encryptedFolderId,
+    is_encrypted: _isEncrypted,
+    ...safe
+  } = file
+  return safe
+}
 
 function safeMatterStringify(content, frontmatter) {
   try {

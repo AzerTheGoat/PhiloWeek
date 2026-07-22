@@ -43,6 +43,16 @@ Si à la place tu vois :
 → le volume n'est pas attaché : recommence l'étape 1. **Ne pousse pas de
 données tant que ce warning apparaît.**
 
+### 3. Variables de sécurité
+
+Ajoute aussi dans **Variables** :
+
+- `NODE_ENV=production`
+- `PUBLIC_READER_SECRET` : une valeur aléatoire d'au moins 32 caractères, utilisée pour signer les identifiants anonymes de lecture publique.
+- `USER_STORAGE_QUOTA_BYTES` : quota maximal par compte en octets; la valeur par défaut est 1 Gio (`1073741824`).
+
+Le volume persistant doit être chiffré au repos et accessible uniquement au service. Les sauvegardes SQLite créées avant qu'un utilisateur active le chiffrement d'un dossier peuvent encore contenir l'ancienne version en clair : applique une rotation courte des sauvegardes et protège le volume. Le mot de passe du coffre n'est jamais stocké dans ces variables.
+
 ---
 
 ## 🚚 Migration de tes données actuelles (à faire au 1er passage)

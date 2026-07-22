@@ -36,6 +36,8 @@ export default function Modals() {
       {modal.type === 'new-spreadsheet' && <NewSpreadsheetModal {...props} />}
       {modal.type === 'new-folder' && <NewFolderModal {...props} />}
       {modal.type === 'lock-folder' && <LockFolderModal {...props} />}
+      {modal.type === 'decrypt-folder' && <DisableEncryptionModal {...props} />}
+      {modal.type === 'export-vault' && <ExportVaultModal {...props} />}
       {modal.type === 'account' && <AccountModal {...props} />}
       {modal.type === 'share-file' && <ShareModal {...props} />}
     </div>
@@ -411,13 +413,13 @@ function LockFolderModal({ modal, hideModal }) {
     e.preventDefault()
     if (submitting) return
     if (password !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return }
-    if (password.length < 4) { toast('Minimum 4 caractères', 'error'); return }
+    if (password.length < 12) { toast('Minimum 12 caractères', 'error'); return }
     setSubmitting(true)
     try {
-      await api.lockFolder(modal.data.id, password)
+      await api.enableFolderEncryption(modal.data.id, password)
       await loadTree()
       hideModal()
-      toast('Dossier verrouillé')
+      toast('Chiffrement activé : le dossier reste ouvert dans cette session')
     } catch (err) {
       toast(err.message, 'error')
       setSubmitting(false)
@@ -427,13 +429,14 @@ function LockFolderModal({ modal, hideModal }) {
   return (
     <div className="modal">
       <div className="modal-header">
-        <h3>🔒 Verrouiller le dossier</h3>
+        <h3>🛡 Chiffrer le dossier</h3>
         <button className="icon-btn" onClick={hideModal}>✕</button>
       </div>
       <form onSubmit={handleSubmit} className="modal-body">
         <p className="modal-hint">
-          Le contenu sera chiffré AES-256. Sans le mot de passe, les fichiers seront inaccessibles.
+          Tout le sous-arbre sera chiffré dans SQLite. Le dossier restera ouvert dans cette session et pourra être verrouillé séparément.
         </p>
+        <p className="share-security-note">Il n’existe aucune récupération : perdre le mot de passe du coffre rend ces données définitivement illisibles.</p>
         <input
           ref={inputRef}
           autoFocus={shouldAutoFocus()}
@@ -452,7 +455,113 @@ function LockFolderModal({ modal, hideModal }) {
         />
         <div className="modal-actions">
           <button type="submit" className="btn-danger" disabled={!password || !confirm || submitting}>
-            {submitting ? 'Verrouillage…' : 'Verrouiller'}
+            {submitting ? 'Chiffrement…' : 'Activer le chiffrement'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function DisableEncryptionModal({ modal, hideModal }) {
+  const { loadTree, toast } = useApp()
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (!password || submitting) return
+    setSubmitting(true)
+    try {
+      await api.disableFolderEncryption(modal.data.id, password)
+      await loadTree()
+      hideModal()
+      toast('Chiffrement désactivé : le sous-arbre est désormais stocké en clair', 'success')
+    } catch (error) {
+      toast(error.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header">
+        <h3>Désactiver le chiffrement</h3>
+        <button className="icon-btn" onClick={hideModal}>✕</button>
+      </div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <p className="modal-hint">
+          Cette opération réécrira toutes les notes du dossier en clair dans SQLite. Le verrouillage seul ne protégera plus une fuite de base.
+        </p>
+        <input
+          ref={inputRef}
+          autoFocus={shouldAutoFocus()}
+          type="password"
+          placeholder="Mot de passe du coffre"
+          value={password}
+          onChange={event => setPassword(event.target.value)}
+          className="modal-input"
+          autoComplete="current-password"
+        />
+        <div className="modal-actions">
+          <button type="submit" className="btn-danger" disabled={!password || submitting}>
+            {submitting ? 'Déchiffrement…' : 'Stocker en clair'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ExportVaultModal({ hideModal }) {
+  const { toast } = useApp()
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      await api.exportObsidian(password)
+      hideModal()
+      toast('Export ZIP préparé')
+    } catch (error) {
+      toast(error.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header">
+        <h3>Exporter vers Obsidian</h3>
+        <button className="icon-btn" onClick={hideModal}>✕</button>
+      </div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <p className="modal-hint">
+          Si ton coffre contient des dossiers chiffrés, saisis son mot de passe. Les notes seront déchiffrées uniquement pour produire le ZIP.
+        </p>
+        <p className="share-security-note">
+          Attention : le ZIP Obsidian obtenu contient les notes en clair. Conserve-le dans un emplacement protégé.
+        </p>
+        <input
+          ref={inputRef}
+          autoFocus={shouldAutoFocus()}
+          type="password"
+          placeholder="Mot de passe du coffre (si nécessaire)"
+          value={password}
+          onChange={event => setPassword(event.target.value)}
+          className="modal-input"
+          autoComplete="current-password"
+        />
+        <div className="modal-actions">
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Préparation…' : 'Télécharger le ZIP'}
           </button>
           <button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button>
         </div>
@@ -467,6 +576,10 @@ function AccountModal({ hideModal }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [vaultCurrent, setVaultCurrent] = useState('')
+  const [vaultNew, setVaultNew] = useState('')
+  const [vaultConfirm, setVaultConfirm] = useState('')
+  const [vaultSubmitting, setVaultSubmitting] = useState(false)
   const inputRef = useModalFocus()
 
   const handleChangePassword = async (e) => {
@@ -491,6 +604,25 @@ function AccountModal({ hideModal }) {
   const handleLogout = async () => {
     hideModal()
     await logout()
+  }
+
+  const handleVaultPassword = async (event) => {
+    event.preventDefault()
+    if (vaultSubmitting) return
+    if (vaultNew !== vaultConfirm) { toast('Les mots de passe du coffre ne correspondent pas', 'error'); return }
+    if (vaultNew.length < 12) { toast('Le mot de passe du coffre doit contenir au moins 12 caractères', 'error'); return }
+    setVaultSubmitting(true)
+    try {
+      await api.changeVaultPassword(vaultCurrent, vaultNew)
+      setVaultCurrent('')
+      setVaultNew('')
+      setVaultConfirm('')
+      toast('Mot de passe du coffre modifié; tous les dossiers chiffrés ont été verrouillés')
+    } catch (error) {
+      toast(error.message, 'error')
+    } finally {
+      setVaultSubmitting(false)
+    }
   }
 
   return (
@@ -531,6 +663,40 @@ function AccountModal({ hideModal }) {
           <div className="modal-actions">
             <button type="submit" className="btn-primary" disabled={!currentPassword || !newPassword || !confirm || submitting}>
               {submitting ? 'Modification…' : 'Changer le mot de passe'}
+            </button>
+          </div>
+        </form>
+        <hr className="modal-divider" />
+        <form onSubmit={handleVaultPassword} className="modal-body" style={{ padding: 0 }}>
+          <h4>Mot de passe du coffre chiffré</h4>
+          <p className="modal-hint">Ce mot de passe est indépendant de la connexion et ouvre les dossiers chiffrés.</p>
+          <input
+            type="password"
+            placeholder="Mot de passe actuel du coffre"
+            value={vaultCurrent}
+            onChange={event => setVaultCurrent(event.target.value)}
+            className="modal-input"
+            autoComplete="current-password"
+          />
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe du coffre (12 caractères minimum)"
+            value={vaultNew}
+            onChange={event => setVaultNew(event.target.value)}
+            className="modal-input"
+            autoComplete="new-password"
+          />
+          <input
+            type="password"
+            placeholder="Confirmer le mot de passe du coffre"
+            value={vaultConfirm}
+            onChange={event => setVaultConfirm(event.target.value)}
+            className="modal-input"
+            autoComplete="new-password"
+          />
+          <div className="modal-actions">
+            <button type="submit" className="btn-primary" disabled={!vaultCurrent || !vaultNew || !vaultConfirm || vaultSubmitting}>
+              {vaultSubmitting ? 'Modification…' : 'Changer le mot de passe du coffre'}
             </button>
           </div>
         </form>

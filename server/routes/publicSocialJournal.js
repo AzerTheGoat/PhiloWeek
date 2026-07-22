@@ -1,6 +1,9 @@
 const express = require('express')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
+const crypto = require('crypto')
+const { isRailway } = require('../paths')
+const { publicReadLimiter } = require('../securityControls')
 
 const router = express.Router()
 
@@ -43,16 +46,15 @@ router.get('/articles/:id', (req, res) => {
 })
 
 // Lecture depuis le lien public (visiteur sans compte). Dédup par appareil
-// via un identifiant anonyme fourni par le client (localStorage).
-router.post('/articles/:id/read', (req, res) => {
+// via un cookie aléatoire HttpOnly signé par le serveur.
+router.post('/articles/:id/read', publicReadLimiter, (req, res) => {
   const db = getDb()
   const published = db.prepare(
     "SELECT id FROM articles WHERE id = ? AND status = 'published'"
   ).get(req.params.id)
   if (!published) return res.status(404).json({ error: 'Article introuvable ou non publie.' })
 
-  const anonId = normalizeAnonId(req.body?.anon_id)
-  if (!anonId) return res.status(400).json({ error: 'Identifiant de lecture requis.' })
+  const anonId = getSignedReaderId(req, res)
 
   const now = new Date().toISOString()
   const existing = db.prepare(
@@ -72,10 +74,39 @@ router.post('/articles/:id/read', (req, res) => {
   res.json({ read_count: Number(read_count || 0) })
 })
 
-function normalizeAnonId(value) {
-  const text = String(value || '').trim()
-  if (!/^[a-zA-Z0-9_-]{8,64}$/.test(text)) return null
-  return text
+function getSignedReaderId(req, res) {
+  const secret = readerSecret()
+  const raw = String(req.cookies?.pw_reader || '')
+  const [id, signature] = raw.split('.')
+  if (/^[a-zA-Z0-9_-]{24,64}$/.test(id || '') && safeEqual(signature, signReader(id, secret))) {
+    return crypto.createHmac('sha256', secret).update(id).digest('base64url')
+  }
+  const next = crypto.randomBytes(24).toString('base64url')
+  res.cookie('pw_reader', `${next}.${signReader(next, secret)}`, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isRailway || process.env.NODE_ENV === 'production',
+    path: '/api/public/social-journal',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+  })
+  return crypto.createHmac('sha256', secret).update(next).digest('base64url')
+}
+
+let fallbackReaderSecret = null
+function readerSecret() {
+  if (process.env.PUBLIC_READER_SECRET?.length >= 32) return process.env.PUBLIC_READER_SECRET
+  if (!fallbackReaderSecret) fallbackReaderSecret = crypto.randomBytes(32)
+  return fallbackReaderSecret
+}
+
+function signReader(id, secret) {
+  return crypto.createHmac('sha256', secret).update(id).digest('base64url')
+}
+
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left || ''))
+  const b = Buffer.from(String(right || ''))
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 
 function normalizeArticleRow(row) {

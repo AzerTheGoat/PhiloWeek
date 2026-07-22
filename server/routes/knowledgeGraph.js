@@ -3,6 +3,7 @@ const matter = require('gray-matter')
 const router = express.Router()
 const { getDb } = require('../db')
 const { getAccessibleFileRows, getFileAccess } = require('../fileAccess')
+const { materializeFile } = require('../vaultCrypto')
 
 const COPY_PROMPTS = {
   none: '',
@@ -17,7 +18,7 @@ Retourne uniquement un JSON valide, sans Markdown autour, au format Opuscule ave
 
 router.get('/', (req, res) => {
   const db = getDb()
-  const files = getReadableFiles(db, req.user.id)
+  const files = getReadableFiles(db, req.user.id, req.user.session_id)
   const paths = buildPaths(db, req.user.id)
   const nodes = files.map(file => {
     const parsed = parseFile(file)
@@ -38,13 +39,13 @@ router.get('/', (req, res) => {
 router.get('/:id/references', (req, res) => {
   const db = getDb()
   const targetAccess = getFileAccess(db, req.params.id, req.user.id)
-  const target = targetAccess?.file
+  const target = targetAccess?.file && materializeFile(db, targetAccess.file, req.user.session_id)
   if (!target) return res.status(404).json({ error: 'Not found' })
 
   const paths = buildPaths(db, req.user.id)
   const references = [
-    ...getWikiReferences(db, target, paths, req.user.id),
-    ...getQuestionnaireReferences(db, target, paths, req.user.id),
+    ...getWikiReferences(db, target, paths, req.user.id, req.user.session_id),
+    ...getQuestionnaireReferences(db, target, paths, req.user.id, req.user.session_id),
   ].sort((a, b) => String(a.source_name).localeCompare(String(b.source_name)))
 
   res.json({
@@ -63,7 +64,7 @@ router.post('/copy', (req, res) => {
   const { file_id: fileId, depth = 1, prompt = 'none' } = req.body || {}
   if (!fileId) return res.status(400).json({ error: 'file_id required' })
 
-  const files = getReadableFiles(db, req.user.id)
+  const files = getReadableFiles(db, req.user.id, req.user.session_id)
   const fileById = new Map(files.map(file => [file.id, file]))
   if (!fileById.has(fileId)) return res.status(404).json({ error: 'Not found' })
 
@@ -97,8 +98,12 @@ router.post('/copy', (req, res) => {
 
 module.exports = router
 
-function getReadableFiles(db, userId) {
+function getReadableFiles(db, userId, sessionId) {
   return getAccessibleFileRows(db, userId, { filesOnly: true })
+    .flatMap(file => {
+      try { return [materializeFile(db, file, sessionId)] }
+      catch (_) { return [] }
+    })
     .filter(file => file.content !== null)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -158,13 +163,16 @@ function addEdge(edges, seen, edge) {
   edges.push(edge)
 }
 
-function getWikiReferences(db, target, paths, userId) {
+function getWikiReferences(db, target, paths, userId, sessionId) {
+  const readable = new Map(getReadableFiles(db, userId, sessionId).map(file => [file.id, file]))
   const rows = db.prepare(`
-    SELECT f.id, f.name, f.content, fl.link_text
+    SELECT fl.source_id, fl.link_text
     FROM file_links fl
-    JOIN files f ON f.id = fl.source_id
-    WHERE fl.target_id = ? AND f.type = 'file' AND f.content IS NOT NULL AND f.deleted_at IS NULL
-  `).all(target.id).filter(file => getFileAccess(db, file.id, userId))
+    WHERE fl.target_id = ?
+  `).all(target.id).flatMap(link => {
+    const file = readable.get(link.source_id)
+    return file ? [{ ...file, link_text: link.link_text }] : []
+  })
 
   return rows.flatMap(row => {
     const snippets = findWikiSnippets(row.content || '', row.link_text || target.name)
@@ -178,8 +186,8 @@ function getWikiReferences(db, target, paths, userId) {
   })
 }
 
-function getQuestionnaireReferences(db, target, paths, userId) {
-  const files = getReadableFiles(db, userId)
+function getQuestionnaireReferences(db, target, paths, userId, sessionId) {
+  const files = getReadableFiles(db, userId, sessionId)
   const targetPath = normalizePath(paths[target.id] || target.name)
   const refs = []
 

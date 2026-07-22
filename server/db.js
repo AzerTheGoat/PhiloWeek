@@ -11,6 +11,9 @@ function getDb() {
     _db = new Database(DB_PATH)
     _db.pragma('journal_mode = WAL')
     _db.pragma('foreign_keys = ON')
+    // Réduit le risque que le plaintext remplacé lors de l'activation du
+    // coffre reste récupérable dans les pages SQLite libérées.
+    _db.pragma('secure_delete = ON')
   }
   return _db
 }
@@ -553,6 +556,42 @@ const MIGRATIONS = [
         ON generated_quizzes(user_id);
     `)
   },
+  // v18 -> v19 : coffre chiffre independant du verrouillage de session.
+  // Le contenu reste chiffre en base meme lorsqu'un dossier est ouvert.
+  (db) => {
+    addColumnIfMissing(db, 'files', 'is_encrypted', 'INTEGER NOT NULL DEFAULT 0 CHECK(is_encrypted IN (0, 1))')
+    addColumnIfMissing(db, 'files', 'encrypted_folder_id', 'TEXT')
+    addColumnIfMissing(db, 'file_revisions', 'encrypted_content', 'TEXT')
+    addColumnIfMissing(db, 'file_revisions', 'encrypted_folder_id', 'TEXT')
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_vaults (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        kdf_name TEXT NOT NULL,
+        kdf_salt BLOB NOT NULL,
+        kdf_params_json TEXT NOT NULL,
+        password_verifier TEXT NOT NULL,
+        key_version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS encrypted_folders (
+        folder_id TEXT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        wrapped_folder_key TEXT NOT NULL,
+        crypto_version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_files_encrypted_folder
+        ON files(encrypted_folder_id, user_id);
+      CREATE INDEX IF NOT EXISTS idx_revisions_encrypted_folder
+        ON file_revisions(encrypted_folder_id, user_id);
+      CREATE INDEX IF NOT EXISTS idx_encrypted_folders_user
+        ON encrypted_folders(user_id, folder_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne
@@ -619,6 +658,22 @@ async function initDb() {
 
   const applied = runMigrations(db)
   const after = db.pragma('user_version', { simple: true })
+  // Une coupure de processus entre la création d'une FDK enveloppée et la
+  // transaction de chiffrement peut laisser une ligne sans dossier marqué.
+  // Elle ne contient aucune donnée utilisateur et doit être retirée pour
+  // permettre une nouvelle tentative sûre au démarrage suivant.
+  if (after >= 19) {
+    db.prepare(`
+      DELETE FROM encrypted_folders
+      WHERE NOT EXISTS (
+        SELECT 1 FROM files
+        WHERE files.id = encrypted_folders.folder_id
+          AND files.is_encrypted = 1
+          AND files.encrypted_folder_id = encrypted_folders.folder_id
+      )
+    `).run()
+    try { db.pragma('wal_checkpoint(TRUNCATE)') } catch (_) {}
+  }
   if (applied > 0) {
     console.log(`  🗄️  Schéma migré : v${before} → v${after} (${applied} migration(s))`)
   } else {
@@ -679,7 +734,7 @@ function wikiTargetCandidates(value) {
 }
 
 function updateAllLinks(db, userId) {
-  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file' AND user_id IS ? AND deleted_at IS NULL").all(userId ?? null)
+  const files = db.prepare("SELECT id, content FROM files WHERE type = 'file' AND user_id IS ? AND deleted_at IS NULL AND content IS NOT NULL").all(userId ?? null)
   const tx = db.transaction(() => {
     for (const file of files) updateLinks(db, file.id, file.content || '', userId)
   })

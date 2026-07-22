@@ -1,0 +1,90 @@
+name: Security checks
+
+on:
+  push:
+    branches: ['main', 'codex/**']
+  pull_request:
+  schedule:
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      - name: Install exact dependencies
+        run: |
+          npm ci --prefix server
+          npm ci --prefix client
+      - name: Audit production dependencies
+        run: |
+          npm audit --prefix server --omit=dev --audit-level=moderate
+          npm audit --prefix client --omit=dev --audit-level=moderate
+      - name: Audit development toolchain
+        run: |
+          npm audit --prefix server --audit-level=high
+          npm audit --prefix client --audit-level=high
+      - name: Static security lint
+        run: npm run lint:security --prefix server
+      - name: Backend security tests
+        run: npm test --prefix server
+      - name: Production build
+        run: npm run build --prefix client
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      packages: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+
+  snyk:
+    if: ${{ vars.ENABLE_SNYK == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+      - name: Install exact project dependencies
+        run: |
+          npm ci --prefix server
+          npm ci --prefix client
+      - name: Snyk Open Source scan
+        run: npx --yes snyk@1.1305.2 test --all-projects --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  sonarqube:
+    if: ${{ vars.SONAR_PROJECT_KEY != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}

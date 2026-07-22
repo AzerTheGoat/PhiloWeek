@@ -6,6 +6,7 @@ const fs = require('fs')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { ROADTRIP_PHOTOS_DIR } = require('../paths')
+const { assertUserStorageQuota, costlyOperationLimiter } = require('../securityControls')
 
 // ————————————————————————————————————————————————————————————————
 // Carnet de voyage (road trips)
@@ -634,7 +635,7 @@ router.delete('/:id', (req, res) => {
 
 // ————————————————————————————————————— Photos (upload / edit / delete)
 
-router.post('/:id/photos', upload.single('photo'), (req, res) => {
+router.post('/:id/photos', costlyOperationLimiter, upload.single('photo'), (req, res) => {
   const db = getDb()
   const trip = getOwnedTrip(db, req.params.id, req.user.id)
   if (!trip) {
@@ -642,6 +643,11 @@ router.post('/:id/photos', upload.single('photo'), (req, res) => {
     return res.status(404).json({ error: 'Not found' })
   }
   if (!req.file) return res.status(400).json({ error: 'No photo file' })
+  try { assertUserStorageQuota(db, req.user.id, req.file.size) }
+  catch (error) {
+    deletePhotoFile(req.file.filename)
+    return res.status(error.status || 413).json({ error: error.message, code: error.code })
+  }
 
   const id = uuidv4()
   const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM road_trip_photos WHERE trip_id = ?').get(req.params.id).m
@@ -752,6 +758,15 @@ router.delete('/notes/:noteId', (req, res) => {
   if (!note) return res.status(404).json({ error: 'Not found' })
   db.prepare('DELETE FROM road_trip_notes WHERE id = ? AND user_id = ?').run(req.params.noteId, req.user.id)
   res.json({ ok: true })
+})
+
+router.use((err, req, res, next) => {
+  if (!(err instanceof multer.MulterError)) return next(err)
+  const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400
+  res.status(status).json({
+    error: err.code === 'LIMIT_FILE_SIZE' ? 'Photo trop volumineuse' : 'Upload de photo invalide',
+    code: err.code,
+  })
 })
 
 module.exports = router

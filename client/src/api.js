@@ -44,7 +44,11 @@ export const permanentlyDeleteTrashItem = id => req('DELETE', `/files/trash/${id
 export const emptyTrash = () => req('DELETE', '/files/trash')
 export const moveFile = (id, parent_id, sort_order) => req('PUT', `/files/${id}/move`, { parent_id, sort_order })
 export const unlockFolder = (id, password) => req('POST', `/files/${id}/unlock`, { password })
-export const lockFolder = (id, password) => req('POST', `/files/${id}/lock`, { password })
+export const enableFolderEncryption = (id, password) => req('POST', `/files/${id}/encryption/enable`, { password })
+export const openEncryptedFolder = (id, password) => req('POST', `/files/${id}/encryption/open`, { password })
+export const lockEncryptedFolder = id => req('POST', `/files/${id}/encryption/lock`)
+export const disableFolderEncryption = (id, password) => req('DELETE', `/files/${id}/encryption`, { password })
+export const changeVaultPassword = (currentPassword, newPassword) => req('PATCH', '/files/vault/password', { currentPassword, newPassword })
 
 // Partage et présence collaborative
 export const getFileShares = id => req('GET', `/shares/${id}`)
@@ -66,14 +70,40 @@ export const importSpreadsheet = (file, parentId = null) => {
 }
 
 // Export / Import
-export const exportObsidian = () => {
-  window.location.href = BASE + '/export/obsidian'
+export const exportObsidian = async (password = '') => {
+  const response = await fetch(BASE + '/export/obsidian', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!response.ok) {
+    let payload = null
+    try { payload = await response.json() } catch (_) {}
+    throw new Error(payload?.error || `Erreur ${response.status}`)
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filenameFromDisposition(response.headers.get('content-disposition')) || 'opuscule-vault.zip'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export const importObsidian = (file, conflict = 'rename') => {
+export const importObsidian = (file, conflict = 'rename', vaultPassword = '') => {
   const fd = new FormData()
   fd.append('vault', file)
   fd.append('conflict', conflict)
+  if (vaultPassword) fd.append('vault_password', vaultPassword)
   return req('POST', '/import/obsidian', fd, true)
+}
+
+function filenameFromDisposition(value) {
+  const utf8 = String(value || '').match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8) return decodeURIComponent(utf8[1])
+  return String(value || '').match(/filename="?([^";]+)"?/i)?.[1] || ''
 }
 
 // Voice
@@ -187,7 +217,7 @@ export const exportRoadTripGeoJson = id => {
 
 // Social journal
 export const getPublicArticle = id => req('GET', `/public/social-journal/articles/${encodeURIComponent(id)}`)
-export const markPublicArticleRead = (id, anonId) => req('POST', `/public/social-journal/articles/${encodeURIComponent(id)}/read`, { anon_id: anonId })
+export const markPublicArticleRead = id => req('POST', `/public/social-journal/articles/${encodeURIComponent(id)}/read`, {})
 export const getArticles = ({ scope = 'feed', q = '', date = '' } = {}) => {
   const p = new URLSearchParams()
   p.set('scope', scope)

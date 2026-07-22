@@ -1,14 +1,16 @@
 const { v4: uuidv4 } = require('uuid')
 const { buildQuizGenerationPrompt, buildEmptyGeneratedQuiz } = require('./quizPrompt')
+const { materializeFile } = require('./vaultCrypto')
 
 const GENERATED_QUIZZES_ROOT = 'Quiz générés'
 
-function createOrRefreshGeneratedQuiz(db, sourceFileId, userId) {
-  const source = db.prepare(`
+function createOrRefreshGeneratedQuiz(db, sourceFileId, userId, sessionId = null) {
+  const storedSource = db.prepare(`
     SELECT * FROM files
     WHERE id = ? AND user_id = ? AND type = 'file' AND deleted_at IS NULL
   `).get(sourceFileId, userId)
-  if (!source) throw httpError(404, 'Note introuvable')
+  if (!storedSource) throw httpError(404, 'Note introuvable')
+  const source = materializeFile(db, storedSource, sessionId)
   if (!/\.md$/i.test(source.name || '')) throw httpError(400, 'Cette action est reservee aux notes Markdown')
   if (/philoweek_type:\s*graph/i.test(source.content || '')) throw httpError(400, 'Un graphe ne peut pas servir de note source')
 

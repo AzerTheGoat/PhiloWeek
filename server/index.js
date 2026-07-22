@@ -7,6 +7,9 @@ const cookieParser = require('cookie-parser')
 const { initDb } = require('./db')
 const { requireAuth } = require('./auth/middleware')
 const { pruneExpiredSessions } = require('./auth/session')
+const { isRailway } = require('./paths')
+const { costlyOperationLimiter, requestIdMiddleware, securityLog, storageQuotaGuard } = require('./securityControls')
+const { pruneExpiredFolderKeys } = require('./vaultCrypto')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -14,15 +17,17 @@ const PORT = process.env.PORT || 3001
 // Railway est derrière un reverse proxy : sans ceci, express-rate-limit et
 // req.ip voient l'IP du proxy pour toutes les requêtes (rate limit cassé),
 // et le flag Secure des cookies peut se tromper.
-app.set('trust proxy', 1)
+app.set('trust proxy', isRailway ? 1 : false)
+
+app.use(requestIdMiddleware)
 
 app.use(helmet({
   // CSP : le build Vite ne charge que des scripts EXTERNES (/assets/*.js),
   // donc `script-src 'self'` suffit et bloque tout script inline / handler
   // on* / URL javascript: injecté via une note Markdown (défense en
   // profondeur en plus du nettoyage HTML côté client).
-  // On reste permissif sur images/styles/média pour ne rien casser :
-  //   - images de notes (http/https) et images base64 (data:) de la frise
+  // Les images distantes sont bloquées pour éviter le pistage par pixel :
+  //   - images locales et images base64 (data:) de la frise
   //   - favicon data: dans index.html
   //   - lecture audio des notes vocales (blob:)
   contentSecurityPolicy: {
@@ -31,13 +36,13 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:', 'http:', 'blob:'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
       mediaSrc: ["'self'", 'blob:'],
       fontSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
-      frameAncestors: ["'self'"],
+      frameAncestors: ["'none'"],
       upgradeInsecureRequests: null,
     },
   },
@@ -57,12 +62,13 @@ app.use('/api/public/social-journal', require('./routes/publicSocialJournal'))
 
 // Tout le reste de /api/* exige une session valide.
 app.use('/api', requireAuth)
+app.use('/api', storageQuotaGuard)
 
 app.use('/api/files', require('./routes/files'))
 app.use('/api/shares', require('./routes/shares'))
 app.use('/api/spreadsheets', require('./routes/spreadsheets'))
-app.use('/api/export', require('./routes/export'))
-app.use('/api/import', require('./routes/import'))
+app.use('/api/export', costlyOperationLimiter, require('./routes/export'))
+app.use('/api/import', costlyOperationLimiter, require('./routes/import'))
 app.use('/api/voice', require('./routes/voice'))
 app.use('/api/timer', require('./routes/timer'))
 app.use('/api/inbox', require('./routes/inbox'))
@@ -74,10 +80,26 @@ app.use('/api/historical-timeline', require('./routes/historicalTimeline'))
 app.use('/api/roadtrips', require('./routes/roadtrips'))
 app.use('/api/social-journal', require('./routes/socialJournal'))
 
+app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint introuvable' }))
+
+app.use((err, req, res, _next) => {
+  securityLog('http.unhandled_error', req, {
+    error_name: err?.name,
+    error_code: err?.code,
+    status: Number(err?.status) || 500,
+  }, 'error')
+  const status = Number(err?.status) || (err?.type === 'entity.too.large' ? 413 : 500)
+  res.status(status).json({
+    error: status < 500 ? (err.message || 'Requête invalide') : 'Erreur interne',
+    code: err?.code,
+    request_id: req.requestId,
+  })
+})
+
 // Serve built React app
 const clientBuild = path.join(__dirname, 'public')
 app.use(express.static(clientBuild))
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   const fs = require('fs')
   const idx = path.join(clientBuild, 'index.html')
   if (fs.existsSync(idx)) res.sendFile(idx)
@@ -92,6 +114,7 @@ initDb().then(() => {
   // Purge des sessions expirées toutes les heures (en plus de la
   // suppression paresseuse au moment de la résolution d'un token).
   setInterval(pruneExpiredSessions, 60 * 60 * 1000).unref()
+  setInterval(pruneExpiredFolderKeys, 60 * 1000).unref()
 }).catch(err => {
   console.error('DB init failed:', err)
   process.exit(1)

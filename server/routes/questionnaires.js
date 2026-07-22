@@ -4,13 +4,14 @@ const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { getAccessibleFileRows, getFileAccess } = require('../fileAccess')
 const { createOrRefreshGeneratedQuiz } = require('../generatedQuizzes')
+const { materializeFile } = require('../vaultCrypto')
 
 const router = express.Router()
 
 router.post('/generate-from-note/:fileId', (req, res) => {
   const db = getDb()
   try {
-    const result = db.transaction(() => createOrRefreshGeneratedQuiz(db, req.params.fileId, req.user.id))()
+    const result = db.transaction(() => createOrRefreshGeneratedQuiz(db, req.params.fileId, req.user.id, req.user.session_id))()
     res.status(result.created ? 201 : 200).json(result)
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || 'Creation du quiz impossible' })
@@ -20,7 +21,7 @@ router.post('/generate-from-note/:fileId', (req, res) => {
 router.post('/session', (req, res) => {
   const db = getDb()
   const { scope = 'all', folder_ids = [], file_id = null, file_ids = [], limit = 12 } = req.body || {}
-  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids }, req.user.id)
+  const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids }, req.user.id, req.user.session_id)
   const stats = getStats(db, req.user.id)
   const questions = []
 
@@ -45,7 +46,7 @@ router.get('/linked/:fileId', (req, res) => {
   if (!target || target.type !== 'file') return res.json([])
 
   const targetPath = getFilePath(db, target.id, req.user.id)
-  const rows = getAccessibleFileRows(db, req.user.id, { filesOnly: true }).filter(file => file.content !== null)
+  const rows = readableRows(db, req.user.id, req.user.session_id)
 
   const linked = rows
     .filter(file => isQuestionnaireContent(file.name, file.content))
@@ -67,6 +68,10 @@ router.post('/results', (req, res) => {
   const body = req.body || {}
   if (!body.question_key || !body.question_text) {
     return res.status(400).json({ error: 'question_key and question_text required' })
+  }
+  if (body.questionnaire_file_id) {
+    const source = getFileAccess(db, String(body.questionnaire_file_id), req.user.id)
+    if (!source) return res.status(404).json({ error: 'Questionnaire introuvable' })
   }
 
   const id = uuidv4()
@@ -107,8 +112,8 @@ router.get('/results', (req, res) => {
 
 module.exports = router
 
-function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId) {
-  let rows = getAccessibleFileRows(db, userId, { filesOnly: true }).filter(file => file.content !== null)
+function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId, sessionId) {
+  let rows = readableRows(db, userId, sessionId)
 
   if (scope === 'file' && fileId) {
     rows = rows.filter(file => file.id === fileId)
@@ -142,6 +147,13 @@ function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId
   }
 
   return rows.filter(file => isReviewContent(file.name, file.content))
+}
+
+function readableRows(db, userId, sessionId) {
+  return getAccessibleFileRows(db, userId, { filesOnly: true }).flatMap(file => {
+    try { return [materializeFile(db, file, sessionId)] }
+    catch (_) { return [] }
+  }).filter(file => file.content !== null)
 }
 
 function collectFolderScope(db, folderIds, userId) {
