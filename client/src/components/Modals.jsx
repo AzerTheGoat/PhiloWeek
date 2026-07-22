@@ -4,6 +4,7 @@ import { createGraphMarkdown } from '../utils/graphFile'
 import { createQuestionnaireJson } from '../utils/questionnaireFile'
 import { createDefinitionsJson } from '../utils/definitionsFile'
 import { createSpreadsheetJson } from '../utils/spreadsheetFile'
+import { createActorNetworkJson } from '../utils/actorNetworkFile'
 import * as api from '../api'
 import ShareModal from './ShareModal'
 import Icon from './Icons'
@@ -31,6 +32,7 @@ export default function Modals() {
     <div className="modal-overlay" data-focus-layer onClick={e => e.target === e.currentTarget && hideModal()}>
       {modal.type === 'new-file' && <NewFileModal {...props} />}
       {modal.type === 'new-graph' && <NewGraphModal {...props} />}
+      {modal.type === 'new-actor-network' && <NewActorNetworkModal {...props} />}
       {modal.type === 'new-questionnaire' && <NewQuestionnaireModal {...props} />}
       {modal.type === 'new-definitions' && <NewDefinitionsModal {...props} />}
       {modal.type === 'new-spreadsheet' && <NewSpreadsheetModal {...props} />}
@@ -40,6 +42,46 @@ export default function Modals() {
       {modal.type === 'export-vault' && <ExportVaultModal {...props} />}
       {modal.type === 'account' && <AccountModal {...props} />}
       {modal.type === 'share-file' && <ShareModal {...props} />}
+    </div>
+  )
+}
+
+function NewActorNetworkModal({ modal, hideModal }) {
+  const { loadTree, openFile, toast } = useApp()
+  const [name, setName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useModalFocus()
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
+    const baseName = name.trim().replace(/\.json$/i, '')
+    try {
+      const file = await api.createFile({
+        parent_id: modal.data?.parent_id || null,
+        name: `${baseName}.json`,
+        type: 'file',
+        content: createActorNetworkJson(baseName),
+      })
+      await loadTree()
+      await openFile(file.id)
+      hideModal()
+      toast(`Réseau d’acteurs « ${baseName} » créé`)
+    } catch (error) {
+      toast(error.message, 'error')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal">
+      <div className="modal-header"><h3>Nouveau réseau d’acteurs</h3><button className="icon-btn" onClick={hideModal}>×</button></div>
+      <form onSubmit={handleSubmit} className="modal-body">
+        <input ref={inputRef} autoFocus={shouldAutoFocus()} className="modal-input" value={name} onChange={event => setName(event.target.value)} placeholder="Ex. Gouvernement français" />
+        <p className="modal-hint">Crée un graphe JSON temporel de personnes, organisations et postes dont les titulaires changent selon l’année.</p>
+        <div className="modal-actions"><button className="btn-primary" disabled={!name.trim() || submitting}>{submitting ? 'Création…' : 'Créer'}</button><button type="button" className="btn-ghost" onClick={hideModal}>Annuler</button></div>
+      </form>
     </div>
   )
 }

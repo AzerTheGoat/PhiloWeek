@@ -6,6 +6,7 @@ import { useArticleReadTracker } from '../utils/useArticleReadTracker'
 import { promptImageUrl } from '../utils/imageInput'
 import useIsMobile from '../hooks/useIsMobile'
 import Icon from './Icons'
+import MarkdownHtml from './MarkdownHtml'
 import * as api from '../api'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -383,7 +384,7 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
         </div>
       )}
       <TagLine tags={parseTags(article.tags)} />
-      <div className="article-markdown markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
+      <MarkdownHtml className="article-markdown markdown-preview" html={html} />
       <div className="article-social-row">
         <button type="button" className={article.liked_by_me ? 'active' : ''} onClick={onLike}>
           <Icon name="heart" size={16} /> {article.like_count || 0}
@@ -471,7 +472,7 @@ function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onC
       )}
       <div className="article-compose">
         <textarea value={form.content} onChange={event => setForm({ ...form, content: event.target.value })} placeholder="Texte en Markdown" />
-        <div className="article-preview markdown-preview" dangerouslySetInnerHTML={{ __html: preview || '<p class="preview-empty">Apercu</p>' }} />
+        <MarkdownHtml className="article-preview markdown-preview" html={preview || '<p class="preview-empty">Apercu</p>'} />
       </div>
     </form>
   )

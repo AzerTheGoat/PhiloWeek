@@ -509,6 +509,7 @@ function getFileKind(file) {
     if (typeof file.content === 'string') {
       try {
         const parsed = JSON.parse(file.content || '{}')
+        if (parsed?.philoweek_type === 'actor_network') return 'actor-network'
         if (parsed?.philoweek_type === 'definitions' || Array.isArray(parsed?.definitions)) return 'definitions'
       } catch (_) {}
       return 'questionnaire'

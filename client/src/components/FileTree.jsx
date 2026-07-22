@@ -143,6 +143,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       ? [
           canEdit && !isLocked && { icon: '📄', label: 'Nouveau fichier ici', action: () => showModal('new-file', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '◎', label: 'Nouveau graphe ici', action: () => showModal('new-graph', { parent_id: node.id }) },
+          canEdit && !isLocked && { icon: '◉', label: 'Nouveau réseau d’acteurs ici', action: () => showModal('new-actor-network', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '?', label: 'Nouveau questionnaire ici', action: () => showModal('new-questionnaire', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: 'abc', label: 'Nouvelles definitions ici', action: () => showModal('new-definitions', { parent_id: node.id }) },
           canEdit && !isLocked && { icon: '▦', label: 'Nouveau tableur Excel ici', action: () => showModal('new-spreadsheet', { parent_id: node.id }) },
@@ -160,6 +161,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
       : [
           isOwner && { icon: 'doc', label: 'Nouveau fichier a cote', action: () => showModal('new-file', { parent_id: node.parent_id || null }) },
           isOwner && { icon: 'graph', label: 'Nouveau graphe a cote', action: () => showModal('new-graph', { parent_id: node.parent_id || null }) },
+          isOwner && { icon: '◉', label: 'Nouveau réseau d’acteurs a cote', action: () => showModal('new-actor-network', { parent_id: node.parent_id || null }) },
           isOwner && { icon: '?', label: 'Nouveau questionnaire a cote', action: () => showModal('new-questionnaire', { parent_id: node.parent_id || null }) },
           isOwner && { icon: 'abc', label: 'Nouvelles definitions a cote', action: () => showModal('new-definitions', { parent_id: node.parent_id || null }) },
           isOwner && { icon: '▦', label: 'Nouveau tableur Excel a cote', action: () => showModal('new-spreadsheet', { parent_id: node.parent_id || null }) },

@@ -6,12 +6,14 @@ import GraphEditor from './GraphEditor'
 import QuestionnaireEditor from './QuestionnaireEditor'
 import DefinitionsEditor from './DefinitionsEditor'
 import SpreadsheetEditor from './SpreadsheetEditor'
+import ActorNetworkEditor from './ActorNetworkEditor'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import Icon from './Icons'
 import { isGraphFile } from '../utils/graphFile'
 import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import { isDefinitionsFile } from '../utils/definitionsFile'
 import { isSpreadsheetFile } from '../utils/spreadsheetFile'
+import { isActorNetworkFile } from '../utils/actorNetworkFile'
 import { normalizeWikiPart } from '../utils/wikiLinks'
 import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
@@ -29,6 +31,7 @@ export default function Editor() {
   let editor
   if (isSpreadsheetFile(currentFile)) editor = <SpreadsheetEditor readOnly={currentFile?.access?.can_edit === false} />
   else if (currentFile?.access?.can_edit === false) editor = <SharedFileViewer file={currentFile} />
+  else if (isActorNetworkFile(currentFile)) editor = <ActorNetworkEditor />
   else if (isGraphFile(currentFile)) editor = <GraphEditor />
   else if (isDefinitionsFile(currentFile)) editor = <DefinitionsEditor />
   else if (isQuestionnaireFile(currentFile)) editor = <QuestionnaireEditor />

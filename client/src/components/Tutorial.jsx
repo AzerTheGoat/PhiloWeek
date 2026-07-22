@@ -17,7 +17,7 @@ const SECTIONS = [
       {
         icon: 'plus',
         title: 'Clic droit = menu contextuel',
-        text: "Clic droit sur un dossier/fichier : nouvelle note, graphe, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, chiffrer ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
+        text: "Clic droit sur un dossier/fichier : nouvelle note, graphe d’idées, réseau d’acteurs, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, chiffrer ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
       },
       {
         icon: 'close',
@@ -63,6 +63,11 @@ const SECTIONS = [
         icon: 'upload',
         title: 'Coller une image',
         text: 'Colle une image directement dans le texte (Ctrl+V) : elle est compressée en WebP et intégrée en base64 dans la note.',
+      },
+      {
+        icon: 'graph',
+        title: 'Diagrammes Mermaid',
+        text: 'Écris un bloc de code balisé mermaid dans une note ou un article pour afficher automatiquement un organigramme, une séquence, une chronologie, un Gantt ou un autre diagramme Mermaid. Un diagramme invalide reste visible sous forme de code avec son erreur.',
       },
     ],
   },
@@ -138,6 +143,31 @@ const SECTIONS = [
         icon: 'graph',
         title: 'Vue mémorisée & création dans le champ',
         text: "Chaque graphe retient ton zoom et ta position de vue : en le rouvrant, tu reviens exactement où tu l'avais laissé. Et un nouveau bloc apparaît au centre de la zone visible (avec un léger décalage pour ne pas empiler), plus jamais à une position fixe hors écran.",
+      },
+    ],
+  },
+  {
+    title: 'Réseau d’acteurs temporel',
+    items: [
+      {
+        icon: 'graph',
+        title: 'Personnes, organisations et postes',
+        text: "Crée un Réseau d’acteurs depuis Fonctions ou le clic droit. Chaque fichier JSON garde ses personnes, organisations et postes avec texte, dates clés, plusieurs images et relations causales.",
+      },
+      {
+        icon: 'timeline',
+        title: 'Le réseau change selon l’année',
+        text: "Déplace le curseur d’année : les acteurs et relations hors période disparaissent. Un nœud Poste affiche automatiquement le titulaire correspondant à l’année grâce à ses mandats datés; naissance ou décès restent séparés de la période de pertinence dans le graphe.",
+      },
+      {
+        icon: 'image',
+        title: 'Apprendre les visages',
+        text: "Ajoute plusieurs portraits pris à des époques ou sous des angles différents, avec légende, crédit, licence et source. Mémoriser masque l’identité, alterne les images, révèle le rôle et les dates, puis propose À revoir ou Je savais.",
+      },
+      {
+        icon: 'upload',
+        title: 'Prompt et import contrôlé',
+        text: "Prompt JSON copie le contrat complet sans appeler d’IA. Importe ensuite un fichier ou colle le JSON : chaque nœud est confirmé et corrigé séparément, puis chaque relation et sa cause sont vérifiées avant fusion.",
       },
     ],
   },

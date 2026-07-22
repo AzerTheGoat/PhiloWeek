@@ -4,6 +4,7 @@ import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { useArticleReadTracker, getAnonReaderId } from '../utils/useArticleReadTracker'
 import * as api from '../api'
 import Icon from './Icons'
+import MarkdownHtml from './MarkdownHtml'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -126,7 +127,7 @@ function PublicArticleView({ article }) {
         </div>
       )}
       <TagLine tags={parseTags(article.tags)} />
-      <div className="article-markdown markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
+      <MarkdownHtml className="article-markdown markdown-preview" html={html} />
       <div className="article-social-row public-article-meta">
         <span><Icon name="eye" size={16} /> {article.read_count || 0} lecteur{Number(article.read_count || 0) > 1 ? 's' : ''}</span>
         <span>{article.like_count || 0} j'aime</span>

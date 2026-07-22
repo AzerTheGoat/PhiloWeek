@@ -50,6 +50,7 @@ export default function Sidebar() {
     showContextMenu(e.clientX, e.clientY, [
       { label: 'Nouveau fichier', action: () => showModal('new-file', {}) },
       { label: 'Nouveau graphe', action: () => showModal('new-graph', {}) },
+      { label: 'Nouveau réseau d’acteurs', action: () => showModal('new-actor-network', {}) },
       { label: 'Nouveau questionnaire', action: () => showModal('new-questionnaire', {}) },
       { label: 'Nouvelles definitions', action: () => showModal('new-definitions', {}) },
       { label: 'Nouveau tableur Excel', action: () => showModal('new-spreadsheet', {}) },
@@ -67,6 +68,7 @@ export default function Sidebar() {
   const createActions = [
     { icon: 'file', label: 'Note', action: () => showModal('new-file', {}) },
     { icon: 'graph', label: 'Graphe d’idées', action: () => showModal('new-graph', {}) },
+    { icon: 'graph', label: 'Réseau d’acteurs', action: () => showModal('new-actor-network', {}) },
     { icon: 'question', label: 'Questionnaire', action: () => showModal('new-questionnaire', {}) },
     { icon: 'book', label: 'Definitions', action: () => showModal('new-definitions', {}) },
     { icon: 'spreadsheet', label: 'Tableur Excel', action: () => showModal('new-spreadsheet', {}) },

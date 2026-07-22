@@ -110,8 +110,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La sidebar garde l'arbre de fichiers comme surface principale.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
-- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Securite, Aide, revision, copie, import/export, theme et compte.
-- Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, questionnaire, definitions, tableur Excel et dossier quand le contexte le permet.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Reseau d'acteurs, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Securite, Aide, revision, copie, import/export, theme et compte.
+- Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, reseau d'acteurs, questionnaire, definitions, tableur Excel et dossier quand le contexte le permet.
 - Les vues principales ne doivent pas afficher de bouton retour de page dans leur header; la navigation se fait par `Fonctions`, les onglets de fichiers et la navigation mobile.
 
 ## Graphes d'idees
@@ -122,6 +122,13 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le graphe permet d'ajouter des cartes `Idee`, `Objectif`, `Question` et `Ressource`, de les deplacer, de modifier leurs details et de creer des liens orientes entre elles.
 - L'export Obsidian inclut les graphes comme fichiers `.md`; l'import les recree automatiquement comme fichiers, sans table dediee.
 - Ne pas convertir les graphes en table SQLite sans mettre a jour export/import. Le format Markdown est le format de compatibilite.
+
+## Rendu Markdown et Mermaid
+
+- Les blocs fenced `mermaid` des notes Markdown, apercus d'articles, articles publies et liens publics sont rendus en diagrammes par `MarkdownHtml.jsx`.
+- Mermaid est charge dynamiquement uniquement lorsqu'un bloc `mermaid` existe. Le rendu utilise `securityLevel: strict`, des limites de taille et de nombre de diagrammes, et suit le theme clair/sombre.
+- Un diagramme invalide ne doit jamais casser tout l'apercu : afficher une erreur locale et conserver son code source lisible.
+- Le rendu Markdown passe toujours par `sanitizeHtml` avant Mermaid; ne jamais activer `securityLevel: loose` ou autoriser du HTML Mermaid interactif.
 
 ## Dossier Journal
 
@@ -222,6 +229,19 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La creation d'un lien sortant se fait via une recherche textuelle de la carte cible, pas via une liste complete de tous les titres.
 - Ces réglages sont stockés dans le JSON du fichier graphe pour rester compatibles avec l'export/import Obsidian.
 
+## Réseaux d'acteurs temporels
+
+- La sidebar permet de créer un `Réseau d'acteurs`, stocké comme fichier `.json` avec `philoweek_type: actor_network` et `version: 1`.
+- Le fichier contient des nœuds `person`, `organization` et `position`. Les personnes et organisations portent texte, dates clés et plusieurs images; une image peut être un fichier local WebP ou une URL HTTPS avec texte alternatif, légende, crédit, licence, source et intervalle facultatif.
+- Les dates biographiques (naissance, décès, fondation, dissolution) restent indépendantes de `active_from/active_to`, qui décrivent seulement la présence pertinente dans le graphe.
+- Un nœud `position` reste stable et utilise des `assignments` datés pour afficher automatiquement son titulaire selon l'année sélectionnée.
+- Chaque relation orientée contient un libellé, une cause explicative, un intervalle facultatif et une source facultative. Elle s'affiche uniquement si sa période et ses deux extrémités sont actives.
+- `ActorNetworkEditor.jsx` fournit un canvas zoomable avec déplacement des cartes, un inspecteur complet, un curseur annuel, un mode JSON de secours et l'historique standard des fichiers.
+- Le bouton `Prompt JSON` copie un contrat strict pour un LLM externe sans effectuer aucun appel fournisseur. L'import par fichier ou collage passe par une confirmation séquentielle de chaque nœud, puis par la vérification des relations; une relation retenue sans cause bloque la confirmation.
+- Le mode `Mémoriser` présente l'image sans l'identité, varie les portraits, révèle le texte et les dates, puis enregistre `À revoir/Je savais` dans `learning.progress` avec des intervalles de rappel progressifs.
+- Les réseaux restent des fichiers JSON standards : aucune table SQLite dédiée ne doit être créée. L'export/import Obsidian les transporte tels quels; ne pas extraire leurs données vers une table sans mettre à jour les deux parcours.
+- Sur mobile, l'inspecteur devient un panneau bas et la carte de mémorisation garde ses actions fixes; les changements restent confinés aux media queries sous 768 px.
+
 ## Graphe de la base
 
 - La vue `Graphe de la base` est accessible depuis la sidebar avec le bouton `Base` et affiche tous les fichiers lisibles comme noeuds.
@@ -282,7 +302,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - La zone principale affiche une barre d'onglets pour les fichiers ouverts.
 - Ouvrir un fichier depuis la sidebar, la recherche ou une autre vue ajoute/active un onglet, sans dupliquer l'onglet si le fichier est deja ouvert.
-- Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees, questionnaires JSON, definitions JSON et tableurs Excel.
+- Les onglets supportent les formats affiches par l'editeur central : Markdown, graphes d'idees, reseaux d'acteurs temporels, questionnaires JSON, definitions JSON et tableurs Excel.
 - Chaque onglet a un bouton de fermeture; le bouton `...` de la barre propose `Tout fermer`.
 - Les onglets ne stockent pas de contenu propre : ils pointent vers l'id du fichier et rechargent le contenu actif via l'API, pour eviter les etats divergents.
 - La position de defilement est memorisee en memoire par fichier et par panneau pendant la session : edition, apercu Markdown, questionnaires, definitions, tableurs et lecture seule reprennent a l'endroit quitte lors d'un changement d'onglet. Les graphes gardent leur propre vue persistante.
@@ -329,7 +349,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 ## Historique des fichiers et corbeille
 
-- Chaque fichier edite par l'application (note Markdown, graphe d'idees, questionnaire JSON, definitions JSON et tableur Excel) garde un historique persistant de ses sauvegardes logiques.
+- Chaque fichier edite par l'application (note Markdown, graphe d'idees, reseau d'acteurs temporel, questionnaire JSON, definitions JSON et tableur Excel) garde un historique persistant de ses sauvegardes logiques.
 - Les boutons Annuler/Retablir sont disponibles dans le header de chaque editeur; les raccourcis sont `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` et `Ctrl/Cmd+Y`.
 - Une nouvelle modification apres une annulation efface la branche de retablissement; les 100 versions les plus recentes sont conservees par fichier.
 - Activer le chiffrement chiffre aussi toutes les revisions existantes et futures; ouvrir ou verrouiller la session ne supprime pas cet historique.

@@ -3,6 +3,7 @@ import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { buildFileNameIndex, resolveWikiTarget } from '../utils/wikiLinks'
+import MarkdownHtml from './MarkdownHtml'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -41,13 +42,7 @@ const Preview = memo(function Preview({ content }) {
     }
   }, [openFile])
 
-  return (
-    <div
-      className="markdown-preview"
-      onClick={handleClick}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
+  return <MarkdownHtml html={html} className="markdown-preview" onClick={handleClick} />
 })
 
 export default Preview
