@@ -3,8 +3,19 @@ const crypto = require('crypto')
 const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { getAccessibleFileRows, getFileAccess } = require('../fileAccess')
+const { createOrRefreshGeneratedQuiz } = require('../generatedQuizzes')
 
 const router = express.Router()
+
+router.post('/generate-from-note/:fileId', (req, res) => {
+  const db = getDb()
+  try {
+    const result = db.transaction(() => createOrRefreshGeneratedQuiz(db, req.params.fileId, req.user.id))()
+    res.status(result.created ? 201 : 200).json(result)
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || 'Creation du quiz impossible' })
+  }
+})
 
 router.post('/session', (req, res) => {
   const db = getDb()

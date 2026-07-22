@@ -342,6 +342,7 @@ function MarkdownEditor() {
         <h2 className="editor-filename">{currentFile.name.replace(/\.md$/i, '')}</h2>
         <div className="editor-meta">
           <FileHistoryControls history={history} />
+          <GenerateQuizButton currentFile={currentFile} flushPending={flushPending} />
           <LinkedQuizLauncher currentFile={currentFile} />
           <span className="word-count">{wordCount} mots</span>
           <span className={`save-status ${isDirty ? 'dirty' : ''}`}>
@@ -395,6 +396,64 @@ function MarkdownEditor() {
       </div>
     </div>
   )
+}
+
+function GenerateQuizButton({ currentFile, flushPending }) {
+  const { loadTree, openFile, toast } = useApp()
+  const [loading, setLoading] = useState(false)
+
+  const generate = useCallback(async () => {
+    if (!currentFile?.id || loading) return
+    setLoading(true)
+    try {
+      await flushPending()
+      const result = await api.generateQuestionnaireFromNote(currentFile.id)
+      const copied = await copyText(result.prompt)
+      await loadTree()
+      await openFile(result.quiz.id)
+      toast(copied
+        ? `Prompt copie. Quiz pret dans ${result.quiz_path}`
+        : `Quiz cree dans ${result.quiz_path}, mais le presse-papiers est indisponible`,
+      copied ? 'success' : 'error')
+    } catch (error) {
+      toast(error.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [currentFile?.id, flushPending, loadTree, loading, openFile, toast])
+
+  return (
+    <button
+      type="button"
+      className="btn-ghost editor-quiz-btn editor-generate-quiz-btn"
+      onClick={generate}
+      disabled={loading}
+      title="Creer le quiz miroir et copier le prompt de generation"
+    >
+      <Icon name="copy" size={15} /> {loading ? 'Preparation...' : 'Creer quiz'}
+    </button>
+  )
+}
+
+async function copyText(value) {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch (_) {
+    try {
+      const textarea = document.createElement('textarea')
+      textarea.value = value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const copied = document.execCommand('copy')
+      textarea.remove()
+      return copied
+    } catch (_) {
+      return false
+    }
+  }
 }
 
 function LinkedQuizLauncher({ currentFile }) {

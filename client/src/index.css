@@ -9337,6 +9337,11 @@ kbd {
   .rt-note-title { min-width: calc(100% - 90px); }
 }
 
+.editor-generate-quiz-btn {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
 /* ——— Road trips prévus : feuille de route lisible ——— */
 .rt-card-route { margin: 7px 0 0 11px; overflow: hidden; color: var(--text-2); font-size: 11.5px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .rt-note-marker b { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; transform: rotate(45deg); color: #fff; font-size: 13px; font-family: inherit; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.22); }

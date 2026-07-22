@@ -536,6 +536,23 @@ const MIGRATIONS = [
         ON app_usage_daily(user_id, entry_date DESC);
     `)
   },
+  // v17 -> v18 : lien stable entre une note Markdown et son quiz genere.
+  // Les chemins restent exportables, mais les identifiants permettent de
+  // suivre sans ambiguite les renommages et deplacements dans l'application.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS generated_quizzes (
+        source_file_id TEXT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+        quiz_file_id TEXT NOT NULL UNIQUE REFERENCES files(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_generated_quizzes_user
+        ON generated_quizzes(user_id);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

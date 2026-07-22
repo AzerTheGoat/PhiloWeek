@@ -55,6 +55,7 @@ file_links   — source_id, target_id, link_text  (relations [[wiki-links]])
 file_tags    — file_id, tag                      (tags #hashtag + frontmatter)
 file_revisions — id, file_id, user_id (proprietaire), actor_user_id, revision_no, content, created_at
 file_shares  — id, file_id, owner_id, shared_with_user_id, permission (view/edit), created_at, updated_at
+generated_quizzes — source_file_id, quiz_file_id, user_id, created_at, updated_at
 timer_sessions — id, file_id, duration_seconds, activity_type, notes, user_id
 app_usage_daily — user_id, entry_date, duration_seconds, updated_at
 voice_notes  — id, file_id, filename, duration_seconds, title, user_id
@@ -228,6 +229,15 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L'export Obsidian inclut les questionnaires `.json` tels quels et ajoute `_Opuscule/QuestionnaireResults.json` pour l'historique; l'import recree les deux.
 - Le panneau `Copier` peut ajouter un prompt structure au debut du presse-papier, dont un prompt de creation de questionnaire JSON.
 - Le panneau `Copier` contient aussi un bloc `Recap de periode` avec `Copier la derniere semaine` et une periode personnalisable; il copie les notes modifiees dans la periode avec un preprompt de synthese prudent.
+
+## Quiz generes depuis une note Markdown
+
+- Le header de chaque note Markdown editable contient `Creer quiz`; l'action sauvegarde d'abord la note, cree ou retrouve son questionnaire miroir, copie un prompt complet pour un LLM externe et ouvre le fichier JSON cible.
+- Le prompt ne fait aucun appel fournisseur. Il exige un JSON Opuscule strict, fonde uniquement sur la note, avec rappel actif, niveaux cognitifs varies, feedback explicatif et distracteurs plausibles. Pour les sujets politiques ou controverses, il distingue faits, jugements normatifs, interpretations et causalites, conserve les attributions et n'invente pas de certitude.
+- Les quiz automatiques vivent sous le dossier racine `Quiz générés`. Une note `Cours/Politique/Institutions.md` correspond a `Quiz générés/Cours/Politique/Institutions.json`.
+- La table `generated_quizzes` conserve le lien stable entre la note et le quiz. Renommer ou deplacer la note, ou l'un de ses dossiers parents, reconstruit le chemin miroir, met a jour `source_paths`, `source_file_ids` et `generated_from`, puis supprime les anciens dossiers miroirs devenus vides.
+- Un quiz automatique reste editable dans son contenu mais ne peut pas etre renomme ou deplace manuellement, car son emplacement appartient a la note source.
+- L'export Obsidian ajoute `_Opuscule/GeneratedQuizzes.json` avec les chemins source/quiz; l'import remappe les identifiants et reactive la synchronisation des chemins.
 
 ## Definitions JSON
 

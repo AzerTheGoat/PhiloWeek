@@ -5,6 +5,7 @@ const { getDb, updateTags, updateLinks, updateAllLinks } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const { hashPassword: hashPasswordStrong, verifyPassword: verifyPasswordStrong } = require('../auth/password')
 const { decorateFileAccess, getAccessibleFileRows, getFileAccess, getSharedTreeRoots, requireFileAccess } = require('../fileAccess')
+const { isGeneratedQuizStructure, isManagedGeneratedQuiz, syncGeneratedQuizzes } = require('../generatedQuizzes')
 
 // Ancien sel statique — conservé UNIQUEMENT pour déchiffrer les dossiers
 // verrouillés avant la migration vers le format GCM (sel aléatoire).
@@ -158,6 +159,9 @@ router.post('/', (req, res) => {
   const parentId = parent_id || null
   const parentCheck = validateWritableParent(db, parentId, req.user.id)
   if (parentCheck.error) return res.status(parentCheck.status).json({ error: parentCheck.error })
+  if (parentId && isGeneratedQuizStructure(db, parentId, req.user.id)) {
+    return res.status(409).json({ error: 'Le dossier Quiz générés est géré automatiquement' })
+  }
   const ownerId = parentCheck.ownerId || req.user.id
   const duplicate = findSiblingByName(db, parentId, name, null, ownerId)
   if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
@@ -197,6 +201,15 @@ router.put('/:id', (req, res) => {
   const { name, content, parent_id, sort_order, base_version } = req.body
   if (!access.isOwner && (name !== undefined || parent_id !== undefined || sort_order !== undefined)) {
     return res.status(403).json({ error: 'Seul le proprietaire peut renommer ou deplacer cet element' })
+  }
+  if ((name !== undefined || parent_id !== undefined) && isManagedGeneratedQuiz(db, file.id, req.user.id)) {
+    return res.status(409).json({ error: 'Ce quiz suit automatiquement sa note source et ne peut pas etre renomme ou deplace manuellement' })
+  }
+  if ((name !== undefined || parent_id !== undefined) && isGeneratedQuizStructure(db, file.id, req.user.id)) {
+    return res.status(409).json({ error: 'Cette arborescence de quiz est geree automatiquement' })
+  }
+  if (parent_id && isGeneratedQuizStructure(db, parent_id, req.user.id)) {
+    return res.status(409).json({ error: 'Le dossier Quiz générés est réservé aux quiz automatiques' })
   }
   const nextParentId = parent_id !== undefined ? (parent_id || null) : file.parent_id
   const nextName = name !== undefined ? name : file.name
@@ -239,8 +252,13 @@ router.put('/:id', (req, res) => {
     }
     db.prepare(`UPDATE files SET ${sets.join(', ')} WHERE id = ?`).run(...vals)
     if (contentChanged) pruneFileRevisions(db, file.id)
+    if (name !== undefined || parent_id !== undefined) syncGeneratedQuizzes(db, file.user_id)
   })
-  updateTx()
+  try {
+    updateTx()
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message || 'Mise a jour impossible' })
+  }
 
   if (content !== undefined) {
     updateTags(db, req.params.id, content)
@@ -261,6 +279,9 @@ router.delete('/:id', (req, res) => {
   const accessCheck = requireFileAccess(db, req.params.id, req.user.id, 'owner')
   if (accessCheck.error) return res.status(accessCheck.status).json({ error: accessCheck.error })
   const file = accessCheck.access.file
+  if (isGeneratedQuizStructure(db, file.id, req.user.id)) {
+    return res.status(409).json({ error: 'Cette arborescence de quiz est geree automatiquement' })
+  }
   if (file.type === 'folder' || file.type === 'locked_folder') {
     const descendantCount = countDescendants(db, file.id, req.user.id)
     if (descendantCount > 0 && req.query.confirm_children !== '1') {
@@ -294,7 +315,17 @@ router.put('/:id/move', (req, res) => {
   if (accessCheck.error) return res.status(accessCheck.status).json({ error: accessCheck.error })
   const file = accessCheck.access.file
 
+  if (isManagedGeneratedQuiz(db, file.id, req.user.id)) {
+    return res.status(409).json({ error: 'Ce quiz suit automatiquement sa note source et ne peut pas etre deplace manuellement' })
+  }
+  if (isGeneratedQuizStructure(db, file.id, req.user.id)) {
+    return res.status(409).json({ error: 'Cette arborescence de quiz est geree automatiquement' })
+  }
+
   const nextParentId = parent_id || null
+  if (nextParentId && isGeneratedQuizStructure(db, nextParentId, req.user.id)) {
+    return res.status(409).json({ error: 'Le dossier Quiz générés est réservé aux quiz automatiques' })
+  }
   const duplicate = findSiblingByName(db, nextParentId, file.name, req.params.id, req.user.id)
   if (duplicate) return res.status(409).json({ error: 'A file or folder with this name already exists here' })
   if (nextParentId) {
@@ -322,9 +353,16 @@ router.put('/:id/move', (req, res) => {
     }
   }
 
-  db.prepare(
-    "UPDATE files SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(nextParentId, sort_order ?? 0, req.params.id)
+  try {
+    db.transaction(() => {
+      db.prepare(
+        "UPDATE files SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run(nextParentId, sort_order ?? 0, req.params.id)
+      syncGeneratedQuizzes(db, req.user.id)
+    })()
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message || 'Deplacement impossible' })
+  }
   res.json({ ok: true })
 })
 

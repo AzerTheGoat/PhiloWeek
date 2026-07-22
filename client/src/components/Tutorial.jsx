@@ -150,6 +150,11 @@ const SECTIONS = [
         text: "Un questionnaire est un fichier JSON de questions (ouvertes ou à choix multiples) avec réponses et explications. Il s'ouvre directement en Aperçu pour réviser sans bruit.",
       },
       {
+        icon: 'copy',
+        title: 'Générer depuis une note',
+        text: "Dans une note Markdown, « Créer quiz » sauvegarde la note, crée son questionnaire dans le dossier miroir Quiz générés et copie un prompt pédagogique complet. Colle ce prompt dans le LLM de ton choix, puis colle uniquement son JSON dans le quiz déjà ouvert. Le quiz suit automatiquement les renommages et déplacements de la note.",
+      },
+      {
         icon: 'thought',
         title: 'Lier des notes sources',
         text: "Dans l'éditeur de questionnaire, le panneau \"Fichiers liés\" associe chaque question à la note dont elle provient — utile pour cibler tes révisions plus tard.",

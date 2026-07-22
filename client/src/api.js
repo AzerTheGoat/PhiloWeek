@@ -139,6 +139,7 @@ export const getQuestionnaireSession = data => req('POST', '/questionnaires/sess
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)
 export const getQuestionnaireResults = () => req('GET', '/questionnaires/results')
 export const getLinkedQuestionnaires = fileId => req('GET', `/questionnaires/linked/${fileId}`)
+export const generateQuestionnaireFromNote = fileId => req('POST', `/questionnaires/generate-from-note/${fileId}`)
 
 // Knowledge graph
 export const getKnowledgeGraph = () => req('GET', '/knowledge-graph')

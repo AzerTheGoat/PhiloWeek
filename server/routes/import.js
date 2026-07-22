@@ -9,6 +9,7 @@ const { getDb, updateTags } = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const { ROADTRIP_PHOTOS_DIR } = require('../paths')
 const { xlsxBufferToSpreadsheetContent } = require('../spreadsheetXlsx')
+const { syncGeneratedQuizzes } = require('../generatedQuizzes')
 
 const ROADTRIP_PHOTO_EXT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' }
 
@@ -67,6 +68,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     let sharePayload = null
     let spreadsheetMetadataPayload = null
     let roadTripsPayload = null
+    let generatedQuizzesPayload = null
     const roadtripPhotoWrites = [] // { filename, buffer } écrits sur disque après la transaction
 
     const importTx = db.transaction(() => {
@@ -183,6 +185,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
           if (jsonSpecial?.philoweek_type === 'road_trips') {
             roadTripsPayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'generated_quizzes') {
+            generatedQuizzesPayload = jsonSpecial
             continue
           }
           if (jsonSpecial?.philoweek_type === 'questionnaire_results') {
@@ -618,6 +624,28 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             WHERE id = ? AND user_id = ? AND name LIKE '%.xlsx'
           `).run(content, fileId, req.user.id)
         }
+      }
+
+      if (generatedQuizzesPayload && Array.isArray(generatedQuizzesPayload.links)) {
+        const insertGeneratedQuiz = db.prepare(`
+          INSERT OR IGNORE INTO generated_quizzes (
+            source_file_id, quiz_file_id, user_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?)
+        `)
+        for (const link of generatedQuizzesPayload.links) {
+          const sourceId = pathToId[String(link.source_path || '')]
+          const quizId = pathToId[String(link.quiz_path || '')]
+          if (!sourceId || !quizId || sourceId === quizId) continue
+          insertGeneratedQuiz.run(
+            sourceId,
+            quizId,
+            req.user.id,
+            normalizeIsoDate(link.created_at) || new Date().toISOString(),
+            normalizeIsoDate(link.updated_at) || new Date().toISOString()
+          )
+          report.imported++
+        }
+        syncGeneratedQuizzes(db, req.user.id)
       }
 
       if (roadTripsPayload && Array.isArray(roadTripsPayload.trips)) {

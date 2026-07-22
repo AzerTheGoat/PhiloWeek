@@ -150,6 +150,23 @@ router.get('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
+  const generatedQuizzes = db.prepare(`
+    SELECT source_file_id, quiz_file_id, created_at, updated_at
+    FROM generated_quizzes WHERE user_id = ? ORDER BY created_at ASC
+  `).all(req.user.id).filter(link => pathMap[link.source_file_id] && pathMap[link.quiz_file_id])
+  if (generatedQuizzes.length > 0) {
+    zip.file('_Opuscule/GeneratedQuizzes.json', JSON.stringify({
+      philoweek_type: 'generated_quizzes',
+      exported: new Date().toISOString(),
+      links: generatedQuizzes.map(link => ({
+        source_path: pathMap[link.source_file_id],
+        quiz_path: pathMap[link.quiz_file_id],
+        created_at: link.created_at,
+        updated_at: link.updated_at,
+      })),
+    }, null, 2))
+  }
+
   const appUsage = db.prepare(`
     SELECT entry_date, duration_seconds, updated_at
     FROM app_usage_daily
