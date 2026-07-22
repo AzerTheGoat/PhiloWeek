@@ -355,6 +355,11 @@ const SECTIONS = [
         text: "Chaque compte a son propre coffre : notes, journal, timer, notes vocales, idées et citations ne sont visibles que par toi.",
       },
       {
+        icon: 'shield',
+        title: 'Comprendre la sécurité',
+        text: "Ouvre Fonctions → Sécurité pour découvrir les protections actives, le fonctionnement des dossiers chiffrés, les limites à connaître et les bons réflexes de sauvegarde.",
+      },
+      {
         icon: 'edit',
         title: 'Changer de mot de passe',
         text: "Depuis Compte, change séparément le mot de passe de connexion et celui du coffre chiffré. Changer le mot de passe de connexion révoque les autres sessions. Il n'y a pas de récupération par e-mail : garde ces secrets en lieu sûr.",

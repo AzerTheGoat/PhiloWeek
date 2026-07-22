@@ -110,7 +110,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La sidebar garde l'arbre de fichiers comme surface principale.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
-- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Aide, revision, copie, import/export, theme et compte.
+- Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Securite, Aide, revision, copie, import/export, theme et compte.
 - Le clic droit dans la zone Fichiers, sur un dossier ou sur un fichier, doit proposer tous les types creatables : note, graphe d'idees, questionnaire, definitions, tableur Excel et dossier quand le contexte le permet.
 - Les vues principales ne doivent pas afficher de bouton retour de page dans leur header; la navigation se fait par `Fonctions`, les onglets de fichiers et la navigation mobile.
 
@@ -142,6 +142,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Dark/light via `document.documentElement.setAttribute('data-theme', ...)`
 - CSS variables dans `:root` et `[data-theme="light"]` dans `index.css`
 - Persisté dans `localStorage` sous la clé `pw-theme`
+
+## Page Sécurité
+
+- La vue `security`, accessible depuis `Fonctions` sous le libelle `Securite`, est rendue par `client/src/components/SecurityPage.jsx` et s'ouvre dans un onglet de vue fermable.
+- Elle explique en termes accessibles l'isolation serveur des comptes, les sessions opaques, le nettoyage des contenus, les limites d'import et les protections contre les abus.
+- Elle distingue explicitement chiffrement persistant et verrouillage de session : un dossier chiffre reste chiffre dans SQLite meme lorsqu'il est ouvert.
+- Elle expose honnetement les limites : metadonnees visibles, ZIP Obsidian en clair, audio et photos hors chiffrement de dossier, absence de recuperation du mot de passe du coffre et risque residuel si le serveur ou une session ouverte sont compromis.
+- Toute evolution importante du modele de securite doit etre repercutee dans cette page; ne jamais y promettre une securite absolue ou l'absence de faille.
 
 ## Notes importantes pour Codex
 

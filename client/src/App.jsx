@@ -18,6 +18,7 @@ import RoadTrips from './components/RoadTrips'
 import SocialJournal from './components/SocialJournal'
 import PublicArticle from './components/PublicArticle'
 import Tutorial from './components/Tutorial'
+import SecurityPage from './components/SecurityPage'
 import Trash from './components/Trash'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
@@ -138,6 +139,8 @@ function AppShell() {
           <SocialJournal />
         ) : view === 'tutorial' ? (
           <Tutorial />
+        ) : view === 'security' ? (
+          <SecurityPage />
         ) : view === 'trash' ? (
           <Trash />
         ) : currentFile ? (
@@ -266,6 +269,7 @@ const VIEW_TABS = {
   roadtrips: { label: 'Carnet de voyage', icon: 'map' },
   'social-journal': { label: 'Journal public', icon: 'newspaper' },
   tutorial: { label: 'Aide', icon: 'thought' },
+  security: { label: 'Sécurité', icon: 'shield' },
   trash: { label: 'Corbeille', icon: 'trash' },
 }
 

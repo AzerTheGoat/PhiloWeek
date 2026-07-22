@@ -87,6 +87,7 @@ export default function Sidebar() {
     { icon: 'map', label: 'Carnet de voyage', active: view === 'roadtrips', action: () => dispatch({ type: 'SET_VIEW', payload: 'roadtrips' }) },
     { icon: 'newspaper', label: 'Journal public', active: view === 'social-journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }) },
     { icon: 'trash', label: 'Corbeille', active: view === 'trash', action: () => dispatch({ type: 'SET_VIEW', payload: 'trash' }) },
+    { icon: 'shield', label: 'Sécurité', active: view === 'security', action: () => dispatch({ type: 'SET_VIEW', payload: 'security' }) },
     { icon: 'thought', label: 'Aide', active: view === 'tutorial', action: () => dispatch({ type: 'SET_VIEW', payload: 'tutorial' }) },
   ]
 
