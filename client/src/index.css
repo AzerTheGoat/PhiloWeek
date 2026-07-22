@@ -6490,7 +6490,7 @@ kbd {
     border-color: var(--accent);
   }
 
-  .mobile-nav { grid-template-columns: repeat(6, 1fr) }
+  .mobile-nav { grid-template-columns: repeat(4, 1fr) }
 
   .inbox-layout {
     grid-template-columns: 1fr;
@@ -7892,7 +7892,7 @@ kbd {
 
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     height: var(--mobile-nav-h);
     padding: 6px 4px env(safe-area-inset-bottom);
     gap: 1px;
@@ -8624,7 +8624,12 @@ kbd {
     min-height: min(520px, calc(var(--mobile-page-h) - 150px));
     margin: 10px 0 0;
     padding: 48px 18px 18px;
-    overflow: hidden;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
     border-radius: 22px;
     background:
@@ -8771,6 +8776,7 @@ kbd {
 
   .questionnaire-editor.is-reviewing .questionnaire-preview-pane {
     padding-top: 8px;
+    overflow: hidden;
   }
 
   .questionnaire-editor.is-reviewing > .questionnaire-toolbar,
@@ -8779,7 +8785,10 @@ kbd {
   }
 
   .questionnaire-editor.is-reviewing .questionnaire-preview-pane > .quiz-card {
-    display: block;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
     width: 100%;
     padding: 0;
     border: 0;
@@ -8787,12 +8796,20 @@ kbd {
   }
 
   .questionnaire-editor.is-reviewing .quiz-card > .questionnaire-preview-head {
+    flex-shrink: 0;
     margin: 0 4px 8px;
+  }
+
+  .questionnaire-editor.is-reviewing .quiz-card > .quiz-flashcard {
+    flex: 1;
+    min-height: 0;
+    margin-top: 0;
   }
 
   .global-quiz-live.quiz-flashcard {
     flex: 1;
     min-height: 0;
+    max-height: 100%;
     margin: 12px;
     padding: 48px 18px 18px;
   }
@@ -8823,7 +8840,9 @@ kbd {
   }
 
   .linked-quiz-live.quiz-flashcard {
-    min-height: calc(100% - 49px);
+    height: calc(100% - 49px);
+    min-height: 0;
+    max-height: calc(100% - 49px);
     margin: 0;
     border: 0;
     border-radius: 0 0 20px 20px;

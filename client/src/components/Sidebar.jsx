@@ -6,13 +6,12 @@ import * as api from '../api'
 
 export default function Sidebar() {
   const {
-    tree, theme, sidebarOpen, loadTree, toast,
+    tree, theme, sidebarOpen, featuresOpen, loadTree, toast,
     dispatch, showModal, showContextMenu, openJournalToday, openFile, view
   } = useApp()
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [importing, setImporting] = useState(false)
-  const [featuresOpen, setFeaturesOpen] = useState(false)
   const importInputRef = useRef(null)
 
   const handleSearch = useCallback(async (q) => {
@@ -117,7 +116,7 @@ export default function Sidebar() {
             type="button"
             title="Fonctionnalités"
             className={`feature-toggle ${featuresOpen ? 'active' : ''}`}
-            onClick={() => setFeaturesOpen(prev => !prev)}
+            onClick={() => dispatch({ type: 'SET_FEATURES_OPEN', payload: !featuresOpen })}
           >
             <Icon name="compass" size={16} />
             <span>Fonctions</span>

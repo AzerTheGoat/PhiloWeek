@@ -7,7 +7,7 @@ const SECTIONS = [
       {
         icon: 'folder',
         title: 'Arborescence & recherche',
-        text: "Dossiers et notes s'organisent librement, comme sur un disque. La barre de recherche (en haut de la sidebar) cherche dans les titres ET le contenu des notes.",
+        text: "Dossiers et notes s'organisent librement, comme sur un disque. La barre de recherche cherche dans les titres ET le contenu. Sur mobile, la barre basse garde quatre accès : Fichiers, Fonctions, Articles et Réviser.",
       },
       {
         icon: 'edit',
@@ -162,7 +162,7 @@ const SECTIONS = [
       {
         icon: 'play',
         title: 'Réviser',
-        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, réfléchis, affiche la solution, puis choisis À revoir ou Je savais. Ton auto-évaluation est gardée en historique.",
+        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, la carte et sa solution défilent verticalement : lis tout, puis choisis À revoir ou Je savais. Ton auto-évaluation est gardée en historique.",
       },
       {
         icon: 'timer',

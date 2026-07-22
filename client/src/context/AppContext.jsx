@@ -16,6 +16,7 @@ const init = {
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
   theme: localStorage.getItem('pw-theme') || 'dark',
   sidebarOpen: !isMobileViewport(),
+  featuresOpen: false,
   toasts: [],
   contextMenu: null,
   modal: null,
@@ -145,6 +146,20 @@ function reducer(state, action) {
         view: viewTabs[viewTabs.length - 1] || 'editor',
       }
     }
+    case 'TOGGLE_MOBILE_SIDEBAR_MODE': {
+      const featuresOpen = action.payload === 'features'
+      const sidebarOpen = !(state.sidebarOpen && state.featuresOpen === featuresOpen)
+      return {
+        ...state,
+        sidebarOpen,
+        featuresOpen,
+        modal: null,
+        contextMenu: null,
+        showFilePicker: false,
+        showQuizLauncher: false,
+      }
+    }
+    case 'SET_FEATURES_OPEN': return { ...state, featuresOpen: Boolean(action.payload) }
     case 'CLOSE_ALL_TABS': return {
       ...state,
       tabs: [],

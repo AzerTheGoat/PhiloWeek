@@ -290,20 +290,28 @@ function getTabIcon(tab) {
 }
 
 function MobileNav() {
-  const { dispatch, view, sidebarOpen } = useApp()
+  const { dispatch, view, sidebarOpen, featuresOpen, showQuizLauncher } = useApp()
   const items = [
-    { key: 'files', label: 'Fichiers', icon: 'folder', active: sidebarOpen, action: () => dispatch({ type: 'TOGGLE_SIDEBAR' }) },
-    { key: 'editor', label: 'Éditer', icon: 'edit', active: view === 'editor' && !sidebarOpen, action: () => dispatch({ type: 'SET_VIEW', payload: 'editor' }) },
-    { key: 'journal', label: 'Journal', icon: 'journal', active: view === 'journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'journal' }) },
-    { key: 'inbox', label: 'Idées', icon: 'idea', active: view === 'inbox', action: () => dispatch({ type: 'SET_VIEW', payload: 'inbox' }) },
-    { key: 'todos', label: 'Tâches', icon: 'listCheck', active: view === 'todos', action: () => dispatch({ type: 'SET_VIEW', payload: 'todos' }) },
-    { key: 'agenda', label: 'Agenda', icon: 'calendar', active: view === 'agenda', action: () => dispatch({ type: 'SET_VIEW', payload: 'agenda' }) },
-    { key: 'graph', label: 'Base', icon: 'database', active: view === 'knowledge-graph', action: () => dispatch({ type: 'SET_VIEW', payload: 'knowledge-graph' }) },
-    { key: 'timeline', label: 'Frise', icon: 'timeline', active: view === 'timeline', action: () => dispatch({ type: 'SET_VIEW', payload: 'timeline' }) },
-    { key: 'roadtrips', label: 'Voyages', icon: 'map', active: view === 'roadtrips', action: () => dispatch({ type: 'SET_VIEW', payload: 'roadtrips' }) },
-    { key: 'social', label: 'Articles', icon: 'newspaper', active: view === 'social-journal', action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }) },
-    { key: 'timer', label: 'Focus', icon: 'timer', active: view === 'timer', action: () => dispatch({ type: 'SET_VIEW', payload: 'timer' }) },
-    { key: 'life', label: 'Vie', icon: 'life', active: view === 'life', action: () => dispatch({ type: 'SET_VIEW', payload: 'life' }) },
+    {
+      key: 'files', label: 'Fichiers', icon: 'folder',
+      active: sidebarOpen && !featuresOpen,
+      action: () => dispatch({ type: 'TOGGLE_MOBILE_SIDEBAR_MODE', payload: 'files' }),
+    },
+    {
+      key: 'features', label: 'Fonctions', icon: 'compass',
+      active: sidebarOpen && featuresOpen,
+      action: () => dispatch({ type: 'TOGGLE_MOBILE_SIDEBAR_MODE', payload: 'features' }),
+    },
+    {
+      key: 'social', label: 'Articles', icon: 'newspaper',
+      active: view === 'social-journal' && !sidebarOpen && !showQuizLauncher,
+      action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }),
+    },
+    {
+      key: 'review', label: 'Réviser', icon: 'play',
+      active: showQuizLauncher,
+      action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }),
+    },
   ]
 
   return (

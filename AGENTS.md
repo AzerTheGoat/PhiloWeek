@@ -318,10 +318,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Experience mobile
 
 - Sous `768px`, l'app doit etre pensee comme une app mobile : barre de navigation fixe en bas, grandes zones tactiles, panneaux Fichiers en tiroirs plein ecran.
+- La barre de navigation mobile contient uniquement quatre acces : `Fichiers`, `Fonctions`, `Articles` et `Reviser`. `Fichiers` ouvre l'arbre; `Fonctions` ouvre directement le panneau des fonctionnalites.
 - Sur mobile, la sidebar n'est pas ouverte par defaut. Ouvrir une note referme automatiquement la sidebar.
 - Quand un tiroir mobile est ouvert, ouvrir l'autre le referme pour eviter les superpositions.
 - Les vues Editeur, Journal, Timer, Inbox, Todo et Vie doivent garder un espace bas compatible avec la barre mobile et les safe areas iOS/Android.
 - Les ajustements mobile doivent rester confines aux media queries ou a des conditions `isMobileViewport()` pour ne pas modifier l'UX ordinateur.
+- Toute carte de revision mobile doit defiler verticalement lorsque la question, la correction ou l'explication depasse la hauteur disponible; aucune action de notation ne doit etre coupee.
 
 ## Historique des fichiers et corbeille
 
