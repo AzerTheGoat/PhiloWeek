@@ -25,6 +25,8 @@ const NODE_WIDTH = 230
 const NODE_HEIGHT = 226
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 1.6
+const MAX_FIT_ZOOM = 0.78
+const FIT_MARGIN = 84
 const CURRENT_YEAR = new Date().getFullYear()
 const LARGE_NETWORK_THRESHOLD = 20
 
@@ -86,16 +88,16 @@ export default function ActorNetworkEditor() {
         const bounds = getNodeBounds(next.nodes)
         initialZoom = clamp(
           Math.min(
-            Math.max(120, stage.clientWidth - 56) / bounds.width,
-            Math.max(120, stage.clientHeight - 56) / bounds.height,
+            Math.max(120, stage.clientWidth - FIT_MARGIN * 2) / bounds.width,
+            Math.max(120, stage.clientHeight - FIT_MARGIN * 2) / bounds.height,
           ),
           MIN_ZOOM,
-          1,
+          MAX_FIT_ZOOM,
         )
         setZoom(initialZoom)
       }
-      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 100) * initialZoom)
-      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 100) * initialZoom)
+      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING) * initialZoom - FIT_MARGIN)
+      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING) * initialZoom - FIT_MARGIN)
     })
     return () => cancelAnimationFrame(frame)
   }, [currentFile]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -160,16 +162,16 @@ export default function ActorNetworkEditor() {
     const bounds = getNodeBounds(nodes)
     const nextZoom = clamp(
       Math.min(
-        Math.max(120, stage.clientWidth - 56) / bounds.width,
-        Math.max(120, stage.clientHeight - 56) / bounds.height,
+        Math.max(120, stage.clientWidth - FIT_MARGIN * 2) / bounds.width,
+        Math.max(120, stage.clientHeight - FIT_MARGIN * 2) / bounds.height,
       ),
       MIN_ZOOM,
-      1,
+      MAX_FIT_ZOOM,
     )
     setZoom(nextZoom)
     requestAnimationFrame(() => {
-      stage.scrollLeft = Math.max(0, (bounds.minX + CANVAS_PADDING - 28) * nextZoom)
-      stage.scrollTop = Math.max(0, (bounds.minY + CANVAS_PADDING - 28) * nextZoom)
+      stage.scrollLeft = Math.max(0, (bounds.minX + CANVAS_PADDING) * nextZoom - FIT_MARGIN)
+      stage.scrollTop = Math.max(0, (bounds.minY + CANVAS_PADDING) * nextZoom - FIT_MARGIN)
     })
   }, [])
 
@@ -241,7 +243,7 @@ export default function ActorNetworkEditor() {
           }
           const distanceSquared = Math.max(2500, dx * dx + dy * dy)
           const distance = Math.sqrt(distanceSquared)
-          const charge = Math.min(1.4, (28000 / distanceSquared) * alpha)
+          const charge = Math.min(1.7, (42000 / distanceSquared) * alpha)
           const chargeX = (dx / distance) * charge
           const chargeY = (dy / distance) * charge
           a.vx += chargeX
@@ -249,8 +251,8 @@ export default function ActorNetworkEditor() {
           b.vx -= chargeX
           b.vy -= chargeY
 
-          const overlapX = NODE_WIDTH + 42 - Math.abs(dx)
-          const overlapY = NODE_HEIGHT + 42 - Math.abs(dy)
+          const overlapX = NODE_WIDTH + 112 - Math.abs(dx)
+          const overlapY = NODE_HEIGHT + 104 - Math.abs(dy)
           if (overlapX > 0 && overlapY > 0) {
             if (overlapX < overlapY) {
               const push = Math.sign(dx) * overlapX * 0.045 * alpha
@@ -272,8 +274,8 @@ export default function ActorNetworkEditor() {
         const dx = (to.x + NODE_WIDTH / 2) - (from.x + NODE_WIDTH / 2)
         const dy = (to.y + NODE_HEIGHT / 2) - (from.y + NODE_HEIGHT / 2)
         const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy))
-        const desired = 350
-        const force = (distance - desired) * 0.0045 * alpha
+        const desired = 460
+        const force = (distance - desired) * 0.0038 * alpha
         const fx = (dx / distance) * force
         const fy = (dy / distance) * force
         from.vx += fx
@@ -286,8 +288,8 @@ export default function ActorNetworkEditor() {
       const centerY = area.height / 2 - NODE_HEIGHT / 2
       simulationNodes.forEach(node => {
         const centrality = 1 + Math.min(5, degree.get(node.id) || 0) * 0.08
-        node.vx += (centerX - node.x) * 0.00045 * alpha * centrality
-        node.vy += (centerY - node.y) * 0.00045 * alpha * centrality
+        node.vx += (centerX - node.x) * 0.00028 * alpha * centrality
+        node.vy += (centerY - node.y) * 0.00028 * alpha * centrality
         node.vx = clamp(node.vx * 0.84, -16, 16)
         node.vy = clamp(node.vy * 0.84, -16, 16)
         node.x = clamp(node.x + node.vx, 0, area.width - NODE_WIDTH)
@@ -1011,8 +1013,8 @@ function getNodeBounds(nodes) {
   const raw = getRawNodeBounds(nodes)
   return {
     ...raw,
-    width: Math.max(NODE_WIDTH, raw.maxX - raw.minX + NODE_WIDTH) + 56,
-    height: Math.max(NODE_HEIGHT, raw.maxY - raw.minY + NODE_HEIGHT) + 56,
+    width: Math.max(NODE_WIDTH, raw.maxX - raw.minX + NODE_WIDTH),
+    height: Math.max(NODE_HEIGHT, raw.maxY - raw.minY + NODE_HEIGHT),
   }
 }
 
@@ -1020,8 +1022,8 @@ function getLayoutArea(count) {
   const columns = Math.max(2, Math.ceil(Math.sqrt(count * 1.35)))
   const rows = Math.ceil(count / columns)
   return {
-    width: Math.max(1500, columns * (NODE_WIDTH + 76)),
-    height: Math.max(1050, rows * (NODE_HEIGHT + 76)),
+    width: Math.max(1800, columns * (NODE_WIDTH + 142)),
+    height: Math.max(1250, rows * (NODE_HEIGHT + 132)),
   }
 }
 
