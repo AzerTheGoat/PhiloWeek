@@ -158,8 +158,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
       )
       const insertArticleComment = db.prepare(
         `INSERT OR IGNORE INTO article_comments (
-          id, article_id, body, user_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`
+          id, article_id, parent_id, body, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       const insertArticleReaction = db.prepare(
         `INSERT OR IGNORE INTO article_reactions (
@@ -319,15 +319,22 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             }
 
             const comments = Array.isArray(jsonSpecial.comments) ? jsonSpecial.comments : []
+            comments.sort((left, right) => Number(Boolean(left?.parent_id)) - Number(Boolean(right?.parent_id)))
             for (const comment of comments) {
               const body = String(comment.body || '').trim()
               if (!comment.article_id || !body) continue
               const articleExists = importedArticleIds.has(comment.article_id) ||
                 db.prepare("SELECT 1 FROM articles WHERE id = ? AND status = 'published'").get(comment.article_id)
               if (!articleExists) continue
+              const id = comment.id || uuidv4()
+              const parentId = String(comment.parent_id || '').trim()
+              const validParentId = parentId && db.prepare(
+                'SELECT 1 FROM article_comments WHERE id = ? AND article_id = ?'
+              ).get(parentId, comment.article_id) ? parentId : null
               insertArticleComment.run(
-                comment.id || uuidv4(),
+                id,
                 comment.article_id,
+                validParentId,
                 body.slice(0, 2000),
                 req.user.id,
                 normalizeIsoDate(comment.created_at) || now,

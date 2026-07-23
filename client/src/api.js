@@ -232,7 +232,7 @@ export const deleteArticle = id => req('DELETE', `/social-journal/articles/${id}
 export const toggleArticleReaction = id => req('POST', `/social-journal/articles/${id}/reaction`)
 export const markArticleRead = id => req('POST', `/social-journal/articles/${id}/read`)
 export const getArticleComments = id => req('GET', `/social-journal/articles/${id}/comments`)
-export const createArticleComment = (id, body) => req('POST', `/social-journal/articles/${id}/comments`, { body })
+export const createArticleComment = (id, body, parent_id = null) => req('POST', `/social-journal/articles/${id}/comments`, { body, parent_id })
 export const deleteArticleComment = id => req('DELETE', `/social-journal/comments/${id}`)
 
 // Timer

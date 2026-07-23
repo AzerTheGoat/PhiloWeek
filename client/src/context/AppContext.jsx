@@ -25,6 +25,7 @@ const init = {
   fileConflicts: {},
   showFilePicker: false,
   showQuizLauncher: false,
+  articleReadingFocus: false,
   currentUser: null,
   authChecked: false,
 }
@@ -104,6 +105,7 @@ function reducer(state, action) {
       return {
         ...state,
         view: nextView,
+        articleReadingFocus: nextView === 'social-journal' ? state.articleReadingFocus : false,
         viewTabs,
         modal: null,
         contextMenu: null,
@@ -160,6 +162,7 @@ function reducer(state, action) {
       }
     }
     case 'SET_FEATURES_OPEN': return { ...state, featuresOpen: Boolean(action.payload) }
+    case 'SET_ARTICLE_READING_FOCUS': return { ...state, articleReadingFocus: Boolean(action.payload) }
     case 'CLOSE_ALL_TABS': return {
       ...state,
       tabs: [],

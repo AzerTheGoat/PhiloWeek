@@ -29,7 +29,7 @@ router.get('/articles/:id', (req, res) => {
   if (!article) return res.status(404).json({ error: 'Article introuvable ou non publie.' })
 
   const comments = db.prepare(`
-    SELECT article_comments.id, article_comments.article_id, article_comments.body,
+    SELECT article_comments.id, article_comments.article_id, article_comments.parent_id, article_comments.body,
       article_comments.created_at, article_comments.updated_at,
       users.username AS author_username,
       0 AS can_edit

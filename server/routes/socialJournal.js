@@ -177,21 +177,34 @@ router.post('/articles/:id/comments', (req, res) => {
   const article = readableArticle(db, req.params.id, req.user.id)
   if (!article) return res.status(404).json({ error: 'Article introuvable.' })
   const body = String(req.body?.body || '').trim()
+  const parentId = String(req.body?.parent_id || '').trim() || null
   if (!body) return res.status(400).json({ error: 'Commentaire vide.' })
   if (body.length > 2000) return res.status(400).json({ error: 'Commentaire trop long.' })
+  if (parentId) {
+    const parent = db.prepare(`
+      SELECT id, article_id, parent_id FROM article_comments WHERE id = ?
+    `).get(parentId)
+    if (!parent || parent.article_id !== req.params.id) {
+      return res.status(400).json({ error: 'Commentaire parent introuvable.' })
+    }
+    if (parent.parent_id) {
+      return res.status(400).json({ error: 'Une réponse ne peut viser qu’un commentaire principal.' })
+    }
+  }
   const id = uuidv4()
   const now = new Date().toISOString()
   db.prepare(`
-    INSERT INTO article_comments (id, article_id, body, user_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, req.params.id, body, req.user.id, now, now)
-  res.status(201).json(db.prepare(`
+    INSERT INTO article_comments (id, article_id, parent_id, body, user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, req.params.id, parentId, body, req.user.id, now, now)
+  const saved = db.prepare(`
     SELECT article_comments.*, users.username AS author_username,
       1 AS can_edit
     FROM article_comments
     LEFT JOIN users ON users.id = article_comments.user_id
     WHERE article_comments.id = ?
-  `).get(id))
+  `).get(id)
+  res.status(201).json(normalizeCommentRow(saved))
 })
 
 router.delete('/comments/:id', (req, res) => {
@@ -206,8 +219,16 @@ router.delete('/comments/:id', (req, res) => {
   if (comment.user_id !== req.user.id && comment.article_owner_id !== req.user.id) {
     return res.status(403).json({ error: 'Tu peux supprimer seulement tes commentaires ou ceux sous tes articles.' })
   }
+  const deleted_ids = db.prepare(`
+    WITH RECURSIVE descendants(id) AS (
+      SELECT id FROM article_comments WHERE id = ?
+      UNION ALL
+      SELECT child.id FROM article_comments child JOIN descendants parent ON child.parent_id = parent.id
+    )
+    SELECT id FROM descendants
+  `).all(req.params.id).map(row => row.id)
   db.prepare('DELETE FROM article_comments WHERE id = ?').run(req.params.id)
-  res.json({ ok: true })
+  res.json({ ok: true, deleted_ids })
 })
 
 function articleSelectSql(where, orderBy) {
@@ -297,7 +318,15 @@ function getComments(db, articleId, userId) {
     LEFT JOIN users ON users.id = article_comments.user_id
     WHERE article_comments.article_id = @articleId
     ORDER BY article_comments.created_at ASC
-  `).all({ articleId, userId })
+  `).all({ articleId, userId }).map(normalizeCommentRow)
+}
+
+function normalizeCommentRow(row) {
+  return {
+    ...row,
+    parent_id: row.parent_id || null,
+    can_edit: Boolean(row.can_edit),
+  }
 }
 
 function normalizeArticlePayload(body = {}) {

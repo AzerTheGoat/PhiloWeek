@@ -136,17 +136,33 @@ function PublicArticleView({ article }) {
       {comments.length > 0 && (
         <section className="article-comments">
           <h3>Conversation</h3>
-          {comments.map(item => (
-            <article key={item.id} className="article-comment">
-              <div>
-                <strong>{item.author_username || 'Compte supprime'}</strong>
-                <span>{formatDate(item.created_at)}</span>
-              </div>
-              <p>{item.body}</p>
-            </article>
-          ))}
+          <PublicCommentThreads comments={comments} />
         </section>
       )}
+    </article>
+  )
+}
+
+function PublicCommentThreads({ comments }) {
+  const byId = new Map((comments || []).map(comment => [comment.id, { ...comment, children: [] }]))
+  const roots = []
+  byId.forEach(comment => {
+    const parent = comment.parent_id ? byId.get(comment.parent_id) : null
+    if (parent) parent.children.push(comment)
+    else roots.push(comment)
+  })
+  return roots.map(comment => <PublicCommentThread key={comment.id} comment={comment} />)
+}
+
+function PublicCommentThread({ comment }) {
+  return (
+    <article className={`article-comment ${comment.parent_id ? 'article-comment-reply' : ''}`}>
+      <div className="article-comment-head">
+        <strong>{comment.author_username || 'Compte supprime'}</strong>
+        <span>{formatDate(comment.created_at)}</span>
+      </div>
+      <p>{comment.body}</p>
+      {comment.children?.map(child => <PublicCommentThread key={child.id} comment={child} />)}
     </article>
   )
 }

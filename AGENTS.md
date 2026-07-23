@@ -67,7 +67,7 @@ agenda_checks — practice_id, entry_date, done, user_id, updated_at
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
 historical_events — id, title, start_label/year/month/day, end_label/year/month/day, description, category, color, image_data, image_caption, tags, user_id
 articles     — id, title, excerpt, content, status (draft/published), published_on, published_at, cover_image_data, tags, event_id, user_id, created_at, updated_at
-article_comments — id, article_id, body, user_id, created_at, updated_at
+article_comments — id, article_id, parent_id, body, user_id, created_at, updated_at
 article_reactions — article_id, user_id, reaction (like), created_at
 users        — id, username (unique, insensible à la casse), password_hash
 sessions     — id, user_id, token_hash, expires_at, user_agent
@@ -334,6 +334,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Un article peut etre lie a une carte de la frise via `articles.event_id`; la frise affiche alors les articles publies associes au repere et permet de les ouvrir dans le journal public.
 - Le journal public propose un onglet `Aujourd hui` pour l'article du jour, un `Fil` commun et `Mes articles` pour retrouver ses publications et brouillons.
 - Les interactions sociales sont stockees dans `article_reactions` (like par utilisateur) et `article_comments`; un auteur peut supprimer les commentaires sous ses articles, et chaque utilisateur peut supprimer ses propres commentaires.
+- Un commentaire peut recevoir une reponse directe via `article_comments.parent_id`. Les reponses restent affichees sous leur commentaire parent dans l'espace connecte et sur le lien public; supprimer un parent supprime ses reponses. Une reponse ne peut pas elle-meme recevoir de reponse.
+- Dans le lecteur d'article connecte, le bouton `Agrandir` active une lecture focalisee : il masque la sidebar, la barre d'onglets, la navigation mobile, le header et le fil du journal. `Quitter la lecture` restaure l'interface normale.
 - Les routes du journal public sont regroupees dans `server/routes/socialJournal.js`; elles doivent garder la lecture publique des articles publies mais filtrer toute modification par `req.user.id`.
 - L'export Obsidian ajoute `_Opuscule/SocialJournal.json` avec `philoweek_type: social_journal`; l'import recrée les articles du compte courant, ses commentaires, ses likes et conserve les liens vers la frise quand le repere existe.
 

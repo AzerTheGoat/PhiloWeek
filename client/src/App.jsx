@@ -65,7 +65,7 @@ function getPublicArticleId() {
 }
 
 function AppShell() {
-  const { theme, sidebarOpen, view, currentFile, currentUser, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher } = useApp()
+  const { theme, sidebarOpen, view, currentFile, currentUser, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, articleReadingFocus } = useApp()
 
   useFocusRecovery()
   useAppUsageTracker(currentUser?.id)
@@ -109,11 +109,11 @@ function AppShell() {
   }, [contextMenu, hideContextMenu])
 
   return (
-    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${articleReadingFocus ? 'article-reading-focus' : ''}`}>
       <Sidebar />
 
       <main className="main-pane">
-        <FileTabs />
+        {!articleReadingFocus && <FileTabs />}
 
         {view === 'timer' ? (
           <Timer />

@@ -1231,6 +1231,34 @@
   padding-right: 4px;
 }
 
+.social-journal-page.reading-focus {
+  padding: 0;
+}
+
+.social-journal-page.reading-focus .social-journal-header,
+.social-journal-page.reading-focus .social-journal-toolbar,
+.social-journal-page.reading-focus .article-feed,
+.social-journal-page.reading-focus .social-journal-back {
+  display: none;
+}
+
+.social-journal-page.reading-focus .social-journal-layout {
+  display: block;
+  padding: 0;
+}
+
+.social-journal-page.reading-focus .article-reader {
+  height: 100%;
+  padding: 24px clamp(18px, 6vw, 96px) 42px;
+}
+
+.social-journal-page.reading-focus .article-view {
+  width: min(100%, 1040px);
+  min-height: auto;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 46px);
+}
+
 .article-view,
 .article-form,
 .article-placeholder {
@@ -1393,7 +1421,7 @@
   border-top: 1px solid var(--border);
 }
 
-.article-comment div {
+.article-comment-head {
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -1410,6 +1438,34 @@
   color: var(--danger);
   font-size: 12px;
 }
+.article-comment-reply {
+  margin: 10px 0 0 22px;
+  padding: 11px 0 0 13px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+}
+.article-comment-actions {
+  display: flex;
+  gap: 12px;
+}
+.article-comment-actions .article-comment-reply-button {
+  color: var(--link);
+}
+.article-reply-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+.article-reply-form > span {
+  grid-column: 1 / -1;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.article-reply-form > div { display: flex; gap: 7px; }
 
 .public-article-page {
   height: var(--app-height, 100dvh);
@@ -1608,6 +1664,8 @@
   .article-owner-actions,
   .article-form-head > div:last-child,
   .article-comments form { flex-direction: column; align-items: stretch; }
+  .article-reply-form { grid-template-columns: 1fr; }
+  .article-reply-form > div { justify-content: flex-end; }
   .article-form input,
   .article-form textarea,
   .article-form select { font-size: 16px; }
@@ -2001,6 +2059,20 @@ a { color: var(--link) }
 
 .app-shell.sidebar-closed.ai-open {
   grid-template-columns: 0 1fr var(--ai-w);
+}
+
+.app-shell.article-reading-focus {
+  grid-template-columns: 1fr;
+}
+
+.app-shell.article-reading-focus .sidebar,
+.app-shell.article-reading-focus .mobile-nav {
+  display: none;
+}
+
+.app-shell.article-reading-focus .main-pane {
+  height: 100vh;
+  padding-bottom: 0;
 }
 
 /* ——— Sidebar ——— */

@@ -23,7 +23,7 @@ const EMPTY_FORM = {
 }
 
 export default function SocialJournal() {
-  const { toast } = useApp()
+  const { toast, articleReadingFocus, dispatch } = useApp()
   const isMobile = useIsMobile()
   const [scope, setScope] = useState('feed')
   const [query, setQuery] = useState('')
@@ -35,9 +35,17 @@ export default function SocialJournal() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [comment, setComment] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
+  const [replyBody, setReplyBody] = useState('')
   // Mobile uniquement : afficher soit le fil, soit l'article/formulaire (plein écran).
   const [mobileView, setMobileView] = useState('feed') // 'feed' | 'reader'
   const backToFeed = useCallback(() => { setMode('read'); setMobileView('feed') }, [])
+
+  useEffect(() => () => dispatch({ type: 'SET_ARTICLE_READING_FOCUS', payload: false }), [dispatch])
+
+  const toggleReadingFocus = useCallback(() => {
+    dispatch({ type: 'SET_ARTICLE_READING_FOCUS', payload: !articleReadingFocus })
+  }, [articleReadingFocus, dispatch])
 
   const loadArticles = useCallback(async () => {
     setLoading(true)
@@ -202,30 +210,45 @@ export default function SocialJournal() {
     }
   }
 
-  const sendComment = async (event) => {
-    event.preventDefault()
-    if (!selected || !comment.trim()) return
+  const publishComment = async (body, parentId = null) => {
+    if (!selected || !body.trim()) return false
     try {
-      const saved = await api.createArticleComment(selected.id, comment)
+      const saved = await api.createArticleComment(selected.id, body, parentId)
       setSelected(current => ({
         ...current,
         comments: [...(current.comments || []), saved],
         comment_count: Number(current.comment_count || 0) + 1,
       }))
-      setComment('')
+      return true
     } catch (err) {
       toast(err.message || 'Commentaire impossible', 'error')
+      return false
+    }
+  }
+
+  const sendComment = async (event) => {
+    event.preventDefault()
+    if (await publishComment(comment)) setComment('')
+  }
+
+  const sendReply = async (event) => {
+    event.preventDefault()
+    if (!replyTo) return
+    if (await publishComment(replyBody, replyTo.id)) {
+      setReplyBody('')
+      setReplyTo(null)
     }
   }
 
   const removeComment = async (commentId) => {
     try {
-      await api.deleteArticleComment(commentId)
+      const result = await api.deleteArticleComment(commentId)
       setSelected(current => ({
         ...current,
-        comments: (current.comments || []).filter(item => item.id !== commentId),
-        comment_count: Math.max(0, Number(current.comment_count || 0) - 1),
+        comments: (current.comments || []).filter(item => !(result.deleted_ids || [commentId]).includes(item.id)),
+        comment_count: Math.max(0, Number(current.comment_count || 0) - (result.deleted_ids || [commentId]).length),
       }))
+      if ((result.deleted_ids || [commentId]).includes(replyTo?.id)) setReplyTo(null)
     } catch (err) {
       toast(err.message || 'Suppression impossible', 'error')
     }
@@ -251,7 +274,7 @@ export default function SocialJournal() {
   }
 
   return (
-    <div className="social-journal-page" data-mobile-view={isMobile ? mobileView : 'both'}>
+    <div className={`social-journal-page ${articleReadingFocus ? 'reading-focus' : ''}`} data-mobile-view={isMobile ? mobileView : 'both'}>
       {isMobile && mobileView === 'reader' && (
         <button type="button" className="social-journal-back" onClick={backToFeed}>
           <Icon name="back" size={16} /> Retour au fil
@@ -337,7 +360,15 @@ export default function SocialJournal() {
               comment={comment}
               setComment={setComment}
               onComment={sendComment}
+              replyTo={replyTo}
+              replyBody={replyBody}
+              setReplyBody={setReplyBody}
+              onReply={sendReply}
+              onStartReply={item => { setReplyTo(item); setReplyBody('') }}
+              onCancelReply={() => { setReplyTo(null); setReplyBody('') }}
               onRemoveComment={removeComment}
+              readingFocus={articleReadingFocus}
+              onToggleReadingFocus={toggleReadingFocus}
             />
           ) : (
             <div className="article-placeholder">
@@ -352,7 +383,7 @@ export default function SocialJournal() {
   )
 }
 
-function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, setComment, onComment, onRemoveComment }) {
+function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, setComment, onComment, replyTo, replyBody, setReplyBody, onReply, onStartReply, onCancelReply, onRemoveComment, readingFocus, onToggleReadingFocus }) {
   const html = useMemo(() => sanitizeHtml(marked(article.content || ''), { allowRemoteImages: true }), [article.content])
   return (
     <article className="article-view">
@@ -369,6 +400,9 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
         </div>
         {(article.status === 'published' || article.can_edit) && (
           <div className="article-owner-actions">
+            <button type="button" className="btn-ghost" onClick={onToggleReadingFocus}>
+              <Icon name={readingFocus ? 'close' : 'expand'} size={16} /> {readingFocus ? 'Quitter la lecture' : 'Agrandir'}
+            </button>
             {article.status === 'published' && <button type="button" className="btn-ghost" onClick={onCopyLink}>Copier le lien</button>}
             {article.can_edit && <button type="button" className="btn-ghost" onClick={onEdit}>Modifier</button>}
             {article.can_edit && <button type="button" className="btn-ghost danger" onClick={onDelete}>Supprimer</button>}
@@ -398,19 +432,87 @@ function ArticleView({ article, onEdit, onDelete, onCopyLink, onLike, comment, s
           <input value={comment} onChange={event => setComment(event.target.value)} placeholder="Ajouter un commentaire..." />
           <button type="submit" className="btn-primary" disabled={!comment.trim()}>Publier</button>
         </form>
-        {(article.comments || []).map(item => (
-          <article key={item.id} className="article-comment">
-            <div>
-              <strong>{item.author_username || 'Compte supprime'}</strong>
-              <span>{formatDate(item.created_at)}</span>
-            </div>
-            <p>{item.body}</p>
-            {item.can_edit && <button type="button" onClick={() => onRemoveComment(item.id)}>Supprimer</button>}
-          </article>
-        ))}
+        <CommentThreadList
+          comments={article.comments || []}
+          replyTo={replyTo}
+          replyBody={replyBody}
+          setReplyBody={setReplyBody}
+          onReply={onReply}
+          onStartReply={onStartReply}
+          onCancelReply={onCancelReply}
+          onRemoveComment={onRemoveComment}
+        />
       </section>
     </article>
   )
+}
+
+function CommentThreadList({ comments, replyTo, replyBody, setReplyBody, onReply, onStartReply, onCancelReply, onRemoveComment }) {
+  const threads = buildCommentThreads(comments)
+  return threads.map(comment => (
+    <CommentThread
+      key={comment.id}
+      comment={comment}
+      replyTo={replyTo}
+      replyBody={replyBody}
+      setReplyBody={setReplyBody}
+      onReply={onReply}
+      onStartReply={onStartReply}
+      onCancelReply={onCancelReply}
+      onRemoveComment={onRemoveComment}
+    />
+  ))
+}
+
+function CommentThread({ comment, replyTo, replyBody, setReplyBody, onReply, onStartReply, onCancelReply, onRemoveComment }) {
+  const isReply = Boolean(comment.parent_id)
+  return (
+    <article className={`article-comment ${isReply ? 'article-comment-reply' : ''}`}>
+      <div className="article-comment-head">
+        <strong>{comment.author_username || 'Compte supprime'}</strong>
+        <span>{formatDate(comment.created_at)}</span>
+      </div>
+      <p>{comment.body}</p>
+      <div className="article-comment-actions">
+        {!isReply && <button type="button" className="article-comment-reply-button" onClick={() => onStartReply(comment)}>Répondre</button>}
+        {Boolean(comment.can_edit) && <button type="button" onClick={() => onRemoveComment(comment.id)}>Supprimer</button>}
+      </div>
+      {replyTo?.id === comment.id && (
+        <form className="article-reply-form" onSubmit={onReply}>
+          <span>Réponse à {comment.author_username || 'ce commentaire'}</span>
+          <input autoFocus value={replyBody} onChange={event => setReplyBody(event.target.value)} placeholder="Écrire une réponse..." />
+          <div>
+            <button type="button" className="btn-ghost" onClick={onCancelReply}>Annuler</button>
+            <button type="submit" className="btn-primary" disabled={!replyBody.trim()}>Répondre</button>
+          </div>
+        </form>
+      )}
+      {comment.children?.map(child => (
+        <CommentThread
+          key={child.id}
+          comment={child}
+          replyTo={replyTo}
+          replyBody={replyBody}
+          setReplyBody={setReplyBody}
+          onReply={onReply}
+          onStartReply={onStartReply}
+          onCancelReply={onCancelReply}
+          onRemoveComment={onRemoveComment}
+        />
+      ))}
+    </article>
+  )
+}
+
+function buildCommentThreads(comments) {
+  const byId = new Map((comments || []).map(comment => [comment.id, { ...comment, children: [] }]))
+  const roots = []
+  byId.forEach(comment => {
+    const parent = comment.parent_id ? byId.get(comment.parent_id) : null
+    if (parent) parent.children.push(comment)
+    else roots.push(comment)
+  })
+  return roots
 }
 
 function ArticleForm({ form, setForm, events, editingId, onSubmit, onCancel, onCover, onCoverUrl }) {

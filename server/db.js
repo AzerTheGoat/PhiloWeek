@@ -329,6 +329,7 @@ const MIGRATIONS = [
       CREATE TABLE IF NOT EXISTS article_comments (
         id TEXT PRIMARY KEY,
         article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+        parent_id TEXT REFERENCES article_comments(id) ON DELETE CASCADE,
         body TEXT NOT NULL,
         user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -351,6 +352,8 @@ const MIGRATIONS = [
         ON articles(event_id);
       CREATE INDEX IF NOT EXISTS idx_article_comments_article
         ON article_comments(article_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_article_comments_parent
+        ON article_comments(parent_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_article_comments_user
         ON article_comments(user_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_article_reactions_user
@@ -590,6 +593,14 @@ const MIGRATIONS = [
         ON file_revisions(encrypted_folder_id, user_id);
       CREATE INDEX IF NOT EXISTS idx_encrypted_folders_user
         ON encrypted_folders(user_id, folder_id);
+    `)
+  },
+  // v19 -> v20 : reponses aux commentaires des articles.
+  (db) => {
+    addColumnIfMissing(db, 'article_comments', 'parent_id', 'TEXT REFERENCES article_comments(id) ON DELETE CASCADE')
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_article_comments_parent
+        ON article_comments(parent_id, created_at);
     `)
   },
 ]

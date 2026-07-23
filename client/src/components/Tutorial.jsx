@@ -385,6 +385,16 @@ const SECTIONS = [
         text: "Chaque compte a son propre coffre : notes, journal, timer, notes vocales, idées et citations ne sont visibles que par toi.",
       },
       {
+        icon: 'edit',
+        title: 'Répondre aux commentaires',
+        text: "Sous un article, utilise Répondre pour ouvrir une réponse sous le commentaire concerné. Les réponses restent regroupées avec leur message parent; tu peux supprimer tes propres messages, et l’auteur de l’article peut modérer toute la conversation.",
+      },
+      {
+        icon: 'expand',
+        title: 'Lecture agrandie',
+        text: 'Dans un article, Agrandir masque la navigation et le fil pour une lecture plus confortable. Utilise Quitter la lecture pour revenir au journal.',
+      },
+      {
         icon: 'shield',
         title: 'Comprendre la sécurité',
         text: "Ouvre Fonctions → Sécurité pour découvrir les protections actives, le fonctionnement des dossiers chiffrés, les limites à connaître et les bons réflexes de sauvegarde.",
