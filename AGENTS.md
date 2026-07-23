@@ -172,6 +172,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Ne pas ajouter de nouveau panneau IA, appel fournisseur, estimation de cout ou generation automatique sans demande explicite.
 - Le recap de semaine/periode passe par le panneau `Copier`, qui met un preprompt dans le presse-papier sans appeler de fournisseur IA.
 
+## Client mobile React Native
+
+- Le client natif vit dans `mobile/` et utilise Expo Router, React Native et le backend Railway existant ; il ne doit jamais embarquer le client web dans une WebView.
+- Les sessions natives passent par les routes `POST /api/auth/mobile/login` et `POST /api/auth/mobile/register`. Le jeton opaque est stocke uniquement via `expo-secure-store` et les routes protegees acceptent `Authorization: Bearer <token>` en plus du cookie web HTTP-only.
+- Le premier MVP mobile couvre l'authentification, les onglets natifs, la consultation initiale des notes/taches/articles et la capture d'idees. Le plan produit complet est dans `docs/MVP_MOBILE_REACT_NATIVE.md`.
+
 ## Déplacement des fichiers et dossiers
 
 - Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.

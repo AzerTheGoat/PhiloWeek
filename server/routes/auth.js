@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid')
 const { getDb } = require('../db')
 const { hashPassword, verifyPassword } = require('../auth/password')
 const { createSession, destroySession, destroyUserSessions, resolveSession, SESSION_TTL_MS } = require('../auth/session')
-const { SESSION_COOKIE } = require('../auth/middleware')
+const { SESSION_COOKIE, requestSessionToken } = require('../auth/middleware')
 const { isRailway } = require('../paths')
 const { securityLog } = require('../securityControls')
 
@@ -84,22 +84,72 @@ router.post('/login', loginLimiter, async (req, res) => {
   res.json({ id: user.id, username: user.username })
 })
 
+// Une application React Native conserve ce jeton opaque dans le trousseau du
+// telephone et le presente ensuite dans Authorization: Bearer <token>.
+router.post('/mobile/login', loginLimiter, async (req, res) => {
+  const GENERIC_ERROR = { error: 'Identifiants invalides' }
+  const { username, password } = req.body || {}
+  if (typeof username !== 'string' || typeof password !== 'string') return res.status(401).json(GENERIC_ERROR)
+
+  const db = getDb()
+  const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username)
+  const validPassword = user
+    ? await verifyPassword(password, user.password_hash)
+    : await verifyPassword(password, await DUMMY_HASH)
+  if (!user || !validPassword) {
+    securityLog('auth.mobile_login.failed', req, { username_hash: require('crypto').createHash('sha256').update(String(username)).digest('hex').slice(0, 16) })
+    return res.status(401).json(GENERIC_ERROR)
+  }
+
+  const token = createSession(user.id, req.headers['user-agent'])
+  securityLog('auth.mobile_login.succeeded', req, { user_id: user.id }, 'info')
+  res.json({ id: user.id, username: user.username, token, expires_in_ms: SESSION_TTL_MS })
+})
+
+router.post('/mobile/register', registerLimiter, async (req, res) => {
+  const { username, password } = req.body || {}
+  if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
+    return res.status(400).json({ error: "Nom d'utilisateur invalide (3-32 caracteres, lettres/chiffres/_/-)" })
+  }
+  const pwError = validatePassword(password, username)
+  if (pwError) return res.status(400).json({ error: pwError })
+
+  const db = getDb()
+  if (db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(username)) {
+    return res.status(409).json({ error: "Ce nom d'utilisateur est deja pris" })
+  }
+  const id = uuidv4()
+  const now = new Date().toISOString()
+  try {
+    db.prepare('INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(id, username, await hashPassword(password), now, now)
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: "Ce nom d'utilisateur est deja pris" })
+    throw err
+  }
+
+  const token = createSession(id, req.headers['user-agent'])
+  securityLog('auth.mobile_register.succeeded', req, { created_user_id: id }, 'info')
+  res.status(201).json({ id, username, token, expires_in_ms: SESSION_TTL_MS })
+})
+
 router.post('/logout', (req, res) => {
-  const authed = resolveSession(req.cookies?.[SESSION_COOKIE])
-  destroySession(req.cookies?.[SESSION_COOKIE])
+  const token = requestSessionToken(req)
+  const authed = resolveSession(token)
+  destroySession(token)
   res.clearCookie(SESSION_COOKIE, COOKIE_OPTS)
   res.json({ ok: true })
   if (authed) securityLog('auth.logout', req, { user_id: authed.id, session_id: authed.session_id }, 'info')
 })
 
 router.get('/me', (req, res) => {
-  const user = resolveSession(req.cookies?.[SESSION_COOKIE])
+  const user = resolveSession(requestSessionToken(req))
   if (!user) return res.status(401).json({ error: 'Non authentifié' })
   res.json(user)
 })
 
 router.patch('/password', async (req, res) => {
-  const authed = resolveSession(req.cookies?.[SESSION_COOKIE])
+  const authed = resolveSession(requestSessionToken(req))
   if (!authed) return res.status(401).json({ error: 'Non authentifié' })
 
   const { currentPassword, newPassword } = req.body || {}
