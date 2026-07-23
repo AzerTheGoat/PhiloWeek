@@ -19,20 +19,24 @@ import {
 
 const AUTOSAVE_DELAY = 650
 const CANVAS_PADDING = 500
-const CANVAS_WIDTH = 3000
-const CANVAS_HEIGHT = 2200
+const BASE_CANVAS_WIDTH = 3000
+const BASE_CANVAS_HEIGHT = 2200
 const NODE_WIDTH = 230
 const NODE_HEIGHT = 226
-const MIN_ZOOM = 0.45
+const MIN_ZOOM = 0.1
 const MAX_ZOOM = 1.6
+const CURRENT_YEAR = new Date().getFullYear()
+const LARGE_NETWORK_THRESHOLD = 20
 
 export default function ActorNetworkEditor() {
   const { currentFile, openFileId, saveFile, toast } = useApp()
   const [network, setNetwork] = useState(() => safeParse(currentFile))
   const [year, setYear] = useState(() => safeParse(currentFile).settings.default_year)
+  const [allDates, setAllDates] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
   const [mode, setMode] = useState('graph')
   const [zoom, setZoom] = useState(0.9)
+  const [layoutRunning, setLayoutRunning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [rawJson, setRawJson] = useState(currentFile?.content || '')
@@ -44,6 +48,8 @@ export default function ActorNetworkEditor() {
   const viewportRef = useRef(null)
   const dragRef = useRef(null)
   const saveTimerRef = useRef(null)
+  const layoutFrameRef = useRef(null)
+  const layoutRunRef = useRef(0)
   const networkRef = useRef(network)
   const dirtyRef = useRef(dirty)
   const importInputRef = useRef(null)
@@ -61,6 +67,10 @@ export default function ActorNetworkEditor() {
     const next = safeParse(currentFile)
     setNetwork(next)
     setYear(next.settings.default_year)
+    setAllDates(false)
+    setLayoutRunning(false)
+    layoutRunRef.current += 1
+    cancelAnimationFrame(layoutFrameRef.current)
     setSelectedId(null)
     setMode('graph')
     setRawJson(currentFile?.content || '')
@@ -71,8 +81,21 @@ export default function ActorNetworkEditor() {
       if (!stage) return
       const minX = next.nodes.length ? Math.min(...next.nodes.map(node => node.x)) : 0
       const minY = next.nodes.length ? Math.min(...next.nodes.map(node => node.y)) : 0
-      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 100) * zoom)
-      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 100) * zoom)
+      let initialZoom = zoom
+      if (next.nodes.length >= LARGE_NETWORK_THRESHOLD) {
+        const bounds = getNodeBounds(next.nodes)
+        initialZoom = clamp(
+          Math.min(
+            Math.max(120, stage.clientWidth - 56) / bounds.width,
+            Math.max(120, stage.clientHeight - 56) / bounds.height,
+          ),
+          MIN_ZOOM,
+          1,
+        )
+        setZoom(initialZoom)
+      }
+      stage.scrollLeft = Math.max(0, (minX + CANVAS_PADDING - 100) * initialZoom)
+      stage.scrollTop = Math.max(0, (minY + CANVAS_PADDING - 100) * initialZoom)
     })
     return () => cancelAnimationFrame(frame)
   }, [currentFile]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,17 +128,24 @@ export default function ActorNetworkEditor() {
     })
   }, [persist])
 
-  useEffect(() => () => clearTimeout(saveTimerRef.current), [])
+  useEffect(() => () => {
+    clearTimeout(saveTimerRef.current)
+    cancelAnimationFrame(layoutFrameRef.current)
+    layoutRunRef.current += 1
+  }, [])
 
   const visibleNodes = useMemo(() => network.nodes.filter(node => (
-    network.settings.show_inactive || isActiveAtYear(node, year)
-  )), [network.nodes, network.settings.show_inactive, year])
+    allDates || network.settings.show_inactive || isActiveAtYear(node, year)
+  )), [allDates, network.nodes, network.settings.show_inactive, year])
   const visibleIds = useMemo(() => new Set(visibleNodes.map(node => node.id)), [visibleNodes])
   const visibleEdges = useMemo(() => network.edges.filter(edge => (
-    visibleIds.has(edge.from) && visibleIds.has(edge.to) && isActiveAtYear(edge, year, 'from_year', 'to_year')
-  )), [network.edges, visibleIds, year])
+    visibleIds.has(edge.from) && visibleIds.has(edge.to) && (allDates || isActiveAtYear(edge, year, 'from_year', 'to_year'))
+  )), [allDates, network.edges, visibleIds, year])
   const nodeMap = useMemo(() => new Map(network.nodes.map(node => [node.id, node])), [network.nodes])
   const selectedNode = nodeMap.get(selectedId) || null
+  const displayYear = allDates ? CURRENT_YEAR : year
+  const canvasSize = useMemo(() => getCanvasSize(network.nodes), [network.nodes])
+  const showAllEdgeLabels = visibleEdges.length <= 24
 
   const updateNode = useCallback((id, patch) => {
     updateNetwork(previous => ({
@@ -123,6 +153,161 @@ export default function ActorNetworkEditor() {
       nodes: previous.nodes.map(node => node.id === id ? { ...node, ...patch } : node),
     }))
   }, [updateNetwork])
+
+  const fitNetwork = useCallback((nodes = networkRef.current.nodes) => {
+    const stage = stageRef.current
+    if (!stage || !nodes.length) return
+    const bounds = getNodeBounds(nodes)
+    const nextZoom = clamp(
+      Math.min(
+        Math.max(120, stage.clientWidth - 56) / bounds.width,
+        Math.max(120, stage.clientHeight - 56) / bounds.height,
+      ),
+      MIN_ZOOM,
+      1,
+    )
+    setZoom(nextZoom)
+    requestAnimationFrame(() => {
+      stage.scrollLeft = Math.max(0, (bounds.minX + CANVAS_PADDING - 28) * nextZoom)
+      stage.scrollTop = Math.max(0, (bounds.minY + CANVAS_PADDING - 28) * nextZoom)
+    })
+  }, [])
+
+  const stopDynamicLayout = useCallback(() => {
+    layoutRunRef.current += 1
+    cancelAnimationFrame(layoutFrameRef.current)
+    setLayoutRunning(false)
+    persist(networkRef.current)
+  }, [persist])
+
+  const runDynamicLayout = useCallback((source = networkRef.current) => {
+    if (!source.nodes.length) return
+    layoutRunRef.current += 1
+    cancelAnimationFrame(layoutFrameRef.current)
+    const runId = layoutRunRef.current
+    const area = getLayoutArea(source.nodes.length)
+    const edges = source.edges.filter(edge => source.nodes.some(node => node.id === edge.from) && source.nodes.some(node => node.id === edge.to))
+    const degree = new Map(source.nodes.map(node => [node.id, 0]))
+    edges.forEach(edge => {
+      degree.set(edge.from, (degree.get(edge.from) || 0) + 1)
+      degree.set(edge.to, (degree.get(edge.to) || 0) + 1)
+    })
+    const sourceBounds = getRawNodeBounds(source.nodes)
+    let simulationNodes = source.nodes.map((node, index) => {
+      const normalizedX = sourceBounds.width > 1
+        ? ((node.x - sourceBounds.minX) / sourceBounds.width) * (area.width - NODE_WIDTH)
+        : area.width / 2 - NODE_WIDTH / 2
+      const normalizedY = sourceBounds.height > 1
+        ? ((node.y - sourceBounds.minY) / sourceBounds.height) * (area.height - NODE_HEIGHT)
+        : area.height / 2 - NODE_HEIGHT / 2
+      const angle = index * 2.399963229728653
+      return {
+        ...node,
+        x: clamp(normalizedX + Math.cos(angle) * 18, 0, area.width - NODE_WIDTH),
+        y: clamp(normalizedY + Math.sin(angle) * 18, 0, area.height - NODE_HEIGHT),
+        vx: 0,
+        vy: 0,
+      }
+    })
+    const edgePairs = edges.map(edge => [edge.from, edge.to])
+    const maxFrames = source.nodes.length > 90 ? 190 : 230
+    let frame = 0
+
+    setSelectedId(null)
+    setLayoutRunning(true)
+    setDirty(true)
+    const initialNetwork = { ...source, nodes: simulationNodes.map(stripVelocity) }
+    networkRef.current = initialNetwork
+    setNetwork(initialNetwork)
+    requestAnimationFrame(() => fitNetwork(initialNetwork.nodes))
+
+    const tick = () => {
+      if (layoutRunRef.current !== runId) return
+      frame += 1
+      const alpha = Math.max(0.05, 1 - frame / maxFrames)
+      const byId = new Map(simulationNodes.map(node => [node.id, node]))
+
+      for (let i = 0; i < simulationNodes.length; i += 1) {
+        const a = simulationNodes[i]
+        const acx = a.x + NODE_WIDTH / 2
+        const acy = a.y + NODE_HEIGHT / 2
+        for (let j = i + 1; j < simulationNodes.length; j += 1) {
+          const b = simulationNodes[j]
+          let dx = acx - (b.x + NODE_WIDTH / 2)
+          let dy = acy - (b.y + NODE_HEIGHT / 2)
+          if (dx === 0 && dy === 0) {
+            dx = ((i * 17 + j * 11) % 9) - 4 || 1
+            dy = ((i * 7 + j * 19) % 9) - 4 || -1
+          }
+          const distanceSquared = Math.max(2500, dx * dx + dy * dy)
+          const distance = Math.sqrt(distanceSquared)
+          const charge = Math.min(1.4, (28000 / distanceSquared) * alpha)
+          const chargeX = (dx / distance) * charge
+          const chargeY = (dy / distance) * charge
+          a.vx += chargeX
+          a.vy += chargeY
+          b.vx -= chargeX
+          b.vy -= chargeY
+
+          const overlapX = NODE_WIDTH + 42 - Math.abs(dx)
+          const overlapY = NODE_HEIGHT + 42 - Math.abs(dy)
+          if (overlapX > 0 && overlapY > 0) {
+            if (overlapX < overlapY) {
+              const push = Math.sign(dx) * overlapX * 0.045 * alpha
+              a.vx += push
+              b.vx -= push
+            } else {
+              const push = Math.sign(dy) * overlapY * 0.045 * alpha
+              a.vy += push
+              b.vy -= push
+            }
+          }
+        }
+      }
+
+      edgePairs.forEach(([fromId, toId]) => {
+        const from = byId.get(fromId)
+        const to = byId.get(toId)
+        if (!from || !to) return
+        const dx = (to.x + NODE_WIDTH / 2) - (from.x + NODE_WIDTH / 2)
+        const dy = (to.y + NODE_HEIGHT / 2) - (from.y + NODE_HEIGHT / 2)
+        const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy))
+        const desired = 350
+        const force = (distance - desired) * 0.0045 * alpha
+        const fx = (dx / distance) * force
+        const fy = (dy / distance) * force
+        from.vx += fx
+        from.vy += fy
+        to.vx -= fx
+        to.vy -= fy
+      })
+
+      const centerX = area.width / 2 - NODE_WIDTH / 2
+      const centerY = area.height / 2 - NODE_HEIGHT / 2
+      simulationNodes.forEach(node => {
+        const centrality = 1 + Math.min(5, degree.get(node.id) || 0) * 0.08
+        node.vx += (centerX - node.x) * 0.00045 * alpha * centrality
+        node.vy += (centerY - node.y) * 0.00045 * alpha * centrality
+        node.vx = clamp(node.vx * 0.84, -16, 16)
+        node.vy = clamp(node.vy * 0.84, -16, 16)
+        node.x = clamp(node.x + node.vx, 0, area.width - NODE_WIDTH)
+        node.y = clamp(node.y + node.vy, 0, area.height - NODE_HEIGHT)
+      })
+
+      const nextNetwork = { ...source, nodes: simulationNodes.map(stripVelocity) }
+      networkRef.current = nextNetwork
+      setNetwork(nextNetwork)
+      if (frame < maxFrames) {
+        layoutFrameRef.current = requestAnimationFrame(tick)
+      } else {
+        setLayoutRunning(false)
+        persist(nextNetwork)
+        fitNetwork(nextNetwork.nodes)
+      }
+    }
+
+    layoutFrameRef.current = requestAnimationFrame(tick)
+  }, [fitNetwork, persist])
 
   const addNode = useCallback((type) => {
     const id = makeActorId(type === 'organization' ? 'org' : type === 'position' ? 'poste' : 'personne')
@@ -168,7 +353,7 @@ export default function ActorNetworkEditor() {
   }, [updateNetwork])
 
   const handlePointerDown = useCallback((event, node) => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || layoutRunning) return
     event.preventDefault()
     event.stopPropagation()
     setSelectedId(node.id)
@@ -180,7 +365,7 @@ export default function ActorNetworkEditor() {
       originY: node.y,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
-  }, [])
+  }, [layoutRunning])
 
   const handlePointerMove = useCallback((event) => {
     const drag = dragRef.current
@@ -243,11 +428,17 @@ export default function ActorNetworkEditor() {
     }
     const next = mergeActorNetwork(networkRef.current, reviewedImport, selected)
     setNetwork(next)
-    persist(next)
     setYear(Math.max(next.settings.min_year, Math.min(next.settings.max_year, year)))
     setImportDraft(null)
-    toast(`${selected.size} nœud${selected.size > 1 ? 's' : ''} importé${selected.size > 1 ? 's' : ''}`)
-  }, [importDraft, persist, toast, year])
+    if (next.nodes.length >= LARGE_NETWORK_THRESHOLD) {
+      requestAnimationFrame(() => runDynamicLayout(next))
+      toast(`${selected.size} nœud${selected.size > 1 ? 's' : ''} importé${selected.size > 1 ? 's' : ''} · disposition en cours`)
+    } else {
+      persist(next)
+      requestAnimationFrame(() => fitNetwork(next.nodes))
+      toast(`${selected.size} nœud${selected.size > 1 ? 's' : ''} importé${selected.size > 1 ? 's' : ''}`)
+    }
+  }, [fitNetwork, importDraft, persist, runDynamicLayout, toast, year])
 
   const applyRawJson = useCallback(() => {
     try {
@@ -288,13 +479,13 @@ export default function ActorNetworkEditor() {
   const history = useFileHistoryActions({ flushPending, applyContent: applyHistoryContent, hasPending: dirty })
 
   const startStudy = useCallback(() => {
-    const cards = buildStudyCards(visibleNodes, network.nodes, year, network.learning?.progress || {})
+    const cards = buildStudyCards(visibleNodes, network.nodes, displayYear, network.learning?.progress || {})
     if (!cards.length) {
       toast('Ajoute au moins une image à une personne, un poste ou une organisation visible.', 'error')
       return
     }
     setStudy({ cards: cards.slice(0, 12), index: 0, revealed: false, known: 0, forgotten: 0 })
-  }, [network.learning?.progress, network.nodes, toast, visibleNodes, year])
+  }, [displayYear, network.learning?.progress, network.nodes, toast, visibleNodes])
 
   const gradeStudy = useCallback((known) => {
     const card = study?.cards[study.index]
@@ -332,7 +523,7 @@ export default function ActorNetworkEditor() {
   }, [persist, study])
 
   return (
-    <div className="actor-network-editor">
+    <div className={`actor-network-editor ${layoutRunning ? 'layout-running' : ''}`}>
       <header className="actor-network-titlebar">
         <div className="actor-network-heading">
           <h2 className="editor-filename">{currentFile.name.replace(/\.json$/i, '')}</h2>
@@ -365,13 +556,26 @@ export default function ActorNetworkEditor() {
       ) : (
         <>
           <div className="actor-network-timebar">
-            <div className="actor-network-year-readout"><span>Année</span><strong>{formatYear(year)}</strong></div>
+            <div className="actor-network-year-readout">
+              <span>{allDates ? 'Période' : 'Année'}</span>
+              <strong>{allDates ? 'Toutes' : formatYear(year)}</strong>
+            </div>
+            <button
+              type="button"
+              className={`actor-network-all-dates ${allDates ? 'active' : ''}`}
+              aria-pressed={allDates}
+              title={`Ignorer les périodes et afficher le titulaire actif en ${CURRENT_YEAR} pour chaque poste`}
+              onClick={() => setAllDates(value => !value)}
+            >
+              Toutes les dates
+            </button>
             <input
               aria-label="Année affichée"
               type="range"
               min={network.settings.min_year}
               max={network.settings.max_year}
               value={year}
+              disabled={allDates}
               onChange={event => setYear(Number(event.target.value))}
             />
             <input
@@ -381,13 +585,22 @@ export default function ActorNetworkEditor() {
               min={network.settings.min_year}
               max={network.settings.max_year}
               value={year}
+              disabled={allDates}
               onChange={event => setYear(clampYear(event.target.value, network.settings))}
             />
             <div className="actor-network-range-fields">
               <label>Début <input type="number" value={network.settings.min_year} onChange={event => updateNetwork(previous => ({ ...previous, settings: { ...previous.settings, min_year: Number(event.target.value) } }), { normalize: true })} /></label>
               <label>Fin <input type="number" value={network.settings.max_year} onChange={event => updateNetwork(previous => ({ ...previous, settings: { ...previous.settings, max_year: Number(event.target.value) } }), { normalize: true })} /></label>
             </div>
-            <label className="actor-network-inactive-toggle"><input type="checkbox" checked={network.settings.show_inactive} onChange={event => updateNetwork(previous => ({ ...previous, settings: { ...previous.settings, show_inactive: event.target.checked } }))} /> Tout afficher</label>
+            <label className="actor-network-inactive-toggle"><input type="checkbox" checked={network.settings.show_inactive} disabled={allDates} onChange={event => updateNetwork(previous => ({ ...previous, settings: { ...previous.settings, show_inactive: event.target.checked } }))} /> Inactifs de l’année</label>
+            <div className="actor-network-layout-actions">
+              <button type="button" className={layoutRunning ? 'active' : ''} onClick={layoutRunning ? stopDynamicLayout : () => runDynamicLayout()}>
+                <Icon name="graph" size={14} /> {layoutRunning ? 'Arrêter' : 'Organiser'}
+              </button>
+              <button type="button" onClick={() => fitNetwork(visibleNodes)} title="Afficher tous les nœuds visibles dans le cadre">
+                <Icon name="expand" size={14} /> Cadrer
+              </button>
+            </div>
             <div className="actor-network-zoom">
               <button type="button" onClick={() => setZoom(value => Math.max(MIN_ZOOM, value - 0.1))}>−</button>
               <button type="button" onClick={() => setZoom(0.9)}>{Math.round(zoom * 100)}%</button>
@@ -411,9 +624,9 @@ export default function ActorNetworkEditor() {
               onPointerCancel={handlePointerUp}
               onClick={() => setSelectedId(null)}
             >
-              <div className="actor-network-canvas" style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}>
-                <div ref={viewportRef} className="actor-network-viewport" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})` }}>
-                  <svg className="actor-network-lines" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
+              <div className="actor-network-canvas" style={{ width: canvasSize.width * zoom, height: canvasSize.height * zoom }}>
+                <div ref={viewportRef} className="actor-network-viewport" style={{ width: canvasSize.width, height: canvasSize.height, transform: `scale(${zoom})` }}>
+                  <svg className="actor-network-lines" width={canvasSize.width} height={canvasSize.height}>
                     <defs>
                       <marker id="actor-network-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                         <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
@@ -426,13 +639,17 @@ export default function ActorNetworkEditor() {
                       const { start, end } = edgePoints(from, to)
                       const labelX = (start.x + end.x) / 2
                       const labelY = (start.y + end.y) / 2
+                      const highlighted = selectedId && (edge.from === selectedId || edge.to === selectedId)
+                      const dimmed = selectedId && !highlighted
                       return (
-                        <g key={edge.id} className="actor-network-edge-group">
+                        <g key={edge.id} className={`actor-network-edge-group ${highlighted ? 'highlighted' : ''} ${dimmed ? 'dimmed' : ''}`}>
                           <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={edge.color} markerEnd="url(#actor-network-arrow)" />
-                          <g transform={`translate(${labelX} ${labelY})`}>
-                            <rect x="-66" y="-13" width="132" height="26" rx="8" />
-                            <text textAnchor="middle" dominantBaseline="middle">{edge.label}</text>
-                          </g>
+                          {(showAllEdgeLabels || highlighted) && (
+                            <g transform={`translate(${labelX} ${labelY})`}>
+                              <rect x="-66" y="-13" width="132" height="26" rx="8" />
+                              <text textAnchor="middle" dominantBaseline="middle">{edge.label}</text>
+                            </g>
+                          )}
                         </g>
                       )
                     })}
@@ -442,7 +659,7 @@ export default function ActorNetworkEditor() {
                       key={node.id}
                       node={node}
                       nodes={network.nodes}
-                      year={year}
+                      year={displayYear}
                       selected={selectedId === node.id}
                       onPointerDown={event => handlePointerDown(event, node)}
                       onClick={event => { event.stopPropagation(); setSelectedId(node.id) }}
@@ -452,7 +669,7 @@ export default function ActorNetworkEditor() {
                     <div className="actor-network-empty-year">
                       <Icon name="timeline" size={34} />
                       <strong>Aucun acteur visible en {formatYear(year)}</strong>
-                      <span>Change l’année, active « Tout afficher » ou ajoute un acteur.</span>
+                      <span>Change l’année, active « Toutes les dates » ou ajoute un acteur.</span>
                     </div>
                   )}
                 </div>
@@ -462,7 +679,7 @@ export default function ActorNetworkEditor() {
               node={selectedNode}
               nodes={network.nodes}
               edges={network.edges}
-              year={year}
+              year={displayYear}
               onUpdate={patch => updateNode(selectedNode.id, patch)}
               onUpdateNode={updateNode}
               onUpdateNetwork={updateNetwork}
@@ -496,7 +713,8 @@ export default function ActorNetworkEditor() {
       {study && (
         <ActorStudy
           study={study}
-          year={year}
+          year={displayYear}
+          allDates={allDates}
           onReveal={() => setStudy(previous => ({ ...previous, revealed: true }))}
           onGrade={gradeStudy}
           onClose={() => setStudy(null)}
@@ -736,7 +954,7 @@ function ActorImportReview({ draft, setDraft, onClose, onConfirm, toast }) {
   )
 }
 
-function ActorStudy({ study, year, onReveal, onGrade, onClose }) {
+function ActorStudy({ study, year, allDates, onReveal, onGrade, onClose }) {
   const card = study.cards[study.index]
   if (!card) {
     return <div className="actor-network-overlay" role="dialog" aria-modal="true"><section className="actor-study-panel done"><Icon name="check" size={42} /><h3>Session terminée</h3><p>{study.known} su · {study.forgotten} à revoir</p><button className="btn-primary" onClick={onClose}>Fermer</button></section></div>
@@ -744,7 +962,7 @@ function ActorStudy({ study, year, onReveal, onGrade, onClose }) {
   return (
     <div className="actor-network-overlay" role="dialog" aria-modal="true">
       <section className="actor-study-panel">
-        <header><div><span>Mémorisation · {formatYear(year)}</span><strong>{study.index + 1} / {study.cards.length}</strong></div><button className="icon-btn" onClick={onClose}>×</button></header>
+        <header><div><span>Mémorisation · {allDates ? 'toutes les dates' : formatYear(year)}</span><strong>{study.index + 1} / {study.cards.length}</strong></div><button className="icon-btn" onClick={onClose}>×</button></header>
         <div className="actor-study-image"><img src={card.image.src} alt={study.revealed ? card.image.alt : ''} referrerPolicy="no-referrer" /></div>
         <div className="actor-study-question">
           {!study.revealed ? <><span>{card.type === 'organization' ? 'Quelle organisation est-ce ?' : 'Qui est cette personne ?'}</span><strong>Essaie de retrouver son nom et son rôle.</strong></> : <><span>{card.subtitle}</span><h3>{card.name}</h3>{card.summary && <p>{card.summary}</p>}{card.details && <details><summary>Voir le texte détaillé</summary><p>{card.details}</p></details>}{card.dates.length > 0 && <ul>{card.dates.slice(0, 4).map(item => <li key={item.id}><strong>{formatYear(item.year)}</strong> {item.label}</li>)}</ul>}</>}
@@ -768,12 +986,60 @@ function safeParse(file) {
   catch (_) { return parseActorNetworkJson(JSON.stringify({ philoweek_type: 'actor_network', version: 1, title: file?.name?.replace(/\.json$/i, '') || 'Réseau d’acteurs', nodes: [], edges: [] })) }
 }
 
+function getCanvasSize(nodes) {
+  if (!nodes.length) return { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT }
+  const maxX = Math.max(0, ...nodes.map(node => Number(node.x) || 0))
+  const maxY = Math.max(0, ...nodes.map(node => Number(node.y) || 0))
+  return {
+    width: Math.max(BASE_CANVAS_WIDTH, Math.ceil(maxX + NODE_WIDTH + CANVAS_PADDING * 2)),
+    height: Math.max(BASE_CANVAS_HEIGHT, Math.ceil(maxY + NODE_HEIGHT + CANVAS_PADDING * 2)),
+  }
+}
+
+function getRawNodeBounds(nodes) {
+  if (!nodes.length) return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 }
+  const xs = nodes.map(node => Number(node.x) || 0)
+  const ys = nodes.map(node => Number(node.y) || 0)
+  const minX = Math.min(...xs)
+  const minY = Math.min(...ys)
+  const maxX = Math.max(...xs)
+  const maxY = Math.max(...ys)
+  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
+}
+
+function getNodeBounds(nodes) {
+  const raw = getRawNodeBounds(nodes)
+  return {
+    ...raw,
+    width: Math.max(NODE_WIDTH, raw.maxX - raw.minX + NODE_WIDTH) + 56,
+    height: Math.max(NODE_HEIGHT, raw.maxY - raw.minY + NODE_HEIGHT) + 56,
+  }
+}
+
+function getLayoutArea(count) {
+  const columns = Math.max(2, Math.ceil(Math.sqrt(count * 1.35)))
+  const rows = Math.ceil(count / columns)
+  return {
+    width: Math.max(1500, columns * (NODE_WIDTH + 76)),
+    height: Math.max(1050, rows * (NODE_HEIGHT + 76)),
+  }
+}
+
+function stripVelocity(node) {
+  const { vx, vy, ...clean } = node
+  return clean
+}
+
 function getViewCenter(stage, zoom) {
   if (!stage) return null
   return {
     x: (stage.scrollLeft + stage.clientWidth / 2) / zoom - CANVAS_PADDING - NODE_WIDTH / 2,
     y: (stage.scrollTop + stage.clientHeight / 2) / zoom - CANVAS_PADDING - NODE_HEIGHT / 2,
   }
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
 }
 
 function nodeCenter(node) {
