@@ -7,6 +7,7 @@ import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControl
 import * as api from '../api'
 import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
+import WikiLinkPreview from './WikiLinkPreview'
 
 const AUTOSAVE_DELAY = 800
 
@@ -410,7 +411,7 @@ export default function DefinitionsEditor() {
                         <textarea
                           value={definition.definition || ''}
                           onChange={event => updateDefinition(index, 'definition', event.target.value)}
-                          placeholder="Définition à retenir… Lien : [[fichier|partie]]"
+                          placeholder="Définition à retenir… Lien : [[fichier#partie|libellé]]"
                         />
                       </label>
                       <label>
@@ -418,7 +419,7 @@ export default function DefinitionsEditor() {
                         <textarea
                           value={definition.example || ''}
                           onChange={event => updateDefinition(index, 'example', event.target.value)}
-                          placeholder="Exemple, nuance ou [[fichier|partie]]…"
+                          placeholder="Exemple, nuance ou [[fichier#partie|libellé]]…"
                         />
                       </label>
                     </div>
@@ -431,6 +432,7 @@ export default function DefinitionsEditor() {
                       />
                     </label>
                     <DefinitionWikiLinks
+                      currentFile={currentFile}
                       definition={definition}
                       fileNames={fileNames}
                       openFile={openFile}
@@ -441,12 +443,13 @@ export default function DefinitionsEditor() {
             </>
           )}
         </div>
+        <WikiLinkPreview rootRef={previewPaneRef} />
       </div>
     </div>
   )
 }
 
-function DefinitionWikiLinks({ definition, fileNames, openFile }) {
+function DefinitionWikiLinks({ currentFile, definition, fileNames, openFile }) {
   const links = useMemo(
     () => parseWikiLinks(`${definition.definition || ''}\n${definition.example || ''}`),
     [definition.definition, definition.example]
@@ -459,15 +462,18 @@ function DefinitionWikiLinks({ definition, fileNames, openFile }) {
     <div className="definition-wiki-links" aria-label="Liens de cette définition">
       <span>Liens</span>
       {links.map(link => {
-        const fileId = resolveWikiTarget(fileIndex, link.target)
+        const fileId = link.target ? resolveWikiTarget(fileIndex, link.target) : currentFile?.id
         return (
           <button
-            key={`${link.target}|${link.part}`}
+            key={`${link.target}#${link.part}|${link.label}`}
             type="button"
             className={`wiki-link ${fileId ? 'resolved' : 'unresolved'}`}
+            data-file-id={fileId || undefined}
+            data-file-part={link.part || undefined}
+            data-file-target={link.target || currentFile?.name || 'Cette fiche'}
             disabled={!fileId}
             onClick={() => fileId && openFile(fileId, { focusPart: link.part || undefined })}
-            title={fileId ? `Ouvrir ${link.target}${link.part ? `, partie ${link.part}` : ''}` : `Fichier introuvable : ${link.target}`}
+            title={!fileId ? `Fichier introuvable : ${link.target || 'lien local'}` : undefined}
           >
             {link.label}
           </button>

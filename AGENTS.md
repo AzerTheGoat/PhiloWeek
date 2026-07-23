@@ -293,9 +293,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les definitions passent dans le moteur de revision existant : le mot devient la question, la definition la correction, et l'exemple l'explication.
 - Une revision de definitions en cours conserve elle aussi sa progression par fichier pendant la session de l'application.
 - Dans le panneau global `Reviser`, selectionner directement un fichier Definitions lance la revision de ses mots; les resultats sont stockes dans `questionnaire_results` comme les quiz.
-- Les champs `definition` et `example` acceptent les liens wiki `[[Nom du fichier|Partie]]`; les liens sont cliquables dans la carte et ouvrent le titre Markdown correspondant dans une note.
-- Une note Markdown peut cibler une definition precise avec `[[Nom de la fiche|Terme]]`; la fiche JSON s'ouvre et centre la carte dont le mot correspond a `Terme`.
-- La resolution des liens sans extension couvre les fichiers `.md`, `.json` et `.xlsx`; la partie apres `|` sert a la fois de libelle et de destination interne.
+- Les champs `definition` et `example` acceptent les liens wiki `[[Nom du fichier#Partie|Libelle]]`; `#` choisit la definition ou le titre Markdown cible et `|` choisit le texte affiche. Les liens locaux `[[#Partie|Libelle]]` restent dans le fichier courant. L'ancien format `[[Nom du fichier|Partie]]` reste compatible.
+- Une note Markdown peut cibler une definition precise avec `[[Nom de la fiche#Terme|Libelle]]`; la fiche JSON s'ouvre et centre la carte dont le mot correspond a `Terme`.
+- La resolution des liens sans extension couvre les fichiers `.md`, `.json` et `.xlsx`. Dans le format explicite, la partie apres `#` est la destination interne et la partie apres `|` est seulement le libelle visible.
 - L'export/import Obsidian inclut les fichiers Definitions tels quels, puisqu'ils restent des fichiers `.json` standards.
 
 ## Onglets de fichiers
@@ -397,3 +397,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - La creation peut importer un vrai fichier `.xlsx`. `server/routes/spreadsheets.js` convertit ce binaire vers le JSON interne avec une limite de 25 Mo et conserve valeurs, formules, feuilles, dimensions, styles, fusions, notes, validations et filtre automatique.
 - Le bouton `XLSX` reconvertit le JSON en classeur Office Open XML. L'export ZIP Obsidian place egalement un vrai binaire `.xlsx` et ajoute `_Opuscule/SpreadsheetMetadata.json` pour restaurer les fonctions internes que le format XLSX ne preserve pas via ExcelJS, notamment graphiques et regles de filtre/format conditionnel.
 - Les tableurs passent par le meme `saveFile`, `content_version`, historique undo/redo, partage view/edit, presence cloud, chiffrement de dossier et corbeille que les autres fichiers; aucune route tableur ne contourne `requireFileAccess`.
+
+## Apercu au survol des liens wiki
+
+- Dans l'apercu Markdown et dans les liens affiches par l'editeur de definitions, survoler un lien wiki resolu affiche une carte pres du pointeur sans ouvrir le fichier.
+- Pour `[[Fiche de definitions#Terme|Libelle]]`, la carte affiche le terme, sa definition et son exemple ou sa nuance. Pour `[[Note#Titre|Libelle]]`, elle affiche le contenu de la section Markdown visee; sans partie, elle montre un extrait du fichier.
+- La syntaxe suit `[[Fichier#Partie|Libelle]]` : `#` determine la destination interne et `|` seulement l'affichage quand `#` est present. `[[#Partie|Libelle]]` vise le fichier courant. L'ancien `[[Fichier|Partie]]` conserve son comportement historique de destination et de libelle.
+- Les questionnaires, reseaux d'acteurs et tableurs affichent un resume adapte a leur format. Un lien non resolu ne declenche aucune requete ni carte.
+- Le contenu est charge uniquement a la demande via la route de fichier deja protegee par les droits d'acces, puis garde dans un cache client court. La carte rend uniquement du texte, jamais le HTML brut du fichier.
+- Le clic conserve son comportement d'ouverture et de centrage. Les liens de l'apercu Markdown sont aussi accessibles au clavier avec Tab puis Entree ou Espace.

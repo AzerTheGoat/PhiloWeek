@@ -47,7 +47,7 @@ const SECTIONS = [
       {
         icon: 'graph',
         title: 'Liens [[wiki]] et #tags',
-        text: "Tape [[ dans une note pour lier une autre note (autocomplete). Les #tags dans le texte ou le frontmatter YAML sont indexés automatiquement.",
+        text: "Tape [[ dans une note pour lier une autre note (autocomplete). Utilise [[Fichier#Section|Libellé]] pour pointer précisément une section tout en choisissant le texte affiché. Dans l’aperçu, survole le lien pour lire la définition ou l’extrait lié sans quitter la note. Les #tags hors des liens restent indexés automatiquement.",
       },
       {
         icon: 'download',
@@ -202,7 +202,7 @@ const SECTIONS = [
       {
         icon: 'abc',
         title: 'Relier notes et définitions',
-        text: "Utilise [[Nom du fichier|Partie]] dans une définition ou une note. Le lien ouvre le fichier puis vise la définition portant ce nom ou le titre Markdown correspondant.",
+        text: "Utilise [[Nom du fichier#Terme|Libellé]] dans une définition ou une note : # indique la définition ou le titre à viser, et | le texte visible. [[#Titre|Voir ici]] pointe dans la note actuelle. L’ancien format [[Fichier|Partie]] reste compatible. Survole le lien pour afficher le contenu associé, puis clique pour l’ouvrir.",
       },
     ],
   },

@@ -215,7 +215,7 @@ function getQuestionnaireReferences(db, target, paths, userId, sessionId) {
 function findWikiSnippets(content, linkText) {
   const body = stripFrontmatter(content)
   const aliases = new Set([linkText, linkText.replace(/\.md$/i, '')])
-  const patterns = [...aliases].map(alias => new RegExp(`\\[\\[${escapeRegExp(alias)}(?:\\|[^\\]]+)?\\]\\]`, 'i'))
+  const patterns = [...aliases].map(alias => new RegExp(`\\[\\[${escapeRegExp(alias)}(?:#[^|\\]]+)?(?:\\|[^\\]]+)?\\]\\]`, 'i'))
   const blocks = body
     .split(/\n{2,}/)
     .map(block => block.trim())

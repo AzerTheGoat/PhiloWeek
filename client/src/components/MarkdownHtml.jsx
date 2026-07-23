@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import WikiLinkPreview from './WikiLinkPreview'
+import { normalizeWikiPart } from '../utils/wikiLinks'
 
 const MAX_DIAGRAMS = 20
 const MAX_SOURCE_LENGTH = 50_000
 let mermaidQueue = Promise.resolve()
 
-export default function MarkdownHtml({ html, className = 'markdown-preview', onClick }) {
+export default function MarkdownHtml({ html, className = 'markdown-preview', focusPart, focusRequest, onClick, onKeyDown }) {
   const rootRef = useRef(null)
   const [theme, setTheme] = useState(readTheme)
 
@@ -74,14 +76,39 @@ export default function MarkdownHtml({ html, className = 'markdown-preview', onC
     return () => { cancelled = true }
   }, [html, theme])
 
+  useEffect(() => {
+    const requestedPart = normalizeWikiPart(focusPart)
+    const root = rootRef.current
+    if (!requestedPart || !root) return undefined
+    let target
+    let cleanupTimer
+    const frame = requestAnimationFrame(() => {
+      target = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+        .find(heading => normalizeWikiPart(heading.textContent) === requestedPart)
+      if (!target) return
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      target.classList.add('wiki-focus-target')
+      cleanupTimer = setTimeout(() => target?.classList.remove('wiki-focus-target'), 2200)
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(cleanupTimer)
+      target?.classList.remove('wiki-focus-target')
+    }
+  }, [focusPart, focusRequest, html, theme])
+
   return (
-    <div
-      key={theme}
-      ref={rootRef}
-      className={className}
-      onClick={onClick}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <>
+      <div
+        key={theme}
+        ref={rootRef}
+        className={className}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      <WikiLinkPreview rootRef={rootRef} refreshKey={theme} />
+    </>
   )
 }
 

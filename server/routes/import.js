@@ -828,14 +828,16 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
       const insertLink = db.prepare(
         'INSERT OR IGNORE INTO file_links (source_id, target_id, link_text) VALUES (?, ?, ?)'
       )
-      const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
+      const linkRegex = /\[\[([^\]]+)\]\]/g
       for (const file of allFiles) {
         const content = file.content || ''
         deleteLinks.run(file.id)
         let m
         linkRegex.lastIndex = 0
         while ((m = linkRegex.exec(content)) !== null) {
-          const linkText = m[1].trim()
+          const destination = String(m[1] || '').split('|', 1)[0].trim()
+          const linkText = destination.split('#', 1)[0].trim()
+          if (!linkText) continue
           const targetId = nameToId[linkText.toLocaleLowerCase()]
           if (targetId && targetId !== file.id) {
             try { insertLink.run(file.id, targetId, linkText); report.linksResolved++ }

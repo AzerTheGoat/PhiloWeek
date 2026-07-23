@@ -683,9 +683,10 @@ async function initDb() {
 
 function updateTags(db, fileId, content) {
   const tags = new Set()
+  const tagSource = String(content || '').replace(/\[\[[^\]]+\]\]/g, ' ')
   const tagRegex = /#([a-zA-Z0-9_À-ɏ-]+)/g
   let m
-  while ((m = tagRegex.exec(content)) !== null) tags.add(m[1])
+  while ((m = tagRegex.exec(tagSource)) !== null) tags.add(m[1])
 
   try {
     const matter = require('gray-matter')
@@ -702,10 +703,13 @@ function updateTags(db, fileId, content) {
 }
 
 function updateLinks(db, fileId, content, userId) {
-  const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
+  const linkRegex = /\[\[([^\]]+)\]\]/g
   const linkTexts = new Set()
   let m
-  while ((m = linkRegex.exec(content)) !== null) linkTexts.add(m[1].trim())
+  while ((m = linkRegex.exec(content)) !== null) {
+    const linkText = wikiFileTarget(m[1])
+    if (linkText) linkTexts.add(linkText)
+  }
 
   db.prepare('DELETE FROM file_links WHERE source_id = ?').run(fileId)
   const insertLink = db.prepare(
@@ -725,6 +729,11 @@ function updateLinks(db, fileId, content, userId) {
     ).get(...candidates, userId ?? null, linkText.toLocaleLowerCase())
     if (target) insertLink.run(fileId, target.id, linkText)
   }
+}
+
+function wikiFileTarget(value) {
+  const destination = String(value || '').split('|', 1)[0].trim()
+  return destination.split('#', 1)[0].trim()
 }
 
 function wikiTargetCandidates(value) {

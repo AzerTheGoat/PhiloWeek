@@ -2,13 +2,13 @@ import { memo, useMemo, useCallback } from 'react'
 import { marked } from 'marked'
 import { useApp } from '../context/useApp'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
-import { buildFileNameIndex, resolveWikiTarget } from '../utils/wikiLinks'
+import { buildFileNameIndex, parseWikiLinkExpression, resolveWikiTarget } from '../utils/wikiLinks'
 import MarkdownHtml from './MarkdownHtml'
 
 marked.setOptions({ breaks: true, gfm: true })
 
 const Preview = memo(function Preview({ content }) {
-  const { fileNames, openFile } = useApp()
+  const { currentFile, fileNames, openFile } = useApp()
 
   const nameToId = useMemo(() => buildFileNameIndex(fileNames), [fileNames])
 
@@ -19,20 +19,22 @@ const Preview = memo(function Preview({ content }) {
     let body = content.replace(/^---[\s\S]*?---\n?/, '')
 
     // Replace [[links]] with HTML spans before Markdown parsing
-    body = body.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, rawTarget, rawPart) => {
-      const target = rawTarget.trim()
-      const part = rawPart?.trim() || ''
-      const label = escapeHtml(part || target)
-      const id = resolveWikiTarget(nameToId, target)
+    body = body.replace(/\[\[([^\]]+)\]\]/g, (_, expression) => {
+      const parsed = parseWikiLinkExpression(expression)
+      if (!parsed) return escapeHtml(`[[${expression}]]`)
+      const { target, part, label } = parsed
+      const safeLabel = escapeHtml(label)
+      const id = target ? resolveWikiTarget(nameToId, target) : currentFile?.id
       if (id) {
         const partAttribute = part ? ` data-file-part="${escapeHtmlAttribute(part)}"` : ''
-        return `<a class="wiki-link resolved" data-file-id="${escapeHtmlAttribute(id)}"${partAttribute}>${label}</a>`
+        const targetLabel = target || currentFile?.name || 'Cette note'
+        return `<a class="wiki-link resolved" role="link" tabindex="0" data-file-id="${escapeHtmlAttribute(id)}" data-file-target="${escapeHtmlAttribute(targetLabel)}"${partAttribute}>${safeLabel}</a>`
       }
-      return `<a class="wiki-link unresolved">${label}</a>`
+      return `<a class="wiki-link unresolved">${safeLabel}</a>`
     })
 
     return sanitizeHtml(marked(body))
-  }, [content, nameToId])
+  }, [content, currentFile?.id, currentFile?.name, nameToId])
 
   const handleClick = useCallback((e) => {
     const link = e.target.closest('.wiki-link.resolved')
@@ -42,7 +44,25 @@ const Preview = memo(function Preview({ content }) {
     }
   }, [openFile])
 
-  return <MarkdownHtml html={html} className="markdown-preview" onClick={handleClick} />
+  const handleKeyDown = useCallback((e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    const link = e.target.closest('.wiki-link.resolved')
+    if (!link) return
+    e.preventDefault()
+    const id = link.dataset.fileId
+    if (id) openFile(id, { focusPart: link.dataset.filePart || undefined })
+  }, [openFile])
+
+  return (
+    <MarkdownHtml
+      html={html}
+      className="markdown-preview"
+      focusPart={currentFile?.initial_focus_part}
+      focusRequest={currentFile}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    />
+  )
 })
 
 export default Preview

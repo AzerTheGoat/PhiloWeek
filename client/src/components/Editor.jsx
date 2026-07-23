@@ -14,7 +14,6 @@ import { isQuestionnaireFile } from '../utils/questionnaireFile'
 import { isDefinitionsFile } from '../utils/definitionsFile'
 import { isSpreadsheetFile } from '../utils/spreadsheetFile'
 import { isActorNetworkFile } from '../utils/actorNetworkFile'
-import { normalizeWikiPart } from '../utils/wikiLinks'
 import { useFileScrollRestoration } from '../utils/useFileScrollRestoration'
 import { loadReviewSession, saveReviewSession } from '../utils/reviewSessionMemory'
 import * as api from '../api'
@@ -135,28 +134,6 @@ function MarkdownEditor() {
     // ré-écrase le contenu qu'on vient de restaurer.
     clearTimeout(saveTimerRef.current)
   }, [currentFile]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Un lien [[fichier|partie]] ouvre la note puis centre le titre Markdown
-  // correspondant à "partie" dans l'aperçu.
-  useEffect(() => {
-    const requestedPart = normalizeWikiPart(currentFile?.initial_focus_part)
-    if (!requestedPart) return undefined
-    let cleanupTimer
-    const frame = requestAnimationFrame(() => {
-      const pane = previewPaneRef.current
-      if (!pane) return
-      const target = [...pane.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-        .find(heading => normalizeWikiPart(heading.textContent) === requestedPart)
-      if (!target) return
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      target.classList.add('wiki-focus-target')
-      cleanupTimer = setTimeout(() => target.classList.remove('wiki-focus-target'), 2200)
-    })
-    return () => {
-      cancelAnimationFrame(frame)
-      clearTimeout(cleanupTimer)
-    }
-  }, [currentFile])
 
   // Debounced word count
   useEffect(() => {
@@ -305,7 +282,7 @@ function MarkdownEditor() {
     }
   }, [triggerSave])
 
-  const filteredFiles = wikiQuery
+  const filteredFiles = wikiQuery && !/[#|]/.test(wikiQuery.query)
     ? fileNames.filter(f => f.name.toLowerCase().includes(wikiQuery.query.toLowerCase())).slice(0, 8)
     : []
 
