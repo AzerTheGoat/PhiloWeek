@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -305,7 +304,7 @@ private fun HomeScreen(
     openSettings: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Column(Modifier.fillMaxWidth().background(Surface).statusBarsPadding()) {
+        Column(Modifier.fillMaxWidth().background(Surface).opusculeStatusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -377,8 +376,12 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(58.dp).clip(CircleShape).background(Ink), contentAlignment = Alignment.Center) {
-                    Text(state.user?.username?.take(1)?.uppercase().orEmpty(), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.headlineMedium)
+                Box(Modifier.size(58.dp).clip(CircleShape).background(Opuscule), contentAlignment = Alignment.Center) {
+                    Text(
+                        state.user?.username?.take(1)?.uppercase().orEmpty(),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
                 }
                 Column(Modifier.padding(start = 14.dp)) {
                     Text(state.user?.username.orEmpty(), style = MaterialTheme.typography.titleLarge)
@@ -400,7 +403,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                     onClick = { readingVisible = true },
                 )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.3.0 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow("Version", "1.3.1 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})

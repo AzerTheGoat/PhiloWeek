@@ -126,29 +126,30 @@ fun OrganizationScreen(
         }
         return
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader(
             "Organiser",
-            modifier = Modifier.padding(horizontal = 0.dp),
             subtitle = "Capturez, planifiez, prenez du recul",
         )
-        SectionLabel("Capturer")
-        ActionRow("Idées", "Pensées rapides à reprendre", Icons.Rounded.Lightbulb, { section = OrganizationSection.IDEAS }, accent = Amber, accentSoft = AmberSoft)
-        HorizontalDivider(color = Divider)
-        ActionRow("Citations", "Textes, auteurs et sources", Icons.AutoMirrored.Rounded.MenuBook, { section = OrganizationSection.QUOTES }, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
-        HorizontalDivider(color = Divider)
-        ActionRow("Fact checks", "Affirmations à vérifier", Icons.Rounded.Verified, { section = OrganizationSection.FACTS }, accent = Sage, accentSoft = SageSoft)
-        Spacer(Modifier.height(22.dp))
-        SectionLabel("Planifier")
-        ActionRow("Tâches", "Échéances et suivi", Icons.Rounded.Checklist, { section = OrganizationSection.TODOS }, accent = Coral, accentSoft = CoralSoft)
-        HorizontalDivider(color = Divider)
-        ActionRow("Agenda & habitudes", "Calendrier et régularité", Icons.Rounded.CalendarMonth, { section = OrganizationSection.AGENDA }, accent = Opuscule, accentSoft = OpusculeSoft)
-        Spacer(Modifier.height(22.dp))
-        SectionLabel("Prendre du recul")
-        ActionRow("Vie en semaines", "Visualiser le temps vécu", Icons.Rounded.FavoriteBorder, { section = OrganizationSection.LIFE }, accent = Coral, accentSoft = CoralSoft)
-        HorizontalDivider(color = Divider)
-        ActionRow("Statistiques", "Temps passé dans Opuscule", Icons.Rounded.BarChart, { section = OrganizationSection.USAGE }, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
-        Spacer(Modifier.height(26.dp))
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            SectionLabel("Capturer")
+            ActionRow("Idées", "Pensées rapides à reprendre", Icons.Rounded.Lightbulb, { section = OrganizationSection.IDEAS }, accent = Amber, accentSoft = AmberSoft)
+            HorizontalDivider(color = Divider)
+            ActionRow("Citations", "Textes, auteurs et sources", Icons.AutoMirrored.Rounded.MenuBook, { section = OrganizationSection.QUOTES }, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
+            HorizontalDivider(color = Divider)
+            ActionRow("Fact checks", "Affirmations à vérifier", Icons.Rounded.Verified, { section = OrganizationSection.FACTS }, accent = Sage, accentSoft = SageSoft)
+            Spacer(Modifier.height(22.dp))
+            SectionLabel("Planifier")
+            ActionRow("Tâches", "Échéances et suivi", Icons.Rounded.Checklist, { section = OrganizationSection.TODOS }, accent = Coral, accentSoft = CoralSoft)
+            HorizontalDivider(color = Divider)
+            ActionRow("Agenda & habitudes", "Calendrier et régularité", Icons.Rounded.CalendarMonth, { section = OrganizationSection.AGENDA }, accent = Opuscule, accentSoft = OpusculeSoft)
+            Spacer(Modifier.height(22.dp))
+            SectionLabel("Prendre du recul")
+            ActionRow("Vie en semaines", "Visualiser le temps vécu", Icons.Rounded.FavoriteBorder, { section = OrganizationSection.LIFE }, accent = Coral, accentSoft = CoralSoft)
+            HorizontalDivider(color = Divider)
+            ActionRow("Statistiques", "Temps passé dans Opuscule", Icons.Rounded.BarChart, { section = OrganizationSection.USAGE }, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
+            Spacer(Modifier.height(26.dp))
+        }
     }
 }
 
@@ -387,8 +388,8 @@ private fun AgendaScreen(state: AppState, back: () -> Unit) {
                     }.padding(vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(if (done) Ink else Surface), contentAlignment = Alignment.Center) {
-                        if (done) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(17.dp))
+                    Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(if (done) Opuscule else Surface), contentAlignment = Alignment.Center) {
+                        if (done) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(17.dp))
                     }
                     Text(practice.title, Modifier.padding(start = 11.dp), style = MaterialTheme.typography.titleMedium)
                 }
@@ -524,7 +525,7 @@ private fun IdeaGardenHeader(count: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(Amber).padding(11.dp)) {
-            Icon(Icons.Rounded.Lightbulb, null, tint = Color.White)
+            Icon(Icons.Rounded.Lightbulb, null, tint = MaterialTheme.colorScheme.onPrimary)
         }
         Column(Modifier.padding(start = 14.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text("Jardin d’idées", color = Amber, style = MaterialTheme.typography.titleLarge)
@@ -653,7 +654,7 @@ private fun TodoActionCard(todo: Todo, toggle: () -> Unit, delete: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(34.dp).clip(CircleShape).background(if (done) accent else Color.Transparent), contentAlignment = Alignment.Center) {
-            Icon(if (done) Icons.Rounded.Check else Icons.Rounded.RadioButtonUnchecked, null, tint = if (done) Color.White else accent)
+            Icon(if (done) Icons.Rounded.Check else Icons.Rounded.RadioButtonUnchecked, null, tint = if (done) MaterialTheme.colorScheme.onPrimary else accent)
         }
         Column(Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(todo.title, style = MaterialTheme.typography.titleMedium, color = if (done) Muted else Ink, textDecoration = if (done) TextDecoration.LineThrough else null)
@@ -742,13 +743,13 @@ private fun MonthGrid(month: YearMonth, selected: LocalDate, agenda: Agenda, tod
                 val hasTodo = todos.any { it.dueAt == day.toString() && it.status != "done" }
                 val active = day == selected
                 Column(
-                    Modifier.weight(1f).aspectRatio(1f).clip(CircleShape).background(if (active) Ink else Color.Transparent)
+                    Modifier.weight(1f).aspectRatio(1f).clip(CircleShape).background(if (active) Opuscule else Color.Transparent)
                         .clickable { pick(day) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(day.dayOfMonth.toString(), color = when { active -> Color.White; day.month != month.month -> Muted.copy(alpha = .45f); else -> Ink }, style = MaterialTheme.typography.bodyMedium)
-                    if (hasTodo) Box(Modifier.size(4.dp).clip(CircleShape).background(if (active) Color.White else Opuscule))
+                    Text(day.dayOfMonth.toString(), color = when { active -> MaterialTheme.colorScheme.onPrimary; day.month != month.month -> Muted.copy(alpha = .45f); else -> Ink }, style = MaterialTheme.typography.bodyMedium)
+                    if (hasTodo) Box(Modifier.size(4.dp).clip(CircleShape).background(if (active) MaterialTheme.colorScheme.onPrimary else Opuscule))
                 }
             }
         }
@@ -847,9 +848,9 @@ private fun UsageChart(days: List<fr.opuscule.android.data.UsageDay>) {
 private fun SmallToggle(label: String, active: Boolean, click: () -> Unit) {
     Text(
         label,
-        color = if (active) Color.White else Ink,
+        color = if (active) MaterialTheme.colorScheme.onPrimary else Ink,
         style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier.clip(CircleShape).background(if (active) Ink else Surface).clickable(onClick = click).padding(horizontal = 16.dp, vertical = 9.dp),
+        modifier = Modifier.clip(CircleShape).background(if (active) Opuscule else Surface).clickable(onClick = click).padding(horizontal = 16.dp, vertical = 9.dp),
     )
 }
 

@@ -112,7 +112,7 @@ private fun ArticleRow(article: Article, open: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = open).padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(28.dp).clip(CircleShape).background(authorColor(article.author)), contentAlignment = Alignment.Center) {
-                Text(article.author?.take(1)?.uppercase().orEmpty(), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium)
+                Text(article.author?.take(1)?.uppercase().orEmpty(), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
             }
             Text(article.author ?: "Compte supprimé", Modifier.padding(start = 9.dp).weight(1f), style = MaterialTheme.typography.labelLarge)
             Text(article.publishedOn.orEmpty(), color = Muted, style = MaterialTheme.typography.bodyMedium)

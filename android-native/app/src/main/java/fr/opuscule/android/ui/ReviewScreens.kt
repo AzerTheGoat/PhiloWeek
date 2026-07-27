@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -229,33 +228,35 @@ private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Uni
     LaunchedEffect(Unit) {
         runCatching { state.api.reviewResults(token) }.onSuccess { resultCount = it.size }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader(
             "Réviser",
-            modifier = Modifier.padding(horizontal = 0.dp),
             subtitle = "Consolidez ce qui compte",
         )
-        Spacer(Modifier.height(20.dp))
-        Box(Modifier.size(66.dp).clip(RoundedCornerShape(21.dp)).background(OpusculeSoft), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.Quiz, null, tint = Opuscule, modifier = Modifier.size(31.dp))
-        }
-        Spacer(Modifier.height(22.dp))
-        Text("Tout revoir", style = MaterialTheme.typography.displaySmall)
-        Spacer(Modifier.height(8.dp))
-        Text("Une série équilibrée entre vos questionnaires, vos définitions et les personnes de vos réseaux.", style = MaterialTheme.typography.bodyLarge, color = Muted)
-        Spacer(Modifier.height(26.dp))
-        PrimaryButton(if (loading) "Préparation…" else "Commencer une série", startAll, Modifier.fillMaxWidth(), !loading)
-        Spacer(Modifier.height(10.dp))
-        SecondaryButton("Choisir les fichiers et dossiers", choose, Modifier.fillMaxWidth(), !loading)
-        Spacer(Modifier.height(30.dp))
-        SurfaceGroup {
-            Row(Modifier.fillMaxWidth().padding(vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.History, null, tint = Muted)
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text("$resultCount réponses enregistrées", style = MaterialTheme.typography.titleMedium)
-                    Text("Les cartes fragiles reviennent plus souvent.", style = MaterialTheme.typography.bodyMedium, color = Muted)
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Spacer(Modifier.height(20.dp))
+            Box(Modifier.size(66.dp).clip(RoundedCornerShape(21.dp)).background(OpusculeSoft), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Quiz, null, tint = Opuscule, modifier = Modifier.size(31.dp))
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("Tout revoir", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(8.dp))
+            Text("Une série équilibrée entre vos questionnaires, vos définitions et les personnes de vos réseaux.", style = MaterialTheme.typography.bodyLarge, color = Muted)
+            Spacer(Modifier.height(26.dp))
+            PrimaryButton(if (loading) "Préparation…" else "Commencer une série", startAll, Modifier.fillMaxWidth(), !loading)
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton("Choisir les fichiers et dossiers", choose, Modifier.fillMaxWidth(), !loading)
+            Spacer(Modifier.height(30.dp))
+            SurfaceGroup {
+                Row(Modifier.fillMaxWidth().padding(vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.History, null, tint = Muted)
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text("$resultCount réponses enregistrées", style = MaterialTheme.typography.titleMedium)
+                        Text("Les cartes fragiles reviennent plus souvent.", style = MaterialTheme.typography.bodyMedium, color = Muted)
+                    }
                 }
             }
+            Spacer(Modifier.height(26.dp))
         }
     }
 }
@@ -282,7 +283,7 @@ private fun ReviewCard(
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.background(Surface).statusBarsPadding()) {
+            Column(Modifier.background(Surface).opusculeStatusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = stop, modifier = Modifier.size(38.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
@@ -329,13 +330,13 @@ private fun ReviewCard(
                             unknown,
                             Modifier.weight(1f).height(54.dp),
                             shape = RoundedCornerShape(15.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Danger, contentColor = androidx.compose.ui.graphics.Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = Danger, contentColor = MaterialTheme.colorScheme.onError),
                         ) { Text("Je ne connais pas", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                         Button(
                             known,
                             Modifier.weight(1f).height(54.dp),
                             shape = RoundedCornerShape(15.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = androidx.compose.ui.graphics.Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = Opuscule, contentColor = MaterialTheme.colorScheme.onPrimary),
                         ) { Text("Je connais", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                     }
                 }
@@ -507,15 +508,15 @@ private fun ReviewScopeSelector(state: AppState, back: () -> Unit, start: (List<
 private fun KindToggle(label: String, key: String, selected: Set<String>, update: (Set<String>) -> Unit) {
     val active = selected.contains(key)
     Row(
-        Modifier.clip(RoundedCornerShape(50)).background(if (active) Ink else Surface)
+        Modifier.clip(RoundedCornerShape(50)).background(if (active) Opuscule else Surface)
             .clickable { update(if (active) selected - key else selected + key) }.padding(horizontal = 11.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (active) {
-            Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(15.dp))
+            Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(4.dp))
         }
-        Text(label, color = if (active) androidx.compose.ui.graphics.Color.White else Ink, style = MaterialTheme.typography.labelMedium)
+        Text(label, color = if (active) MaterialTheme.colorScheme.onPrimary else Ink, style = MaterialTheme.typography.labelMedium)
     }
 }
 

@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +39,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -90,11 +92,17 @@ import io.noties.markwon.ext.tables.TablePlugin
 import kotlinx.coroutines.launch
 
 @Composable
+fun Modifier.opusculeStatusBarsPadding(): Modifier {
+    val systemInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    return padding(top = systemInset.coerceAtMost(36.dp))
+}
+
+@Composable
 fun OpusculeLogo(modifier: Modifier = Modifier, compact: Boolean = false) {
     val logoSize = if (compact) 36.dp else 76.dp
-    val accent = Opuscule
+    val foreground = MaterialTheme.colorScheme.onPrimary
     Box(
-        modifier.size(logoSize).clip(RoundedCornerShape(if (compact) 11.dp else 23.dp)).background(Ink),
+        modifier.size(logoSize).clip(RoundedCornerShape(if (compact) 11.dp else 23.dp)).background(Opuscule),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(if (compact) 21.dp else 43.dp)) {
@@ -104,8 +112,8 @@ fun OpusculeLogo(modifier: Modifier = Modifier, compact: Boolean = false) {
                 cubicTo(size.width * .82f, size.height * .18f, size.width * .9f, size.height * .52f, center.x, size.height * .92f)
                 cubicTo(size.width * .1f, size.height * .52f, size.width * .18f, size.height * .18f, center.x, size.height * .08f)
             }
-            drawPath(path, Color.White, style = stroke)
-            drawCircle(accent, radius = size.minDimension * .12f, center = center)
+            drawPath(path, foreground, style = stroke)
+            drawCircle(foreground, radius = size.minDimension * .12f, center = center)
         }
     }
 }
@@ -118,7 +126,7 @@ fun ScreenHeader(
     action: (@Composable () -> Unit)? = null,
 ) {
     val compact = LocalCompactInterface.current
-    Column(modifier.fillMaxWidth().background(Surface).statusBarsPadding()) {
+    Column(modifier.fillMaxWidth().background(Surface).opusculeStatusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -157,7 +165,7 @@ fun DetailScaffold(
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.background(Surface).statusBarsPadding()) {
+            Column(Modifier.background(Surface).opusculeStatusBarsPadding()) {
                 Row(
                     Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -230,7 +238,12 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         modifier.height(54.dp),
         enabled = enabled,
         shape = RoundedCornerShape(15.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White, disabledContainerColor = Divider),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Opuscule,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = Divider,
+            disabledContentColor = Muted,
+        ),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
 }
 
