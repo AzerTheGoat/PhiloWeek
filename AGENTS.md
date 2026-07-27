@@ -256,24 +256,23 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 
 - La navigation Android native contient `Aujourd’hui`, `Bibliothèque`,
   `Capturer`, `Réviser` et `Vous`.
-- `Aujourd’hui` mélange des rappels actifs, idées à reprendre, citations,
-  fact checks ouverts et articles publiés dans un flux vertical continu. Le
-  moteur diversifie les types et présente des chapitres de cinq éléments.
+- `Aujourd’hui` organise le défilement vertical par catégories stables : Quiz,
+  Définitions, Personnes, Idées, Articles, Citations puis À vérifier. Une
+  catégorie absente des données n’occupe pas de page vide.
 - Une réponse donnée depuis `Aujourd’hui` utilise les mêmes routes de résultat
   et la même pondération que la session complète de révision.
 - Après révélation d’une réponse dans `Aujourd’hui`, glisser la carte à gauche
   enregistre `À revoir` et glisser à droite enregistre `Je savais`, puis avance
-  vers la prochaine carte de rappel. La correction reste défilable dans la carte.
-  Le pager est continu et remasque une réponse lorsqu’une carte revient plus tard.
+  vers la prochaine carte de la même catégorie. La correction reste défilable
+  dans la carte.
 - Le geste horizontal des cartes de rappel est verrouillé sur son axe afin de ne
   jamais absorber le défilement vertical de l’énoncé ou de la correction. Après
   un swipe ou un bouton d’évaluation, la prochaine carte de rappel remplace
-  immédiatement la carte courante, sans animation verticale parasite.
-- Le flux `Aujourd’hui` n’affiche aucun faux total de chapitre : `CONTINU ∞`
-  décrit sa nature, tandis que le header compte uniquement les éléments réellement
-  évalués pendant la session.
-- Le flux distingue questionnaires, définitions et personnes afin d’insérer
-  régulièrement chaque famille entre les idées, articles, citations et enquêtes.
+  immédiatement la carte courante avec une transition horizontale; le pager
+  vertical ne change jamais de catégorie à la suite d’une évaluation.
+- Le bandeau du flux affiche le nom réel de la catégorie courante, sans faux
+  compteur ni notion de flux infini. Le header compte uniquement les éléments
+  réellement évalués pendant la session.
 - `Bibliothèque` regroupe notes et articles dans un sélecteur commun. Ouvrir une
   note depuis la recherche ferme le clavier avant d’afficher le lecteur.
 - `Capturer` ouvre un panneau bas avec focus immédiat et crée réellement une

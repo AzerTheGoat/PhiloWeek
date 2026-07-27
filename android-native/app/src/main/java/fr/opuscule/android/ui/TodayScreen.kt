@@ -1,5 +1,12 @@
 package fr.opuscule.android.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -98,6 +105,12 @@ private sealed interface KnowledgeItem {
     }
 }
 
+private data class KnowledgeSection(
+    val id: String,
+    val label: String,
+    val items: List<KnowledgeItem>,
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TodayScreen(
@@ -108,12 +121,14 @@ fun TodayScreen(
     openSection: (OrganizationSection) -> Unit,
 ) {
     val token = state.token ?: return
-    var items by remember { mutableStateOf<List<KnowledgeItem>>(emptyList()) }
+    var sections by remember { mutableStateOf<List<KnowledgeSection>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var completed by remember { mutableIntStateOf(0) }
-    val revealed = remember { mutableStateMapOf<Int, Boolean>() }
-    val rated = remember { mutableStateMapOf<Int, Boolean>() }
+    val sectionCursors = remember { mutableStateMapOf<String, Int>() }
+    val transitionDirections = remember { mutableStateMapOf<String, Int>() }
+    val revealed = remember { mutableStateMapOf<String, Boolean>() }
+    val rated = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
 
     suspend fun loadFeed() {
@@ -127,7 +142,7 @@ fun TodayScreen(
                 val facts = async { runCatching { state.api.factChecks(token) }.getOrDefault(emptyList()) }
                 val articles = async { runCatching { state.api.articles(token) }.getOrDefault(emptyList()) }
                 awaitAll(reviews, ideas, quotes, facts, articles)
-                buildKnowledgeFeed(
+                buildKnowledgeSections(
                     reviews.await(),
                     ideas.await(),
                     quotes.await(),
@@ -135,7 +150,7 @@ fun TodayScreen(
                     articles.await(),
                 )
             }
-        }.onSuccess { items = it }
+        }.onSuccess { sections = it }
             .onFailure { error = it.message ?: "Impossible de préparer votre journée." }
         loading = false
     }
@@ -154,7 +169,7 @@ fun TodayScreen(
             error != null -> Box(Modifier.fillMaxSize()) {
                 ErrorPane(error.orEmpty(), { scope.launch { loadFeed() } })
             }
-            items.isEmpty() -> EmptyPane(
+            sections.isEmpty() -> EmptyPane(
                 "Votre journée est prête",
                 "Ajoutez des notes, des idées ou des questionnaires pour alimenter ce flux.",
                 Icons.Rounded.SwipeVertical,
@@ -162,15 +177,16 @@ fun TodayScreen(
                 openReview,
             )
             else -> {
-                val pagerState = rememberPagerState(pageCount = { Int.MAX_VALUE })
+                val pagerState = rememberPagerState(pageCount = { sections.size })
+                val currentSection = sections[pagerState.currentPage.coerceIn(sections.indices)]
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("FLUX D’APPRENTISSAGE", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    Text("CATÉGORIE", style = MaterialTheme.typography.labelMedium, color = Muted)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "CONTINU ∞",
+                        currentSection.label.uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         color = Opuscule,
                     )
@@ -178,29 +194,36 @@ fun TodayScreen(
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    beyondViewportPageCount = 2,
+                    beyondViewportPageCount = 1,
                 ) { page ->
-                    val item = items[page % items.size]
-                    KnowledgePage(
-                        item = item,
-                        revealed = revealed[page] == true,
-                        rating = rated[page] == true,
-                        reveal = { revealed[page] = true },
+                    val section = sections[page]
+                    val cursor = sectionCursors[section.id] ?: 0
+                    val occurrenceKey = "${section.id}:$cursor"
+                    KnowledgeSectionPage(
+                        section = section,
+                        cursor = cursor,
+                        direction = transitionDirections[section.id] ?: 1,
+                        revealed = revealed[occurrenceKey] == true,
+                        rating = rated[occurrenceKey] == true,
+                        reveal = { revealed[occurrenceKey] = true },
                         complete = {
                             completed += 1
-                            scope.launch { pagerState.animateScrollToPage(page + 1) }
+                            transitionDirections[section.id] = 1
+                            sectionCursors[section.id] = cursor + 1
                         },
                         saveRecall = { known ->
-                            val question = (item as? KnowledgeItem.Recall)?.question ?: return@KnowledgePage
-                            if (rated[page] == true) return@KnowledgePage
-                            rated[page] = true
+                            val item = section.items[cursor % section.items.size]
+                            val question = (item as? KnowledgeItem.Recall)?.question
+                                ?: return@KnowledgeSectionPage
+                            if (rated[occurrenceKey] == true) return@KnowledgeSectionPage
+                            rated[occurrenceKey] = true
                             completed += 1
-                            val nextPage = nextRecallPage(items, page)
+                            transitionDirections[section.id] = if (known) 1 else -1
+                            sectionCursors[section.id] = cursor + 1
                             scope.launch {
-                                pagerState.scrollToPage(nextPage)
                                 runCatching { state.api.saveReview(token, question, known) }
                                     .onFailure {
-                                        rated.remove(page)
+                                        rated.remove(occurrenceKey)
                                         completed = (completed - 1).coerceAtLeast(0)
                                         state.handle(it)
                                     }
@@ -240,6 +263,49 @@ private fun TodayHeader(state: AppState, completed: Int, openSettings: () -> Uni
             }
         }
         HorizontalDivider(color = Divider.copy(alpha = .65f))
+    }
+}
+
+@Composable
+private fun KnowledgeSectionPage(
+    section: KnowledgeSection,
+    cursor: Int,
+    direction: Int,
+    revealed: Boolean,
+    rating: Boolean,
+    reveal: () -> Unit,
+    complete: () -> Unit,
+    saveRecall: (Boolean) -> Unit,
+    openReview: () -> Unit,
+    openArticles: () -> Unit,
+    openSection: (OrganizationSection) -> Unit,
+) {
+    AnimatedContent(
+        targetState = cursor,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            (
+                slideInHorizontally(tween(320)) { width -> if (direction > 0) -width else width } +
+                    fadeIn(tween(220))
+                ) togetherWith (
+                slideOutHorizontally(tween(260)) { width -> if (direction > 0) width else -width } +
+                    fadeOut(tween(180))
+                )
+        },
+        label = "knowledge-section-${section.id}",
+    ) { targetCursor ->
+        val item = section.items[targetCursor % section.items.size]
+        KnowledgePage(
+            item = item,
+            revealed = if (targetCursor == cursor) revealed else false,
+            rating = if (targetCursor == cursor) rating else false,
+            reveal = if (targetCursor == cursor) reveal else ({ }),
+            complete = if (targetCursor == cursor) complete else ({ }),
+            saveRecall = if (targetCursor == cursor) saveRecall else ({ _ -> }),
+            openReview = openReview,
+            openArticles = openArticles,
+            openSection = openSection,
+        )
     }
 }
 
@@ -463,16 +529,6 @@ private fun RecallSwipePage(
     }
 }
 
-private fun nextRecallPage(items: List<KnowledgeItem>, currentPage: Int): Int {
-    if (items.isEmpty()) return currentPage + 1
-    for (offset in 1..items.size) {
-        if (items[(currentPage + offset) % items.size] is KnowledgeItem.Recall) {
-            return currentPage + offset
-        }
-    }
-    return currentPage + 1
-}
-
 @Composable
 private fun KnowledgeEyebrow(label: String, icon: ImageVector) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -484,26 +540,44 @@ private fun KnowledgeEyebrow(label: String, icon: ImageVector) {
     }
 }
 
-private fun buildKnowledgeFeed(
+private fun buildKnowledgeSections(
     reviews: List<ReviewQuestion>,
     ideas: List<Idea>,
     quotes: List<Quote>,
     facts: List<FactCheck>,
     articles: List<Article>,
-): List<KnowledgeItem> {
-    val buckets = listOf(
-        reviews.filter { it.kind == "questionnaire" }.map(KnowledgeItem::Recall),
-        reviews.filter { it.kind == "definition" }.map(KnowledgeItem::Recall),
-        reviews.filter { it.kind == "actor" }.map(KnowledgeItem::Recall),
-        ideas.take(8).map(KnowledgeItem::Thought),
-        articles.filter { !it.readByMe }.ifEmpty { articles }.take(8).map(KnowledgeItem::Reading),
-        quotes.take(8).map(KnowledgeItem::Citation),
-        facts.filter { it.status == "to_check" || it.status == "partial" }.take(8).map(KnowledgeItem::Investigation),
-    )
-    val result = mutableListOf<KnowledgeItem>()
-    val max = buckets.maxOfOrNull(List<*>::size) ?: 0
-    repeat(max) { index ->
-        buckets.forEach { bucket -> bucket.getOrNull(index)?.let(result::add) }
+): List<KnowledgeSection> = buildList {
+    fun addSection(id: String, label: String, items: List<KnowledgeItem>) {
+        if (items.isNotEmpty()) add(KnowledgeSection(id, label, items))
     }
-    return result
+
+    addSection(
+        "quiz",
+        "Quiz",
+        reviews.filter { it.kind == "questionnaire" }.map(KnowledgeItem::Recall),
+    )
+    addSection(
+        "definitions",
+        "Définitions",
+        reviews.filter { it.kind == "definition" }.map(KnowledgeItem::Recall),
+    )
+    addSection(
+        "actors",
+        "Personnes",
+        reviews.filter { it.kind == "actor" }.map(KnowledgeItem::Recall),
+    )
+    addSection("ideas", "Idées", ideas.take(12).map(KnowledgeItem::Thought))
+    addSection(
+        "articles",
+        "Articles",
+        articles.filter { !it.readByMe }.ifEmpty { articles }.take(12).map(KnowledgeItem::Reading),
+    )
+    addSection("quotes", "Citations", quotes.take(12).map(KnowledgeItem::Citation))
+    addSection(
+        "facts",
+        "À vérifier",
+        facts.filter { it.status == "to_check" || it.status == "partial" }
+            .take(12)
+            .map(KnowledgeItem::Investigation),
+    )
 }
