@@ -263,8 +263,15 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   et la même pondération que la session complète de révision.
 - Après révélation d’une réponse dans `Aujourd’hui`, glisser la carte à gauche
   enregistre `À revoir` et glisser à droite enregistre `Je savais`, puis avance
-  vers la carte verticale suivante. La correction reste défilable dans la carte.
+  vers la prochaine carte de rappel. La correction reste défilable dans la carte.
   Le pager est continu et remasque une réponse lorsqu’une carte revient plus tard.
+- Le geste horizontal des cartes de rappel est verrouillé sur son axe afin de ne
+  jamais absorber le défilement vertical de l’énoncé ou de la correction. Après
+  un swipe ou un bouton d’évaluation, la prochaine carte de rappel remplace
+  immédiatement la carte courante, sans animation verticale parasite.
+- Le flux `Aujourd’hui` n’affiche aucun faux total de chapitre : `CONTINU ∞`
+  décrit sa nature, tandis que le header compte uniquement les éléments réellement
+  évalués pendant la session.
 - Le flux distingue questionnaires, définitions et personnes afin d’insérer
   régulièrement chaque famille entre les idées, articles, citations et enquêtes.
 - `Bibliothèque` regroupe notes et articles dans un sélecteur commun. Ouvrir une

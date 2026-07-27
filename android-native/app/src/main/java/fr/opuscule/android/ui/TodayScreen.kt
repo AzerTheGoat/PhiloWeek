@@ -3,7 +3,9 @@ package fr.opuscule.android.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -112,6 +113,7 @@ fun TodayScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var completed by remember { mutableIntStateOf(0) }
     val revealed = remember { mutableStateMapOf<Int, Boolean>() }
+    val rated = remember { mutableStateMapOf<Int, Boolean>() }
     val scope = rememberCoroutineScope()
 
     suspend fun loadFeed() {
@@ -161,14 +163,17 @@ fun TodayScreen(
             )
             else -> {
                 val pagerState = rememberPagerState(pageCount = { Int.MAX_VALUE })
-                val chapterPosition = (pagerState.currentPage % 5) + 1
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("CHAPITRE DU JOUR", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    Text("FLUX D’APPRENTISSAGE", style = MaterialTheme.typography.labelMedium, color = Muted)
                     Spacer(Modifier.weight(1f))
-                    Text("$chapterPosition / 5", style = MaterialTheme.typography.labelMedium, color = Opuscule)
+                    Text(
+                        "CONTINU ∞",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Opuscule,
+                    )
                 }
                 VerticalPager(
                     state = pagerState,
@@ -179,6 +184,7 @@ fun TodayScreen(
                     KnowledgePage(
                         item = item,
                         revealed = revealed[page] == true,
+                        rating = rated[page] == true,
                         reveal = { revealed[page] = true },
                         complete = {
                             completed += 1
@@ -186,13 +192,18 @@ fun TodayScreen(
                         },
                         saveRecall = { known ->
                             val question = (item as? KnowledgeItem.Recall)?.question ?: return@KnowledgePage
+                            if (rated[page] == true) return@KnowledgePage
+                            rated[page] = true
+                            completed += 1
+                            val nextPage = nextRecallPage(items, page)
                             scope.launch {
+                                pagerState.scrollToPage(nextPage)
                                 runCatching { state.api.saveReview(token, question, known) }
-                                    .onSuccess {
-                                        completed += 1
-                                        pagerState.animateScrollToPage(page + 1)
+                                    .onFailure {
+                                        rated.remove(page)
+                                        completed = (completed - 1).coerceAtLeast(0)
+                                        state.handle(it)
                                     }
-                                    .onFailure(state::handle)
                             }
                         },
                         openReview = openReview,
@@ -236,6 +247,7 @@ private fun TodayHeader(state: AppState, completed: Int, openSettings: () -> Uni
 private fun KnowledgePage(
     item: KnowledgeItem,
     revealed: Boolean,
+    rating: Boolean,
     reveal: () -> Unit,
     complete: () -> Unit,
     saveRecall: (Boolean) -> Unit,
@@ -244,7 +256,7 @@ private fun KnowledgePage(
     openSection: (OrganizationSection) -> Unit,
 ) {
     if (item is KnowledgeItem.Recall) {
-        RecallSwipePage(item.question, revealed, reveal, saveRecall, openReview)
+        RecallSwipePage(item.question, revealed, rating, reveal, saveRecall, openReview)
         return
     }
 
@@ -337,6 +349,7 @@ private fun KnowledgePage(
 private fun RecallSwipePage(
     question: ReviewQuestion,
     revealed: Boolean,
+    rating: Boolean,
     reveal: () -> Unit,
     save: (Boolean) -> Unit,
     openReview: () -> Unit,
@@ -344,23 +357,20 @@ private fun RecallSwipePage(
     var horizontalDrag by remember(question.key, revealed) { mutableFloatStateOf(0f) }
     val swipeThreshold = with(LocalDensity.current) { 92.dp.toPx() }
     val swipeProgress = (abs(horizontalDrag) / swipeThreshold).coerceIn(0f, 1f)
-    val gesture = if (revealed) {
-        Modifier.pointerInput(question.key, revealed) {
-            detectHorizontalDragGestures(
-                onHorizontalDrag = { change, amount ->
-                    change.consume()
-                    horizontalDrag = (horizontalDrag + amount).coerceIn(-size.width.toFloat(), size.width.toFloat())
-                },
-                onDragCancel = { horizontalDrag = 0f },
-                onDragEnd = {
-                    when {
-                        horizontalDrag <= -swipeThreshold -> save(false)
-                        horizontalDrag >= swipeThreshold -> save(true)
-                    }
-                    horizontalDrag = 0f
-                },
-            )
-        }
+    val gesture = if (revealed && !rating) {
+        Modifier.draggable(
+            state = rememberDraggableState { amount ->
+                horizontalDrag = (horizontalDrag + amount).coerceIn(-1_200f, 1_200f)
+            },
+            orientation = Orientation.Horizontal,
+            onDragStopped = {
+                when {
+                    horizontalDrag <= -swipeThreshold -> save(false)
+                    horizontalDrag >= swipeThreshold -> save(true)
+                }
+                horizontalDrag = 0f
+            },
+        )
     } else Modifier
 
     Box(
@@ -418,8 +428,8 @@ private fun RecallSwipePage(
                 PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton("← À revoir", { save(false) }, Modifier.weight(1f))
-                    PrimaryButton("Je savais →", { save(true) }, Modifier.weight(1f))
+                    SecondaryButton("← À revoir", { save(false) }, Modifier.weight(1f), enabled = !rating)
+                    PrimaryButton("Je savais →", { save(true) }, Modifier.weight(1f), enabled = !rating)
                 }
             }
             Text(
@@ -451,6 +461,16 @@ private fun RecallSwipePage(
             )
         }
     }
+}
+
+private fun nextRecallPage(items: List<KnowledgeItem>, currentPage: Int): Int {
+    if (items.isEmpty()) return currentPage + 1
+    for (offset in 1..items.size) {
+        if (items[(currentPage + offset) % items.size] is KnowledgeItem.Recall) {
+            return currentPage + offset
+        }
+    }
+    return currentPage + 1
 }
 
 @Composable
