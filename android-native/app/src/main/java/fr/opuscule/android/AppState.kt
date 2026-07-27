@@ -30,6 +30,12 @@ class AppState(application: Application) : AndroidViewModel(application) {
         private set
     var compactInterface by mutableStateOf(appearancePreferences.getBoolean("compact_interface", true))
         private set
+    var themeMode by mutableStateOf(appearancePreferences.getString("theme_mode", "system") ?: "system")
+        private set
+    var readingFontSize by mutableStateOf(
+        appearancePreferences.getFloat("reading_font_size", 17.5f).coerceIn(14f, 25f)
+    )
+        private set
 
     var token: String? = null
         private set
@@ -76,6 +82,16 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun updateCompactInterface(compact: Boolean) {
         compactInterface = compact
         appearancePreferences.edit().putBoolean("compact_interface", compact).apply()
+    }
+
+    fun updateThemeMode(mode: String) {
+        themeMode = mode.takeIf { it in setOf("system", "light", "dark") } ?: "system"
+        appearancePreferences.edit().putString("theme_mode", themeMode).apply()
+    }
+
+    fun updateReadingFontSize(size: Float) {
+        readingFontSize = size.coerceIn(14f, 25f)
+        appearancePreferences.edit().putFloat("reading_font_size", readingFontSize).apply()
     }
 
     fun handle(error: Throwable) {

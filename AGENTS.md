@@ -220,18 +220,25 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   `POST /api/auth/mobile/register`, puis `Authorization: Bearer`. Le jeton est
   chiffré localement avec une clé AES-GCM non exportable d'Android Keystore;
   les sauvegardes Android sont désactivées.
-- Le thème du client Kotlin est clair. Le backend Railway par défaut est défini
-  via `API_BASE_URL` dans `android-native/app/build.gradle.kts`.
+- Le client Kotlin propose `Système`, `Clair` et `Sombre`. Les deux palettes
+  utilisent un bleu Opuscule, des surfaces froides et des cartes fortement
+  contrastées; le choix est mémorisé localement. Le backend Railway par défaut
+  est défini via `API_BASE_URL` dans `android-native/app/build.gradle.kts`.
 - L'interface Android utilise une seule couleur d'accent Opuscule; rouge, vert et
   orange restent réservés aux états. Le réglage `Apparence` permet de choisir une
   densité compacte ou confortable et mémorise ce choix localement.
 - Les headers Android respectent les zones système mais restent compacts. Le bouton
   Retour ferme d'abord un détail, un réglage ou une session, puis revient à
   `Accueil` depuis un onglet racine avant de pouvoir quitter l'application.
+- Le fond des headers Android s'étend derrière la barre système et leur contenu
+  commence immédiatement sous le poinçon/caméra. Les icônes système basculent
+  explicitement en clair ou sombre pour que l'heure reste visible.
 - Dans une note Markdown Android, sélectionner un seul mot ouvre directement le
   dictionnaire gratuit français/anglais.
 - Le dictionnaire Android s'affiche dans un panneau bas natif; les définitions
   utilisent une typographie contrastée et restent défilables sans masquer la note.
+- Le réglage `Taille de lecture` ajuste de 14 à 25 sp le corps du Markdown natif,
+  affiche un aperçu immédiat et mémorise la valeur sur l'appareil.
 - Le lecteur Markdown Android reprend la hiérarchie visuelle du web : titres
   colorés, liens, citations, listes, code et tableaux stylés. Les blocs fenced
   `mermaid` sont isolés du texte puis rendus en image native via la route

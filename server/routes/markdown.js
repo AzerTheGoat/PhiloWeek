@@ -11,6 +11,9 @@ router.post('/mermaid', async (req, res) => {
   if (source.length > MAX_MERMAID_SOURCE) {
     return res.status(413).json({ error: 'Le diagramme Mermaid est trop volumineux.' })
   }
+  const renderSource = req.body?.dark && !/^%%\{init:/i.test(source)
+    ? `%%{init: {'theme':'dark'}}%%\n${source}`
+    : source
 
   try {
     const response = await fetch('https://kroki.io/mermaid/png', {
@@ -20,7 +23,7 @@ router.post('/mermaid', async (req, res) => {
         'Content-Type': 'text/plain; charset=utf-8',
         'User-Agent': 'Opuscule/2.0 Mermaid renderer',
       },
-      body: source,
+      body: renderSource,
       signal: AbortSignal.timeout(15_000),
     })
     if (!response.ok) {

@@ -610,6 +610,7 @@ private fun FactStatusChip(status: String) {
     )
 }
 
+@Composable
 private fun factSoftColor(status: String) = when (status) {
     "true" -> SuccessSoft
     "false" -> DangerSoft
@@ -777,6 +778,11 @@ private fun HabitRhythm(agenda: Agenda) {
 @Composable
 private fun LifeDots(total: Int, elapsed: Int, weeks: Boolean) {
     if (total <= 0) return
+    val currentColor = Amber
+    val futureColor = SurfacePressed
+    val earlyColor = KnowledgeBlue
+    val middleColor = Opuscule
+    val lateColor = Sage
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = if (weeks) 32 else 24
         val cell = (maxWidth / columns).coerceAtMost(if (weeks) 11.dp else 13.dp)
@@ -788,11 +794,11 @@ private fun LifeDots(total: Int, elapsed: Int, weeks: Boolean) {
                 val x = (index % columns) * cellPx + cellPx / 2
                 val y = (index / columns) * cellPx + cellPx / 2
                 val color = when {
-                    index == elapsed.coerceAtMost(total - 1) -> Amber
-                    index >= elapsed -> SurfacePressed
-                    index < total / 3 -> KnowledgeBlue
-                    index < total * 2 / 3 -> Opuscule
-                    else -> Sage
+                    index == elapsed.coerceAtMost(total - 1) -> currentColor
+                    index >= elapsed -> futureColor
+                    index < total / 3 -> earlyColor
+                    index < total * 2 / 3 -> middleColor
+                    else -> lateColor
                 }
                 drawCircle(color, radius, androidx.compose.ui.geometry.Offset(x, y))
             }
@@ -819,13 +825,15 @@ private fun Metric(label: String, value: String, modifier: Modifier) {
 @Composable
 private fun UsageChart(days: List<fr.opuscule.android.data.UsageDay>) {
     val maxValue = max(1, days.maxOfOrNull { it.seconds } ?: 1)
+    val accent = Opuscule
+    val ink = Ink
     Canvas(Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(18.dp)).background(Surface).padding(12.dp)) {
         if (days.isEmpty()) return@Canvas
         val step = size.width / days.size
         days.forEachIndexed { index, day ->
             val height = size.height * (day.seconds.toFloat() / maxValue)
             drawLine(
-                color = if (index == days.lastIndex) Opuscule else Ink.copy(alpha = .72f),
+                color = if (index == days.lastIndex) accent else ink.copy(alpha = .72f),
                 start = androidx.compose.ui.geometry.Offset(step * index + step / 2, size.height),
                 end = androidx.compose.ui.geometry.Offset(step * index + step / 2, size.height - height),
                 strokeWidth = (step * .52f).coerceAtLeast(3f),
@@ -852,6 +860,7 @@ private fun factLabel(status: String) = when (status) {
     else -> "À vérifier"
 }
 
+@Composable
 private fun factColor(status: String) = when (status) {
     "true" -> Success
     "false" -> Danger

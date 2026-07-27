@@ -250,10 +250,10 @@ class ApiClient {
         )
     }
 
-    suspend fun renderMermaid(token: String, source: String): ByteArray =
+    suspend fun renderMermaid(token: String, source: String, dark: Boolean): ByteArray =
         callBytes(
             "/markdown/mermaid",
-            JSONObject().put("source", source),
+            JSONObject().put("source", source).put("dark", dark),
             token,
         )
 

@@ -488,6 +488,7 @@ private fun fileKind(file: FileNode): String = when {
     else -> "Fichier"
 }
 
+@Composable
 private fun fileAccent(file: FileNode): Color = when {
     file.isFolder -> Amber
     file.name.endsWith(".md", true) -> KnowledgeBlue
@@ -497,6 +498,7 @@ private fun fileAccent(file: FileNode): Color = when {
     else -> Opuscule
 }
 
+@Composable
 private fun fileAccentSoft(file: FileNode): Color = when (fileAccent(file)) {
     Amber -> AmberSoft
     KnowledgeBlue -> KnowledgeBlueSoft

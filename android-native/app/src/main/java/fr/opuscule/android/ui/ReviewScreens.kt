@@ -282,7 +282,7 @@ private fun ReviewCard(
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.statusBarsPadding()) {
+            Column(Modifier.background(Surface).statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = stop, modifier = Modifier.size(38.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
@@ -553,12 +553,14 @@ private fun kindIcon(kind: String) = when (kind) {
     else -> Icons.Rounded.Quiz
 }
 
+@Composable
 private fun reviewKindAccent(kind: String) = when (kind) {
     "actor" -> Sage
     "definition" -> KnowledgeBlue
     else -> Opuscule
 }
 
+@Composable
 private fun reviewKindSoft(kind: String) = when (kind) {
     "actor" -> SageSoft
     "definition" -> KnowledgeBlueSoft

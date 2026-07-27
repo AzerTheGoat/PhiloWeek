@@ -92,6 +92,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun OpusculeLogo(modifier: Modifier = Modifier, compact: Boolean = false) {
     val logoSize = if (compact) 36.dp else 76.dp
+    val accent = Opuscule
     Box(
         modifier.size(logoSize).clip(RoundedCornerShape(if (compact) 11.dp else 23.dp)).background(Ink),
         contentAlignment = Alignment.Center,
@@ -104,7 +105,7 @@ fun OpusculeLogo(modifier: Modifier = Modifier, compact: Boolean = false) {
                 cubicTo(size.width * .1f, size.height * .52f, size.width * .18f, size.height * .18f, center.x, size.height * .08f)
             }
             drawPath(path, Color.White, style = stroke)
-            drawCircle(Opuscule, radius = size.minDimension * .12f, center = center)
+            drawCircle(accent, radius = size.minDimension * .12f, center = center)
         }
     }
 }
@@ -117,7 +118,7 @@ fun ScreenHeader(
     action: (@Composable () -> Unit)? = null,
 ) {
     val compact = LocalCompactInterface.current
-    Column(modifier.fillMaxWidth().background(Canvas).statusBarsPadding()) {
+    Column(modifier.fillMaxWidth().background(Surface).statusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -156,7 +157,7 @@ fun DetailScaffold(
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.background(Canvas).statusBarsPadding()) {
+            Column(Modifier.background(Surface).statusBarsPadding()) {
                 Row(
                     Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -315,22 +316,28 @@ fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((
 private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink: ((String) -> Unit)?) {
     val context = LocalContext.current
     val state: AppState = viewModel()
+    val readingFontSize = LocalReadingFontSize.current
+    val ink = Ink
+    val accent = Opuscule
+    val accentSoft = OpusculeSoft
+    val surface = Surface
+    val divider = Divider
     var selectedWord by remember { mutableStateOf<String?>(null) }
-    val markwon = remember {
+    val markwon = remember(context, ink, accent, surface, divider) {
         Markwon.builder(context)
             .usePlugin(object : AbstractMarkwonPlugin() {
                 override fun configureTheme(builder: MarkwonTheme.Builder) {
                     builder
-                        .linkColor(Opuscule.toArgbCompat())
+                        .linkColor(accent.toArgbCompat())
                         .isLinkUnderlined(false)
-                        .blockQuoteColor(Opuscule.toArgbCompat())
-                        .listItemColor(Opuscule.toArgbCompat())
-                        .codeTextColor(Opuscule.toArgbCompat())
-                        .codeBlockTextColor(Ink.toArgbCompat())
-                        .codeBackgroundColor(Surface.toArgbCompat())
-                        .codeBlockBackgroundColor(Surface.toArgbCompat())
-                        .headingBreakColor(Divider.toArgbCompat())
-                        .thematicBreakColor(Divider.toArgbCompat())
+                        .blockQuoteColor(accent.toArgbCompat())
+                        .listItemColor(accent.toArgbCompat())
+                        .codeTextColor(accent.toArgbCompat())
+                        .codeBlockTextColor(ink.toArgbCompat())
+                        .codeBackgroundColor(surface.toArgbCompat())
+                        .codeBlockBackgroundColor(surface.toArgbCompat())
+                        .headingBreakColor(divider.toArgbCompat())
+                        .thematicBreakColor(divider.toArgbCompat())
                         .headingTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD))
                         .headingTextSizeMultipliers(floatArrayOf(1.75f, 1.42f, 1.22f, 1.08f, 1f, .96f))
                 }
@@ -342,11 +349,11 @@ private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink:
         modifier = modifier,
         factory = {
             TextView(it).apply {
-                setTextColor(Ink.toArgbCompat())
-                setLinkTextColor(Opuscule.toArgbCompat())
-                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 17.5f)
+                setTextColor(ink.toArgbCompat())
+                setLinkTextColor(accent.toArgbCompat())
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, readingFontSize)
                 setLineSpacing(4f, 1.28f)
-                highlightColor = OpusculeSoft.toArgbCompat()
+                highlightColor = accentSoft.toArgbCompat()
                 movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
                 setTextIsSelectable(true)
                 fun selectedDictionaryWord(): String? {
@@ -380,10 +387,14 @@ private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink:
             }
         },
         update = {
+            it.setTextColor(ink.toArgbCompat())
+            it.setLinkTextColor(accent.toArgbCompat())
+            it.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, readingFontSize)
+            it.highlightColor = accentSoft.toArgbCompat()
             it.movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
             val rendered = SpannableStringBuilder(markwon.toMarkdown(expandWikiLinks(markdown)))
             rendered.getSpans(0, rendered.length, HeadingSpan::class.java).forEach { heading ->
-                val color = if (heading.level <= 2) Opuscule else Ink
+                val color = if (heading.level <= 2) accent else ink
                 rendered.setSpan(
                     ForegroundColorSpan(color.toArgbCompat()),
                     rendered.getSpanStart(heading),
@@ -419,17 +430,18 @@ private fun splitMarkdown(markdown: String): List<MarkdownPart> {
 private fun MermaidDiagram(source: String, key: Int) {
     val state: AppState = viewModel()
     val token = state.token
+    val dark = LocalIsDarkTheme.current
     var image by remember(source) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var error by remember(source) { mutableStateOf<String?>(null) }
     var retry by remember(source) { mutableStateOf(0) }
-    LaunchedEffect(source, retry, token) {
+    LaunchedEffect(source, retry, token, dark) {
         if (token == null || source.isBlank()) {
             error = "Diagramme Mermaid vide."
             return@LaunchedEffect
         }
         image = null
         error = null
-        runCatching { state.api.renderMermaid(token, source) }
+        runCatching { state.api.renderMermaid(token, source, dark) }
             .onSuccess { bytes ->
                 image = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
                 if (image == null) error = "Image Mermaid illisible."

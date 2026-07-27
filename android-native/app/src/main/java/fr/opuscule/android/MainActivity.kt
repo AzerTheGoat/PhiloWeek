@@ -22,7 +22,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val state: AppState = viewModel()
-            OpusculeTheme(compactInterface = state.compactInterface) {
+            OpusculeTheme(
+                themeMode = state.themeMode,
+                compactInterface = state.compactInterface,
+                readingFontSize = state.readingFontSize,
+            ) {
                 Surface(Modifier.fillMaxSize()) {
                     Root(state)
                 }

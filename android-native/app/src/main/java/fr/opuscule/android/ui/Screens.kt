@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Lock
@@ -54,6 +55,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Snackbar
@@ -76,6 +78,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import fr.opuscule.android.AppState
 import kotlinx.coroutines.delay
@@ -91,8 +94,10 @@ private enum class RootTab(val label: String, val icon: ImageVector) {
     ARTICLES("Articles", Icons.AutoMirrored.Rounded.Article),
 }
 
+@Composable
 private fun rootTabAccent(@Suppress("UNUSED_PARAMETER") tab: RootTab): Color = Opuscule
 
+@Composable
 private fun rootTabAccentSoft(@Suppress("UNUSED_PARAMETER") tab: RootTab): Color = OpusculeSoft
 
 @Composable
@@ -299,38 +304,46 @@ private fun HomeScreen(
     quickCapture: (OrganizationSection) -> Unit,
     openSettings: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            OpusculeLogo(compact = true)
-            Text("Opuscule", Modifier.padding(start = 11.dp).weight(1f), style = MaterialTheme.typography.titleLarge)
-            IconButton(onClick = openSettings, modifier = Modifier.clip(CircleShape).background(Surface)) {
-                Icon(Icons.Rounded.Person, "Réglages", tint = Ink)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth().background(Surface).statusBarsPadding()) {
+            Row(
+                Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OpusculeLogo(Modifier.size(32.dp), compact = true)
+                Text("Opuscule", Modifier.padding(start = 10.dp).weight(1f), style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = openSettings, modifier = Modifier.size(38.dp).clip(CircleShape).background(SurfacePressed)) {
+                    Icon(Icons.Rounded.Person, "Réglages", tint = Ink, modifier = Modifier.size(20.dp))
+                }
             }
+            HorizontalDivider(color = Divider.copy(alpha = .65f))
         }
-        Spacer(Modifier.height(26.dp))
-        Text("Bienvenue, ${state.user?.username.orEmpty()}", style = MaterialTheme.typography.displaySmall)
-        Spacer(Modifier.height(8.dp))
-        Text("Que voulez-vous faire aujourd’hui ?", style = MaterialTheme.typography.bodyLarge, color = Muted)
-        Spacer(Modifier.height(34.dp))
-        SurfaceGroup {
-            ActionRow("Réviser maintenant", "Une série sur toutes vos connaissances", Icons.Rounded.Quiz, goReview, accent = Opuscule, accentSoft = OpusculeSoft)
-            HorizontalDivider(color = Divider)
-            ActionRow("Ouvrir mes fichiers", "Notes et documents", Icons.Rounded.FolderOpen, goFiles)
-            HorizontalDivider(color = Divider)
-            ActionRow("Lire les articles", "Les dernières publications", Icons.Rounded.AutoStories, goArticles)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Spacer(Modifier.height(24.dp))
+            Text("Bienvenue, ${state.user?.username.orEmpty()}", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(8.dp))
+            Text("Que voulez-vous faire aujourd’hui ?", style = MaterialTheme.typography.bodyLarge, color = Muted)
+            Spacer(Modifier.height(30.dp))
+            SurfaceGroup {
+                ActionRow("Réviser maintenant", "Une série sur toutes vos connaissances", Icons.Rounded.Quiz, goReview, accent = Opuscule, accentSoft = OpusculeSoft)
+                HorizontalDivider(color = Divider)
+                ActionRow("Ouvrir mes fichiers", "Notes et documents", Icons.Rounded.FolderOpen, goFiles)
+                HorizontalDivider(color = Divider)
+                ActionRow("Lire les articles", "Les dernières publications", Icons.Rounded.AutoStories, goArticles)
+            }
+            Spacer(Modifier.height(26.dp))
+            SectionLabel("Capture rapide")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                QuickAction("Idée", Icons.Rounded.Lightbulb, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.IDEAS) }
+                QuickAction("Citation", Icons.Rounded.MenuBook, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.QUOTES) }
+            }
+            Spacer(Modifier.height(9.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                QuickAction("Fact check", Icons.Rounded.Verified, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.FACTS) }
+                QuickAction("Tâche", Icons.Rounded.Checklist, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.TODOS) }
+            }
+            Spacer(Modifier.height(28.dp))
         }
-        Spacer(Modifier.height(30.dp))
-        SectionLabel("Capture rapide")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            QuickAction("Idée", Icons.Rounded.Lightbulb, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.IDEAS) }
-            QuickAction("Citation", Icons.Rounded.MenuBook, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.QUOTES) }
-        }
-        Spacer(Modifier.height(9.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            QuickAction("Fact check", Icons.Rounded.Verified, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.FACTS) }
-            QuickAction("Tâche", Icons.Rounded.Checklist, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.TODOS) }
-        }
-        Spacer(Modifier.height(28.dp))
     }
 }
 
@@ -352,6 +365,12 @@ private fun QuickAction(label: String, icon: ImageVector, accent: Color, accentS
 @Composable
 private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
     var appearanceVisible by remember { mutableStateOf(false) }
+    var readingVisible by remember { mutableStateOf(false) }
+    val themeLabel = when (state.themeMode) {
+        "dark" -> "Sombre"
+        "light" -> "Clair"
+        else -> "Système"
+    }
     DetailScaffold("Réglages", onBack) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
@@ -369,12 +388,19 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             SurfaceGroup {
                 ActionRow(
                     "Apparence",
-                    if (state.compactInterface) "Interface compacte · palette sobre" else "Interface confortable · palette sobre",
+                    "$themeLabel · ${if (state.compactInterface) "compacte" else "confortable"}",
                     Icons.Rounded.TipsAndUpdates,
                     onClick = { appearanceVisible = true },
                 )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.2.0 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow(
+                    "Taille de lecture",
+                    "${state.readingFontSize.toInt()} sp · notes et documents",
+                    Icons.Rounded.FormatSize,
+                    onClick = { readingVisible = true },
+                )
+                HorizontalDivider(color = Divider)
+                ActionRow("Version", "1.3.0 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})
@@ -386,11 +412,27 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             onDismissRequest = { appearanceVisible = false },
             title = { Text("Apparence") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Une seule couleur d’accent, avec du rouge et du vert réservés aux états.", color = Muted)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("THÈME", color = Opuscule, style = MaterialTheme.typography.labelMedium)
+                    listOf(
+                        "system" to "Suivre le téléphone",
+                        "light" to "Clair",
+                        "dark" to "Sombre",
+                    ).forEach { (mode, label) ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                .clickable { state.updateThemeMode(mode) }.padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(state.themeMode == mode, { state.updateThemeMode(mode) })
+                            Text(label)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("DENSITÉ", color = Opuscule, style = MaterialTheme.typography.labelMedium)
                     Row(
                         Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                            .clickable { state.updateCompactInterface(true) }.padding(8.dp),
+                            .clickable { state.updateCompactInterface(true) }.padding(vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(state.compactInterface, { state.updateCompactInterface(true) })
@@ -398,7 +440,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                     }
                     Row(
                         Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                            .clickable { state.updateCompactInterface(false) }.padding(8.dp),
+                            .clickable { state.updateCompactInterface(false) }.padding(vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(!state.compactInterface, { state.updateCompactInterface(false) })
@@ -409,7 +451,43 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = { appearanceVisible = false }) { Text("Terminé", color = Opuscule) }
             },
-            containerColor = Canvas,
+            containerColor = ReadingPaper,
+        )
+    }
+    if (readingVisible) {
+        AlertDialog(
+            onDismissRequest = { readingVisible = false },
+            title = { Text("Taille de lecture") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        "Ajustez uniquement le texte des notes Markdown.",
+                        color = Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Lire, comprendre, retenir.",
+                        color = Ink,
+                        fontSize = state.readingFontSize.sp,
+                        lineHeight = (state.readingFontSize * 1.45f).sp,
+                    )
+                    Slider(
+                        value = state.readingFontSize,
+                        onValueChange = state::updateReadingFontSize,
+                        valueRange = 14f..25f,
+                        steps = 21,
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("14", color = Muted, style = MaterialTheme.typography.labelMedium)
+                        Text("${state.readingFontSize.toInt()} sp", color = Opuscule, style = MaterialTheme.typography.labelLarge)
+                        Text("25", color = Muted, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { readingVisible = false }) { Text("Terminé", color = Opuscule) }
+            },
+            containerColor = ReadingPaper,
         )
     }
 }

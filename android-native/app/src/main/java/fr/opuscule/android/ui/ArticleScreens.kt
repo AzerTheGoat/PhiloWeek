@@ -303,6 +303,7 @@ private fun articleImageModel(value: String): Any {
     return runCatching { Base64.decode(encoded, Base64.DEFAULT) }.getOrElse { value }
 }
 
+@Composable
 private fun authorColor(author: String?): androidx.compose.ui.graphics.Color {
     val colors = listOf(Opuscule, KnowledgeBlue, Sage, Amber, Coral)
     return colors[(author.orEmpty().hashCode() and Int.MAX_VALUE) % colors.size]

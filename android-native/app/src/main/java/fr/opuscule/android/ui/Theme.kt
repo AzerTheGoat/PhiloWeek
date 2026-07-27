@@ -2,11 +2,14 @@ package fr.opuscule.android.ui
 
 import android.app.Activity
 import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -16,45 +19,86 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 
-val Canvas = Color(0xFFFCFAF6)
-val Surface = Color(0xFFF4F0E9)
-val SurfacePressed = Color(0xFFECE6DC)
-val ReadingPaper = Color(0xFFFFFEFB)
-val Ink = Color(0xFF20202A)
-val Muted = Color(0xFF74717A)
-val Divider = Color(0xFFE7E0D6)
-val Opuscule = Color(0xFF6552C8)
-val OpusculeSoft = Color(0xFFEDE9FF)
-val KnowledgeBlue = Opuscule
-val KnowledgeBlueSoft = OpusculeSoft
-val Sage = Opuscule
-val SageSoft = OpusculeSoft
-val Amber = Opuscule
-val AmberSoft = OpusculeSoft
-val Coral = Opuscule
-val CoralSoft = OpusculeSoft
-val Danger = Color(0xFFC83D4A)
-val DangerSoft = Color(0xFFFFE9EC)
-val Success = Color(0xFF287653)
-val SuccessSoft = Color(0xFFE5F4EB)
-val Warning = Color(0xFFA15F18)
-
-private val Colors = lightColorScheme(
-    primary = Opuscule,
-    onPrimary = Color.White,
-    primaryContainer = OpusculeSoft,
-    onPrimaryContainer = Opuscule,
-    background = Canvas,
-    onBackground = Ink,
-    surface = Canvas,
-    onSurface = Ink,
-    surfaceVariant = Surface,
-    onSurfaceVariant = Muted,
-    outline = Divider,
-    error = Danger,
-    errorContainer = DangerSoft,
+data class OpusculePalette(
+    val canvas: Color,
+    val surface: Color,
+    val surfacePressed: Color,
+    val readingPaper: Color,
+    val ink: Color,
+    val muted: Color,
+    val divider: Color,
+    val accent: Color,
+    val accentSoft: Color,
+    val danger: Color,
+    val dangerSoft: Color,
+    val success: Color,
+    val successSoft: Color,
+    val warning: Color,
 )
+
+private val LightPalette = OpusculePalette(
+    canvas = Color(0xFFF7F8FC),
+    surface = Color(0xFFEDF1F8),
+    surfacePressed = Color(0xFFE1E7F1),
+    readingPaper = Color(0xFFFFFFFF),
+    ink = Color(0xFF172033),
+    muted = Color(0xFF626D80),
+    divider = Color(0xFFD9E0EB),
+    accent = Color(0xFF1769FF),
+    accentSoft = Color(0xFFE7F0FF),
+    danger = Color(0xFFD83B53),
+    dangerSoft = Color(0xFFFFE8ED),
+    success = Color(0xFF16855B),
+    successSoft = Color(0xFFE2F5EB),
+    warning = Color(0xFFB86A0C),
+)
+
+private val DarkPalette = OpusculePalette(
+    canvas = Color(0xFF0D111A),
+    surface = Color(0xFF171D29),
+    surfacePressed = Color(0xFF222B3B),
+    readingPaper = Color(0xFF121824),
+    ink = Color(0xFFF4F7FC),
+    muted = Color(0xFFAAB3C4),
+    divider = Color(0xFF2A3447),
+    accent = Color(0xFF70A7FF),
+    accentSoft = Color(0xFF192E52),
+    danger = Color(0xFFFF6B7C),
+    dangerSoft = Color(0xFF3A1D27),
+    success = Color(0xFF52CE91),
+    successSoft = Color(0xFF17372A),
+    warning = Color(0xFFFFB45C),
+)
+
+private val LocalOpusculePalette = compositionLocalOf { LightPalette }
+val LocalCompactInterface = compositionLocalOf { true }
+val LocalReadingFontSize = compositionLocalOf { 17.5f }
+val LocalIsDarkTheme = compositionLocalOf { false }
+
+val Canvas: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.canvas
+val Surface: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.surface
+val SurfacePressed: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.surfacePressed
+val ReadingPaper: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.readingPaper
+val Ink: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.ink
+val Muted: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.muted
+val Divider: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.divider
+val Opuscule: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.accent
+val OpusculeSoft: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.accentSoft
+val KnowledgeBlue: Color @Composable @ReadOnlyComposable get() = Opuscule
+val KnowledgeBlueSoft: Color @Composable @ReadOnlyComposable get() = OpusculeSoft
+val Sage: Color @Composable @ReadOnlyComposable get() = Opuscule
+val SageSoft: Color @Composable @ReadOnlyComposable get() = OpusculeSoft
+val Amber: Color @Composable @ReadOnlyComposable get() = Opuscule
+val AmberSoft: Color @Composable @ReadOnlyComposable get() = OpusculeSoft
+val Coral: Color @Composable @ReadOnlyComposable get() = Opuscule
+val CoralSoft: Color @Composable @ReadOnlyComposable get() = OpusculeSoft
+val Danger: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.danger
+val DangerSoft: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.dangerSoft
+val Success: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.success
+val SuccessSoft: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.successSoft
+val Warning: Color @Composable @ReadOnlyComposable get() = LocalOpusculePalette.current.warning
 
 private val AppTypography = Typography(
     displaySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 39.sp, letterSpacing = (-0.6).sp),
@@ -68,26 +112,77 @@ private val AppTypography = Typography(
     labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, lineHeight = 16.sp),
 )
 
-val LocalCompactInterface = compositionLocalOf { true }
-
 @Composable
-fun OpusculeTheme(compactInterface: Boolean = true, content: @Composable () -> Unit) {
+fun OpusculeTheme(
+    themeMode: String = "system",
+    compactInterface: Boolean = true,
+    readingFontSize: Float = 17.5f,
+    content: @Composable () -> Unit,
+) {
+    val systemDark = isSystemInDarkTheme()
+    val dark = when (themeMode) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
+    }
+    val palette = if (dark) DarkPalette else LightPalette
+    val colors = if (dark) {
+        darkColorScheme(
+            primary = palette.accent,
+            onPrimary = Color(0xFF06152E),
+            primaryContainer = palette.accentSoft,
+            onPrimaryContainer = palette.ink,
+            background = palette.canvas,
+            onBackground = palette.ink,
+            surface = palette.readingPaper,
+            onSurface = palette.ink,
+            surfaceVariant = palette.surface,
+            onSurfaceVariant = palette.muted,
+            outline = palette.divider,
+            error = palette.danger,
+            errorContainer = palette.dangerSoft,
+        )
+    } else {
+        lightColorScheme(
+            primary = palette.accent,
+            onPrimary = Color.White,
+            primaryContainer = palette.accentSoft,
+            onPrimaryContainer = palette.accent,
+            background = palette.canvas,
+            onBackground = palette.ink,
+            surface = palette.readingPaper,
+            onSurface = palette.ink,
+            surfaceVariant = palette.surface,
+            onSurfaceVariant = palette.muted,
+            outline = palette.divider,
+            error = palette.danger,
+            errorContainer = palette.dangerSoft,
+        )
+    }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Canvas.toArgb()
-            window.navigationBarColor = Canvas.toArgb()
+            window.statusBarColor = Color.Transparent.toArgb()
+            window.navigationBarColor = palette.canvas.toArgb()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 window.isStatusBarContrastEnforced = false
                 window.isNavigationBarContrastEnforced = false
             }
-            window.decorView.systemUiVisibility =
-                android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
-                    android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
         }
     }
-    CompositionLocalProvider(LocalCompactInterface provides compactInterface) {
-        MaterialTheme(colorScheme = Colors, typography = AppTypography, content = content)
+
+    CompositionLocalProvider(
+        LocalOpusculePalette provides palette,
+        LocalCompactInterface provides compactInterface,
+        LocalReadingFontSize provides readingFontSize,
+        LocalIsDarkTheme provides dark,
+    ) {
+        MaterialTheme(colorScheme = colors, typography = AppTypography, content = content)
     }
 }
