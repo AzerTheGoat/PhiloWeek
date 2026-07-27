@@ -1,6 +1,7 @@
 package fr.opuscule.android.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -45,9 +47,11 @@ import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -64,6 +68,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -86,11 +91,11 @@ import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 private enum class RootTab(val label: String, val icon: ImageVector) {
-    HOME("Accueil", Icons.Rounded.Home),
-    FILES("Fichiers", Icons.Rounded.FolderOpen),
+    TODAY("Aujourd’hui", Icons.Rounded.Home),
+    LIBRARY("Bibliothèque", Icons.Rounded.FolderOpen),
+    CAPTURE("Capturer", Icons.Rounded.Add),
     REVIEW("Réviser", Icons.Rounded.Quiz),
-    ORGANIZE("Organiser", Icons.Rounded.Checklist),
-    ARTICLES("Articles", Icons.AutoMirrored.Rounded.Article),
+    YOU("Vous", Icons.Rounded.Person),
 }
 
 @Composable
@@ -163,19 +168,29 @@ fun AuthScreen(state: AppState) {
 
 @Composable
 fun OpusculeApp(state: AppState) {
-    var tabName by rememberSaveable { mutableStateOf(RootTab.HOME.name) }
+    var tabName by rememberSaveable { mutableStateOf(RootTab.TODAY.name) }
     var fileStack by remember { mutableStateOf<List<String>>(emptyList()) }
     var settingsVisible by remember { mutableStateOf(false) }
+    var captureVisible by remember { mutableStateOf(false) }
     var organizeTarget by remember { mutableStateOf<OrganizationSection?>(null) }
+    var libraryArticles by rememberSaveable { mutableStateOf(false) }
     var chromeHidden by remember { mutableStateOf(false) }
+    var lastRootBackAt by remember { mutableLongStateOf(0L) }
     val tab = RootTab.valueOf(tabName)
     val snackbars = remember { SnackbarHostState() }
+    val activity = LocalActivity.current
 
-    BackHandler(enabled = settingsVisible || fileStack.isNotEmpty() || tab != RootTab.HOME) {
+    BackHandler {
         when {
             settingsVisible -> settingsVisible = false
+            captureVisible -> captureVisible = false
             fileStack.isNotEmpty() -> fileStack = fileStack.dropLast(1)
-            tab != RootTab.HOME -> tabName = RootTab.HOME.name
+            tab != RootTab.TODAY -> tabName = RootTab.TODAY.name
+            System.currentTimeMillis() - lastRootBackAt < 2_000L -> activity?.finish()
+            else -> {
+                lastRootBackAt = System.currentTimeMillis()
+                state.notify("Appuyez encore une fois pour quitter.", "warning")
+            }
         }
     }
 
@@ -206,28 +221,16 @@ fun OpusculeApp(state: AppState) {
             },
             bottomBar = {
                 if (!chromeHidden) {
-                Column(Modifier.background(Canvas).navigationBarsPadding()) {
-                    HorizontalDivider(color = Divider)
-                    NavigationBar(containerColor = Canvas, tonalElevation = 0.dp) {
-                        RootTab.entries.forEach { item ->
-                            val accent = rootTabAccent(item)
-                            val accentSoft = rootTabAccentSoft(item)
-                            NavigationBarItem(
-                                selected = item == tab,
-                                onClick = { tabName = item.name },
-                                icon = { Icon(item.icon, null, modifier = Modifier.size(22.dp)) },
-                                label = { Text(item.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = accent,
-                                    selectedTextColor = accent,
-                                    indicatorColor = accentSoft,
-                                    unselectedIconColor = Muted,
-                                    unselectedTextColor = Muted,
-                                ),
-                            )
-                        }
-                    }
-                }
+                    OpusculeBottomBar(
+                        selected = tab,
+                        select = { item ->
+                            if (item == RootTab.CAPTURE) captureVisible = true
+                            else {
+                                chromeHidden = false
+                                tabName = item.name
+                            }
+                        },
+                    )
                 }
             },
         ) { padding ->
@@ -238,18 +241,41 @@ fun OpusculeApp(state: AppState) {
                 label = "root-navigation",
             ) { current ->
                 when (current) {
-                    RootTab.HOME -> HomeScreen(
+                    RootTab.TODAY -> TodayScreen(
+                        state = state,
+                        openSettings = { settingsVisible = true },
+                        openReview = { tabName = RootTab.REVIEW.name },
+                        openArticles = {
+                            libraryArticles = true
+                            tabName = RootTab.LIBRARY.name
+                        },
+                        openSection = {
+                            organizeTarget = it
+                            tabName = RootTab.YOU.name
+                        },
+                    )
+                    RootTab.LIBRARY -> if (libraryArticles) {
+                        ArticlesScreen(
+                            state,
+                            onDetailChange = { chromeHidden = it },
+                            openFiles = { libraryArticles = false },
+                        )
+                    } else {
+                        FilesScreen(
+                            state,
+                            openOverlay = { fileStack = listOf(it) },
+                            openArticles = { libraryArticles = true },
+                        )
+                    }
+                    RootTab.CAPTURE -> Unit
+                    RootTab.REVIEW -> ReviewScreen(state, openSource = { fileStack = listOf(it) }, onImmersiveChange = { chromeHidden = it })
+                    RootTab.YOU -> OrganizationScreen(
                         state,
-                        goFiles = { tabName = RootTab.FILES.name },
-                        goReview = { tabName = RootTab.REVIEW.name },
-                        goArticles = { tabName = RootTab.ARTICLES.name },
-                        quickCapture = { organizeTarget = it; tabName = RootTab.ORGANIZE.name },
+                        organizeTarget,
+                        { organizeTarget = null },
+                        onDetailChange = { chromeHidden = it },
                         openSettings = { settingsVisible = true },
                     )
-                    RootTab.FILES -> FilesScreen(state, openOverlay = { fileStack = listOf(it) })
-                    RootTab.REVIEW -> ReviewScreen(state, openSource = { fileStack = listOf(it) }, onImmersiveChange = { chromeHidden = it })
-                    RootTab.ORGANIZE -> OrganizationScreen(state, organizeTarget, { organizeTarget = null }, onDetailChange = { chromeHidden = it })
-                    RootTab.ARTICLES -> ArticlesScreen(state, onDetailChange = { chromeHidden = it })
                 }
             }
         }
@@ -274,6 +300,62 @@ fun OpusculeApp(state: AppState) {
             exit = slideOutHorizontally { it } + fadeOut(),
         ) {
             SettingsScreen(state) { settingsVisible = false }
+        }
+        if (captureVisible) {
+            QuickCaptureSheet(state) { captureVisible = false }
+        }
+    }
+}
+
+@Composable
+private fun OpusculeBottomBar(selected: RootTab, select: (RootTab) -> Unit) {
+    Column(Modifier.fillMaxWidth().background(Canvas).navigationBarsPadding()) {
+        HorizontalDivider(color = Divider.copy(alpha = .75f))
+        Row(
+            Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RootTab.entries.forEach { item ->
+                val active = item == selected
+                Column(
+                    Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                        .clickable { select(item) }.padding(vertical = 7.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Box(
+                        Modifier.size(if (item == RootTab.CAPTURE) 42.dp else 32.dp)
+                            .clip(if (item == RootTab.CAPTURE) CircleShape else androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .background(
+                                when {
+                                    item == RootTab.CAPTURE -> Opuscule
+                                    active -> OpusculeSoft
+                                    else -> Color.Transparent
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            item.icon,
+                            item.label,
+                            tint = when {
+                                item == RootTab.CAPTURE -> MaterialTheme.colorScheme.onPrimary
+                                active -> Opuscule
+                                else -> Muted
+                            },
+                            modifier = Modifier.size(if (item == RootTab.CAPTURE) 25.dp else 20.dp),
+                        )
+                    }
+                    if (item != RootTab.CAPTURE) {
+                        Text(
+                            item.label,
+                            color = if (active) Opuscule else Muted,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -361,6 +443,7 @@ private fun QuickAction(label: String, icon: ImageVector, accent: Color, accentS
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
     var appearanceVisible by remember { mutableStateOf(false) }
@@ -403,7 +486,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                     onClick = { readingVisible = true },
                 )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.3.2 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow("Version", "1.4.0 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})
@@ -411,86 +494,90 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
         }
     }
     if (appearanceVisible) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { appearanceVisible = false },
-            title = { Text("Apparence") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("THÈME", color = Opuscule, style = MaterialTheme.typography.labelMedium)
-                    listOf(
-                        "system" to "Suivre le téléphone",
-                        "light" to "Clair",
-                        "dark" to "Sombre",
-                    ).forEach { (mode, label) ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                                .clickable { state.updateThemeMode(mode) }.padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(state.themeMode == mode, { state.updateThemeMode(mode) })
-                            Text(label)
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("DENSITÉ", color = Opuscule, style = MaterialTheme.typography.labelMedium)
-                    Row(
-                        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                            .clickable { state.updateCompactInterface(true) }.padding(vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(state.compactInterface, { state.updateCompactInterface(true) })
-                        Text("Compact · plus d’espace utile")
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                            .clickable { state.updateCompactInterface(false) }.padding(vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(!state.compactInterface, { state.updateCompactInterface(false) })
-                        Text("Confort · éléments plus espacés")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { appearanceVisible = false }) { Text("Terminé", color = Opuscule) }
-            },
             containerColor = ReadingPaper,
-        )
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Apparence", style = MaterialTheme.typography.headlineMedium)
+                Text("Une interface lisible, cohérente avec votre façon de travailler.", color = Muted)
+                SectionLabel("Thème")
+                listOf(
+                    "system" to "Suivre le téléphone",
+                    "light" to "Clair",
+                    "dark" to "Sombre",
+                ).forEach { (mode, label) ->
+                    SettingsChoice(label, state.themeMode == mode) { state.updateThemeMode(mode) }
+                }
+                SectionLabel("Densité")
+                SettingsChoice("Compact · plus d’espace utile", state.compactInterface) {
+                    state.updateCompactInterface(true)
+                }
+                SettingsChoice("Confort · éléments plus espacés", !state.compactInterface) {
+                    state.updateCompactInterface(false)
+                }
+                PrimaryButton("Terminé", { appearanceVisible = false }, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+        }
     }
     if (readingVisible) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { readingVisible = false },
-            title = { Text("Taille de lecture") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "Ajustez uniquement le texte des notes Markdown.",
-                        color = Muted,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+            containerColor = ReadingPaper,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("Taille de lecture", style = MaterialTheme.typography.headlineMedium)
+                Text("Ajustez le corps du texte des notes Markdown.", color = Muted)
+                Column(
+                    Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                        .background(Surface).padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Text(
                         "Lire, comprendre, retenir.",
                         color = Ink,
                         fontSize = state.readingFontSize.sp,
                         lineHeight = (state.readingFontSize * 1.45f).sp,
                     )
-                    Slider(
-                        value = state.readingFontSize,
-                        onValueChange = state::updateReadingFontSize,
-                        valueRange = 14f..25f,
-                        steps = 21,
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("14", color = Muted, style = MaterialTheme.typography.labelMedium)
-                        Text("${state.readingFontSize.toInt()} sp", color = Opuscule, style = MaterialTheme.typography.labelLarge)
-                        Text("25", color = Muted, style = MaterialTheme.typography.labelMedium)
-                    }
+                    Text("${state.readingFontSize.toInt()} sp", color = Opuscule, style = MaterialTheme.typography.labelLarge)
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { readingVisible = false }) { Text("Terminé", color = Opuscule) }
-            },
-            containerColor = ReadingPaper,
-        )
+                Slider(
+                    value = state.readingFontSize,
+                    onValueChange = state::updateReadingFontSize,
+                    valueRange = 14f..25f,
+                    steps = 21,
+                )
+                PrimaryButton("Terminé", { readingVisible = false }, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp))
+            .background(if (selected) OpusculeSoft else Surface)
+            .clickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), color = if (selected) Opuscule else Ink, style = MaterialTheme.typography.labelLarge)
+        Box(
+            Modifier.size(22.dp).clip(CircleShape)
+                .background(if (selected) Opuscule else Divider),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(15.dp))
+        }
     }
 }

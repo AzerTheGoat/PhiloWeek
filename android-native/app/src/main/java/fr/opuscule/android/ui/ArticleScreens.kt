@@ -63,9 +63,16 @@ import fr.opuscule.android.AppState
 import fr.opuscule.android.data.Article
 import fr.opuscule.android.data.Comment
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
-fun ArticlesScreen(state: AppState, onDetailChange: (Boolean) -> Unit = {}) {
+fun ArticlesScreen(
+    state: AppState,
+    onDetailChange: (Boolean) -> Unit = {},
+    openFiles: (() -> Unit)? = null,
+) {
     val token = state.token ?: return
     var rows by remember { mutableStateOf<List<Article>>(emptyList()) }
     var selected by remember { mutableStateOf<String?>(null) }
@@ -88,10 +95,13 @@ fun ArticlesScreen(state: AppState, onDetailChange: (Boolean) -> Unit = {}) {
         return
     }
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("Articles", subtitle = "Les publications de la communauté") {
+        ScreenHeader("Bibliothèque", subtitle = "Vos notes et vos lectures") {
             IconButton(onClick = { load() }, modifier = Modifier.clip(CircleShape).background(Surface)) {
                 Icon(Icons.Rounded.Refresh, "Actualiser")
             }
+        }
+        openFiles?.let {
+            LibraryModeSwitch(true, selectFiles = it, selectArticles = {})
         }
         when {
             loading -> LoadingPane()
@@ -115,16 +125,23 @@ private fun ArticleRow(article: Article, open: () -> Unit) {
                 Text(article.author?.take(1)?.uppercase().orEmpty(), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
             }
             Text(article.author ?: "Compte supprimé", Modifier.padding(start = 9.dp).weight(1f), style = MaterialTheme.typography.labelLarge)
-            Text(article.publishedOn.orEmpty(), color = Muted, style = MaterialTheme.typography.bodyMedium)
+            Text(articleDate(article.publishedOn), color = Muted, style = MaterialTheme.typography.bodyMedium)
         }
         article.coverImage?.let { AsyncImage(articleImageModel(it), article.title, Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(18.dp)).background(Surface)) }
-        Text(article.title, style = MaterialTheme.typography.headlineMedium)
+        Text(article.title, style = MaterialTheme.typography.titleLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
         article.excerpt?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = Muted, maxLines = 3, overflow = TextOverflow.Ellipsis) }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             MetaIcon(Icons.Rounded.FavoriteBorder, article.likeCount.toString())
             MetaIcon(Icons.Rounded.ChatBubbleOutline, article.commentCount.toString())
         }
     }
+}
+
+private fun articleDate(value: String?): String {
+    if (value.isNullOrBlank()) return ""
+    return runCatching {
+        LocalDate.parse(value.take(10)).format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.FRENCH))
+    }.getOrDefault(value.take(10))
 }
 
 @Composable
@@ -297,7 +314,7 @@ private fun shareArticle(context: android.content.Context, url: String, title: S
     context.startActivity(Intent.createChooser(intent, "Partager l’article"))
 }
 
-private fun articleImageModel(value: String): Any {
+fun articleImageModel(value: String): Any {
     if (!value.startsWith("data:image/", ignoreCase = true)) return value
     val encoded = value.substringAfter(',', "")
     return runCatching { Base64.decode(encoded, Base64.DEFAULT) }.getOrElse { value }

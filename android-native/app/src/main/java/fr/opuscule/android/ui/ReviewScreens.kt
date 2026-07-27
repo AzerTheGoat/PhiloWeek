@@ -225,8 +225,15 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
 private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Unit, choose: () -> Unit) {
     val token = state.token ?: return
     var resultCount by remember { mutableIntStateOf(0) }
+    var recentCount by remember { mutableIntStateOf(0) }
+    var recentAccuracy by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
-        runCatching { state.api.reviewResults(token) }.onSuccess { resultCount = it.size }
+        runCatching { state.api.reviewResults(token) }.onSuccess { results ->
+            resultCount = results.size
+            val recent = results.takeLast(20)
+            recentCount = recent.size
+            recentAccuracy = if (recent.isEmpty()) 0 else (recent.count { it.correct } * 100 / recent.size)
+        }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader(
@@ -242,6 +249,12 @@ private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Uni
             Text("Tout revoir", style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(8.dp))
             Text("Une série équilibrée entre vos questionnaires, vos définitions et les personnes de vos réseaux.", style = MaterialTheme.typography.bodyLarge, color = Muted)
+            Spacer(Modifier.height(22.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                ReviewMetric("À faire", "12", Modifier.weight(1f))
+                ReviewMetric("Récentes", recentCount.toString(), Modifier.weight(1f))
+                ReviewMetric("Maîtrise", "$recentAccuracy %", Modifier.weight(1f))
+            }
             Spacer(Modifier.height(26.dp))
             PrimaryButton(if (loading) "Préparation…" else "Commencer une série", startAll, Modifier.fillMaxWidth(), !loading)
             Spacer(Modifier.height(10.dp))
@@ -258,6 +271,17 @@ private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Uni
             }
             Spacer(Modifier.height(26.dp))
         }
+    }
+}
+
+@Composable
+private fun ReviewMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(17.dp)).background(Surface).padding(horizontal = 13.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(value, style = MaterialTheme.typography.titleLarge, color = Opuscule)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Muted)
     }
 }
 

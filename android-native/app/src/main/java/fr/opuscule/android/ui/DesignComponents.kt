@@ -230,6 +230,32 @@ fun SectionLabel(value: String) {
 }
 
 @Composable
+fun LibraryModeSwitch(selectedArticles: Boolean, selectFiles: () -> Unit, selectArticles: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(15.dp)).background(Surface).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        listOf(false to "Mes notes", true to "Articles").forEach { (articles, label) ->
+            val selected = selectedArticles == articles
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) ReadingPaper else Color.Transparent)
+                    .clickable { if (articles) selectArticles() else selectFiles() }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (selected) Ink else Muted,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick,
@@ -318,7 +344,35 @@ fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((
                     NativeMarkdownText(part.value, Modifier.fillMaxWidth(), onWikiLink)
                 }
                 is MarkdownPart.Mermaid -> MermaidDiagram(part.value, index)
+                is MarkdownPart.Image -> MarkdownImage(part)
             }
+        }
+    }
+}
+
+@Composable
+private fun MarkdownImage(part: MarkdownPart.Image) {
+    val remote = part.source.startsWith("https://", true) ||
+        part.source.startsWith("http://", true) ||
+        part.source.startsWith("data:image/", true)
+    if (remote) {
+        coil.compose.AsyncImage(
+            model = part.source,
+            contentDescription = part.alt.ifBlank { "Image de la note" },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 420.dp)
+                .clip(RoundedCornerShape(18.dp)).background(Surface),
+        )
+    } else {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("Image locale indisponible", color = Ink, style = MaterialTheme.typography.titleMedium)
+            Text(
+                part.alt.ifBlank { part.source.substringAfterLast('/').substringAfterLast('\\') },
+                color = Muted,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -422,6 +476,7 @@ private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink:
 private sealed interface MarkdownPart {
     data class Text(val value: String) : MarkdownPart
     data class Mermaid(val value: String) : MarkdownPart
+    data class Image(val alt: String, val source: String) : MarkdownPart
 }
 
 private fun splitMarkdown(markdown: String): List<MarkdownPart> {
@@ -429,12 +484,30 @@ private fun splitMarkdown(markdown: String): List<MarkdownPart> {
     val result = mutableListOf<MarkdownPart>()
     var cursor = 0
     pattern.findAll(markdown).take(20).forEach { match ->
-        if (match.range.first > cursor) result += MarkdownPart.Text(markdown.substring(cursor, match.range.first))
+        if (match.range.first > cursor) appendMarkdownText(result, markdown.substring(cursor, match.range.first))
         result += MarkdownPart.Mermaid(match.groupValues[1].trim())
         cursor = match.range.last + 1
     }
-    if (cursor < markdown.length) result += MarkdownPart.Text(markdown.substring(cursor))
+    if (cursor < markdown.length) appendMarkdownText(result, markdown.substring(cursor))
     return result.ifEmpty { listOf(MarkdownPart.Text(markdown)) }
+}
+
+private fun appendMarkdownText(result: MutableList<MarkdownPart>, value: String) {
+    val images = Regex("""!\[([^\]]*)]\(([^)]+)\)|!\[\[([^\]]+)]]""")
+    var cursor = 0
+    images.findAll(value).take(40).forEach { match ->
+        if (match.range.first > cursor) result += MarkdownPart.Text(value.substring(cursor, match.range.first))
+        val wikiImage = match.groupValues[3].trim()
+        if (wikiImage.isNotBlank()) {
+            result += MarkdownPart.Image(wikiImage.substringAfterLast('/'), wikiImage)
+        } else {
+            val rawSource = match.groupValues[2].trim()
+            val source = rawSource.substringBefore(" \"").substringBefore(" '").trim('<', '>')
+            result += MarkdownPart.Image(match.groupValues[1].trim(), source)
+        }
+        cursor = match.range.last + 1
+    }
+    if (cursor < value.length) result += MarkdownPart.Text(value.substring(cursor))
 }
 
 @Composable

@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,6 +54,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +70,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -79,7 +84,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 @Composable
-fun FilesScreen(state: AppState, openOverlay: (String) -> Unit) {
+fun FilesScreen(state: AppState, openOverlay: (String) -> Unit, openArticles: (() -> Unit)? = null) {
     val token = state.token ?: return
     var roots by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     var expanded by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -89,6 +94,8 @@ fun FilesScreen(state: AppState, openOverlay: (String) -> Unit) {
     var newNote by remember { mutableStateOf(false) }
     var unlock by remember { mutableStateOf<FileNode?>(null) }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
 
     fun load() = scope.launch {
         loading = true
@@ -105,10 +112,13 @@ fun FilesScreen(state: AppState, openOverlay: (String) -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("Fichiers", subtitle = "Toutes vos connaissances") {
+            ScreenHeader("Bibliothèque", subtitle = "Vos notes et vos lectures") {
                 IconButton(onClick = { newNote = true }, modifier = Modifier.clip(CircleShape).background(Surface)) {
                     Icon(Icons.Rounded.Add, "Nouvelle note", tint = Ink)
                 }
+            }
+            openArticles?.let {
+                LibraryModeSwitch(false, selectFiles = {}, selectArticles = it)
             }
             OutlinedTextField(
                 query,
@@ -135,7 +145,11 @@ fun FilesScreen(state: AppState, openOverlay: (String) -> Unit) {
                                     when {
                                         file.isFolder && file.locked -> unlock = file
                                         file.isFolder -> expanded = if (expanded.contains(file.id)) expanded - file.id else expanded + file.id
-                                        else -> openOverlay(file.id)
+                                        else -> {
+                                            focusManager.clearFocus(force = true)
+                                            keyboard?.hide()
+                                            openOverlay(file.id)
+                                        }
                                     }
                                 },
                             )
@@ -417,24 +431,28 @@ private fun ReaderPaper(content: @Composable () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewNoteDialog(dismiss: () -> Unit, create: (String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = dismiss,
-        title = { Text("Nouvelle note") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Titre") }, singleLine = true)
-                OutlinedTextField(content, { content = it }, label = { Text("Premières lignes") }, minLines = 4)
-            }
-        },
-        confirmButton = { TextButton(onClick = { create(title.trim(), content) }, enabled = title.isNotBlank()) { Text("Créer", color = Opuscule) } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Annuler", color = Muted) } },
-        shape = RoundedCornerShape(22.dp),
-        containerColor = Canvas,
-    )
+        containerColor = ReadingPaper,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Nouvelle note", style = MaterialTheme.typography.headlineMedium)
+            Text("Commencez simplement. La structure viendra ensuite.", color = Muted)
+            OpusculeField(title, { title = it }, "Titre")
+            OpusculeField(content, { content = it }, "Premières lignes", minLines = 5)
+            PrimaryButton("Créer la note", { create(title.trim(), content) }, Modifier.fillMaxWidth(), title.isNotBlank())
+            Spacer(Modifier.height(14.dp))
+        }
+    }
 }
 
 @Composable

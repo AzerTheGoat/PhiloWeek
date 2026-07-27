@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -46,10 +49,12 @@ import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -102,6 +107,7 @@ fun OrganizationScreen(
     requested: OrganizationSection?,
     consumed: () -> Unit,
     onDetailChange: (Boolean) -> Unit = {},
+    openSettings: () -> Unit = {},
 ) {
     var section by remember { mutableStateOf<OrganizationSection?>(null) }
     LaunchedEffect(requested) {
@@ -114,6 +120,7 @@ fun OrganizationScreen(
         onDetailChange(section != null)
         onDispose { if (section != null) onDetailChange(false) }
     }
+    BackHandler(enabled = section != null) { section = null }
     if (section != null) {
         when (section!!) {
             OrganizationSection.IDEAS -> IdeasScreen(state) { section = null }
@@ -128,10 +135,18 @@ fun OrganizationScreen(
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader(
-            "Organiser",
-            subtitle = "Capturez, planifiez, prenez du recul",
+            "Vous",
+            subtitle = "Vos idées, vos projets et votre progression",
         )
         Column(Modifier.padding(horizontal = 20.dp)) {
+            SectionLabel("Votre espace")
+            ActionRow(
+                state.user?.username.orEmpty(),
+                "Apparence, lecture et compte",
+                Icons.Rounded.Person,
+                openSettings,
+            )
+            Spacer(Modifier.height(18.dp))
             SectionLabel("Capturer")
             ActionRow("Idées", "Pensées rapides à reprendre", Icons.Rounded.Lightbulb, { section = OrganizationSection.IDEAS }, accent = Amber, accentSoft = AmberSoft)
             HorizontalDivider(color = Divider)
@@ -690,6 +705,7 @@ private fun ConfirmDeleteDialog(title: String, message: String, dismiss: () -> U
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SimpleCreateDialog(
     title: String,
@@ -703,21 +719,29 @@ private fun SimpleCreateDialog(
     var primary by remember { mutableStateOf("") }
     var secondary by remember { mutableStateOf(secondaryDefault) }
     var third by remember { mutableStateOf("") }
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = dismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedTextField(primary, { primary = it }, label = { Text(primaryLabel) }, minLines = if (secondaryLabel == null) 4 else 2)
-                secondaryLabel?.let { OutlinedTextField(secondary, { secondary = it }, label = { Text(it) }) }
-                thirdLabel?.let { OutlinedTextField(third, { third = it }, label = { Text(it) }, minLines = 2) }
-            }
-        },
-        confirmButton = { TextButton(onClick = { save(primary.trim(), secondary.trim(), third.trim()) }, enabled = primary.isNotBlank()) { Text("Enregistrer", color = Opuscule) } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Annuler", color = Muted) } },
-        shape = RoundedCornerShape(22.dp),
-        containerColor = Canvas,
-    )
+        containerColor = ReadingPaper,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.headlineMedium)
+            Text("Capturez maintenant, précisez seulement ce qui est utile.", color = Muted)
+            OpusculeField(primary, { primary = it }, primaryLabel, minLines = if (secondaryLabel == null) 4 else 2)
+            secondaryLabel?.let { OpusculeField(secondary, { value -> secondary = value }, it) }
+            thirdLabel?.let { OpusculeField(third, { value -> third = value }, it, minLines = 2) }
+            PrimaryButton(
+                "Enregistrer",
+                { save(primary.trim(), secondary.trim(), third.trim()) },
+                Modifier.fillMaxWidth(),
+                primary.isNotBlank(),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
+    }
 }
 
 @Composable

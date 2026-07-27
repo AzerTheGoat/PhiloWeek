@@ -1,0 +1,407 @@
+package fr.opuscule.android.ui
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Article
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Quiz
+import androidx.compose.material.icons.rounded.SwipeVertical
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import fr.opuscule.android.AppState
+import fr.opuscule.android.data.Article
+import fr.opuscule.android.data.FactCheck
+import fr.opuscule.android.data.Idea
+import fr.opuscule.android.data.Quote
+import fr.opuscule.android.data.ReviewQuestion
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+
+private sealed interface KnowledgeItem {
+    val id: String
+
+    data class Recall(val question: ReviewQuestion) : KnowledgeItem {
+        override val id = "recall:${question.key}"
+    }
+
+    data class Thought(val idea: Idea) : KnowledgeItem {
+        override val id = "idea:${idea.id}"
+    }
+
+    data class Citation(val quote: Quote) : KnowledgeItem {
+        override val id = "quote:${quote.id}"
+    }
+
+    data class Investigation(val fact: FactCheck) : KnowledgeItem {
+        override val id = "fact:${fact.id}"
+    }
+
+    data class Reading(val article: Article) : KnowledgeItem {
+        override val id = "article:${article.id}"
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun TodayScreen(
+    state: AppState,
+    openSettings: () -> Unit,
+    openReview: () -> Unit,
+    openArticles: () -> Unit,
+    openSection: (OrganizationSection) -> Unit,
+) {
+    val token = state.token ?: return
+    var items by remember { mutableStateOf<List<KnowledgeItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var completed by remember { mutableIntStateOf(0) }
+    val revealed = remember { mutableStateMapOf<String, Boolean>() }
+    val scope = rememberCoroutineScope()
+
+    suspend fun loadFeed() {
+        loading = true
+        error = null
+        runCatching {
+            coroutineScope {
+                val reviews = async { runCatching { state.api.review(token, limit = 8) }.getOrDefault(emptyList()) }
+                val ideas = async { runCatching { state.api.ideas(token) }.getOrDefault(emptyList()) }
+                val quotes = async { runCatching { state.api.quotes(token) }.getOrDefault(emptyList()) }
+                val facts = async { runCatching { state.api.factChecks(token) }.getOrDefault(emptyList()) }
+                val articles = async { runCatching { state.api.articles(token) }.getOrDefault(emptyList()) }
+                awaitAll(reviews, ideas, quotes, facts, articles)
+                buildKnowledgeFeed(
+                    reviews.await(),
+                    ideas.await(),
+                    quotes.await(),
+                    facts.await(),
+                    articles.await(),
+                )
+            }
+        }.onSuccess { items = it }
+            .onFailure { error = it.message ?: "Impossible de préparer votre journée." }
+        loading = false
+    }
+
+    LaunchedEffect(token) { loadFeed() }
+
+    Column(Modifier.fillMaxSize().background(Canvas)) {
+        TodayHeader(state, completed, openSettings)
+        when {
+            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CircularProgressIndicator(color = Opuscule, strokeWidth = 3.dp)
+                    Text("Opuscule prépare ce qui mérite votre attention.", color = Muted)
+                }
+            }
+            error != null -> Box(Modifier.fillMaxSize()) {
+                ErrorPane(error.orEmpty(), { scope.launch { loadFeed() } })
+            }
+            items.isEmpty() -> EmptyPane(
+                "Votre journée est prête",
+                "Ajoutez des notes, des idées ou des questionnaires pour alimenter ce flux.",
+                Icons.Rounded.SwipeVertical,
+                "Ouvrir Réviser",
+                openReview,
+            )
+            else -> {
+                val pagerState = rememberPagerState(pageCount = { Int.MAX_VALUE })
+                val chapterPosition = (pagerState.currentPage % 5) + 1
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("CHAPITRE DU JOUR", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    Spacer(Modifier.weight(1f))
+                    Text("$chapterPosition / 5", style = MaterialTheme.typography.labelMedium, color = Opuscule)
+                }
+                VerticalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = 2,
+                ) { page ->
+                    val item = items[page % items.size]
+                    KnowledgePage(
+                        item = item,
+                        revealed = revealed[item.id] == true,
+                        reveal = { revealed[item.id] = true },
+                        complete = {
+                            completed += 1
+                            scope.launch { pagerState.animateScrollToPage(page + 1) }
+                        },
+                        saveRecall = { known ->
+                            val question = (item as? KnowledgeItem.Recall)?.question ?: return@KnowledgePage
+                            scope.launch {
+                                runCatching { state.api.saveReview(token, question, known) }
+                                    .onSuccess {
+                                        completed += 1
+                                        pagerState.animateScrollToPage(page + 1)
+                                    }
+                                    .onFailure(state::handle)
+                            }
+                        },
+                        openReview = openReview,
+                        openArticles = openArticles,
+                        openSection = openSection,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayHeader(state: AppState, completed: Int, openSettings: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(Surface)) {
+        Row(
+            Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OpusculeLogo(Modifier.size(34.dp), compact = true)
+            Column(Modifier.padding(start = 11.dp).weight(1f)) {
+                Text("Aujourd’hui", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    if (completed == 0) "Votre espace pour apprendre" else "$completed élément${if (completed > 1) "s" else ""} travaillé${if (completed > 1) "s" else ""}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Muted,
+                )
+            }
+            IconButton(
+                onClick = openSettings,
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfacePressed),
+            ) {
+                Icon(Icons.Rounded.Person, "Réglages", tint = Ink)
+            }
+        }
+        HorizontalDivider(color = Divider.copy(alpha = .65f))
+    }
+}
+
+@Composable
+private fun KnowledgePage(
+    item: KnowledgeItem,
+    revealed: Boolean,
+    reveal: () -> Unit,
+    complete: () -> Unit,
+    saveRecall: (Boolean) -> Unit,
+    openReview: () -> Unit,
+    openArticles: () -> Unit,
+    openSection: (OrganizationSection) -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(ReadingPaper)
+                .padding(horizontal = 22.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            when (item) {
+                is KnowledgeItem.Recall -> RecallKnowledgeCard(item.question, revealed, reveal, saveRecall, openReview)
+                is KnowledgeItem.Thought -> {
+                    KnowledgeEyebrow("IDÉE À REPRENDRE", Icons.Rounded.Lightbulb)
+                    Text(item.idea.content, style = MaterialTheme.typography.headlineMedium, maxLines = 9, overflow = TextOverflow.Ellipsis)
+                    Text("Une idée devient utile quand elle rencontre une autre idée, une preuve ou une décision.", color = Muted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton("Plus tard", complete, Modifier.weight(1f))
+                        PrimaryButton("Développer", { openSection(OrganizationSection.IDEAS) }, Modifier.weight(1f))
+                    }
+                }
+                is KnowledgeItem.Citation -> {
+                    KnowledgeEyebrow("CITATION À RETROUVER", Icons.AutoMirrored.Rounded.MenuBook)
+                    Text(
+                        "“${item.quote.quote}”",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontFamily = FontFamily.Serif,
+                        fontStyle = FontStyle.Italic,
+                    )
+                    item.quote.author?.takeIf(String::isNotBlank)?.let {
+                        Text("— $it", color = Opuscule, fontWeight = FontWeight.SemiBold)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton("Passer", complete, Modifier.weight(1f))
+                        PrimaryButton("Contextualiser", { openSection(OrganizationSection.QUOTES) }, Modifier.weight(1f))
+                    }
+                }
+                is KnowledgeItem.Investigation -> {
+                    KnowledgeEyebrow("ENQUÊTE OUVERTE", Icons.Rounded.Verified)
+                    Text(item.fact.claim, style = MaterialTheme.typography.headlineMedium, maxLines = 9, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        when (item.fact.status) {
+                            "true" -> "Verdict actuel : confirmé"
+                            "false" -> "Verdict actuel : réfuté"
+                            "partial" -> "Verdict actuel : partiellement vrai"
+                            else -> "Cette affirmation attend encore une vérification."
+                        },
+                        color = Muted,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton("Passer", complete, Modifier.weight(1f))
+                        PrimaryButton("Enquêter", { openSection(OrganizationSection.FACTS) }, Modifier.weight(1f))
+                    }
+                }
+                is KnowledgeItem.Reading -> {
+                    KnowledgeEyebrow("LECTURE SUGGÉRÉE", Icons.AutoMirrored.Rounded.Article)
+                    item.article.coverImage?.let {
+                        AsyncImage(
+                            model = articleImageModel(it),
+                            contentDescription = item.article.title,
+                            modifier = Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(18.dp)).background(Surface),
+                        )
+                    }
+                    Text(item.article.title, style = MaterialTheme.typography.headlineMedium)
+                    item.article.excerpt?.let {
+                        Text(it, color = Muted, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton("Passer", complete, Modifier.weight(1f))
+                        PrimaryButton("Lire", openArticles, Modifier.weight(1f))
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.SwipeVertical, null, tint = Muted, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Balayez pour continuer", color = Muted, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecallKnowledgeCard(
+    question: ReviewQuestion,
+    revealed: Boolean,
+    reveal: () -> Unit,
+    save: (Boolean) -> Unit,
+    openReview: () -> Unit,
+) {
+    KnowledgeEyebrow("RAPPEL ACTIF", Icons.Rounded.Quiz)
+    Text(question.questionnaireTitle.ifBlank { question.fileName }, color = Muted, style = MaterialTheme.typography.labelLarge)
+    Text(
+        question.prompt,
+        style = MaterialTheme.typography.titleLarge,
+        maxLines = 11,
+        overflow = TextOverflow.Ellipsis,
+    )
+    AnimatedContent(revealed, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "today-answer") { visible ->
+        if (visible) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(OpusculeSoft).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("RÉPONSE", color = Opuscule, style = MaterialTheme.typography.labelMedium)
+                Text(question.answer, style = MaterialTheme.typography.titleLarge)
+                question.explanation.takeIf(String::isNotBlank)?.let { Text(it, color = Muted) }
+            }
+        } else {
+            Text(
+                "Formulez la réponse mentalement avant de la révéler.",
+                color = Muted,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+    if (!revealed) {
+        PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SecondaryButton("À revoir", { save(false) }, Modifier.weight(1f))
+            PrimaryButton("Je savais", { save(true) }, Modifier.weight(1f))
+        }
+    }
+    Text(
+        "Session complète",
+        modifier = Modifier.fillMaxWidth().clickable(onClick = openReview).padding(vertical = 4.dp),
+        textAlign = TextAlign.Center,
+        color = Opuscule,
+        style = MaterialTheme.typography.labelLarge,
+    )
+}
+
+@Composable
+private fun KnowledgeEyebrow(label: String, icon: ImageVector) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(OpusculeSoft), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = Opuscule, modifier = Modifier.size(20.dp))
+        }
+        Text(label, Modifier.padding(start = 10.dp).weight(1f), color = Opuscule, style = MaterialTheme.typography.labelMedium)
+        Icon(Icons.Rounded.MoreHoriz, null, tint = Muted)
+    }
+}
+
+private fun buildKnowledgeFeed(
+    reviews: List<ReviewQuestion>,
+    ideas: List<Idea>,
+    quotes: List<Quote>,
+    facts: List<FactCheck>,
+    articles: List<Article>,
+): List<KnowledgeItem> {
+    val buckets = listOf(
+        reviews.map(KnowledgeItem::Recall),
+        ideas.take(8).map(KnowledgeItem::Thought),
+        quotes.take(8).map(KnowledgeItem::Citation),
+        facts.filter { it.status == "to_check" || it.status == "partial" }.take(8).map(KnowledgeItem::Investigation),
+        articles.take(8).map(KnowledgeItem::Reading),
+    )
+    val result = mutableListOf<KnowledgeItem>()
+    val max = buckets.maxOfOrNull(List<*>::size) ?: 0
+    repeat(max) { index ->
+        buckets.forEach { bucket -> bucket.getOrNull(index)?.let(result::add) }
+    }
+    return result
+}

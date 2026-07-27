@@ -252,6 +252,26 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   autorisé. Les prérequis et l'installation manuelle sont documentés dans
   `android-native/README.md`.
 
+### Boucle mobile Aujourd’hui
+
+- La navigation Android native contient `Aujourd’hui`, `Bibliothèque`,
+  `Capturer`, `Réviser` et `Vous`.
+- `Aujourd’hui` mélange des rappels actifs, idées à reprendre, citations,
+  fact checks ouverts et articles publiés dans un flux vertical continu. Le
+  moteur diversifie les types et présente des chapitres de cinq éléments.
+- Une réponse donnée depuis `Aujourd’hui` utilise les mêmes routes de résultat
+  et la même pondération que la session complète de révision.
+- `Bibliothèque` regroupe notes et articles dans un sélecteur commun. Ouvrir une
+  note depuis la recherche ferme le clavier avant d’afficher le lecteur.
+- `Capturer` ouvre un panneau bas avec focus immédiat et crée réellement une
+  idée, une citation, un fact check ou une tâche via les routes existantes.
+- `Vous` regroupe le compte, les collections personnelles, les tâches, l’agenda,
+  la vie en perspective et les statistiques.
+- Sur `Aujourd’hui`, quitter demande deux pressions Retour. Dans un détail,
+  Retour ferme le détail sans perdre la racine active.
+- Le lecteur affiche les images Markdown HTTP(S) et data URI. Une image locale
+  inaccessible produit un état explicite au lieu d’un nom de fichier brut.
+
 ### Dictionnaire et suivi des cartes à corriger
 
 - Dans les lectures Android (notes, articles et contenus textuels des
