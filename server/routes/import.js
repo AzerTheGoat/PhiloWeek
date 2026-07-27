@@ -32,7 +32,9 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
 
   const db = getDb()
-  const conflict = req.body.conflict || 'rename'
+  // Un import doit conserver les noms d'origine. En cas de conflit de chemin,
+  // le contenu est remplacé plutôt que de créer un suffixe -import-… illisible.
+  const conflict = req.body.conflict === 'skip' ? 'skip' : 'overwrite'
   const report = { imported: 0, skipped: 0, linksResolved: 0, linksBroken: 0, errors: [] }
 
   try {
@@ -516,15 +518,11 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
 
           let fileId
           if (existing) {
-            if (conflict === 'skip') { report.skipped++; return }
+            if (conflict === 'skip') { report.skipped++; continue }
             if (conflict === 'overwrite') {
               db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(existing.id)
               updateFile.run(rawContent, req.user.id, existing.id)
               fileId = existing.id
-            } else {
-              const newName = addImportSuffix(fileName)
-              fileId = uuidv4()
-              insertFile.run(fileId, parentId, newName, rawContent, req.user.id, req.user.id)
             }
           } else {
             fileId = uuidv4()
@@ -943,12 +941,6 @@ function safeMatter(rawContent) {
 function safeJson(rawContent) {
   try { return JSON.parse(String(rawContent || '').replace(/^\uFEFF/, '')) }
   catch (_) { return null }
-}
-
-function addImportSuffix(fileName) {
-  const match = String(fileName || '').match(/^(.*?)(\.[^.]+)$/)
-  const suffix = `-import-${Date.now()}`
-  return match ? `${match[1]}${suffix}${match[2]}` : `${fileName}${suffix}`
 }
 
 function parseQuotesExport(content) {

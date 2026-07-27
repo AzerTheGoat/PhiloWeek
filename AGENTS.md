@@ -357,6 +357,19 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le backend `PUT /api/files/:id/move` doit refuser les cycles : impossible de déplacer un dossier dans lui-même ou dans un de ses descendants.
 - Un dossier chiffré fermé dans la session ne peut recevoir aucun nouveau fichier tant qu'il n'est pas ouvert.
 
+## Import et actions groupées web
+
+- L’import Obsidian conserve toujours les noms et chemins des fichiers. Lorsqu’un
+  fichier existe déjà au même emplacement, son contenu est remplacé; ne jamais
+  créer de suffixe automatique tel que `-import-...`.
+- Dans la sidebar web, `Sélectionner` active une sélection explicite de plusieurs
+  fichiers ou dossiers appartenant à l’utilisateur. `Tout` sélectionne les
+  éléments disponibles et `Corbeille` demande une confirmation puis déplace le
+  lot en une seule requête vers la corbeille restaurable pendant 30 jours.
+- La route `POST /api/files/batch-trash` exige la propriété, limite la sélection
+  à 200 éléments, protège Journal et les arborescences de quiz générés, et évite
+  de traiter deux fois un descendant déjà couvert par son dossier parent.
+
 ## Dossiers chiffrés et verrouillage de session
 
 - Le chiffrement persistant et le verrouillage temporaire sont deux états indépendants. `files.is_encrypted` marque uniquement la racine chiffrée; tous ses descendants portent `encrypted_folder_id`.

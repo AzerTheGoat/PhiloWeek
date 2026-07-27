@@ -7,11 +7,13 @@ import * as api from '../api'
 export default function Sidebar() {
   const {
     tree, theme, sidebarOpen, featuresOpen, loadTree, toast,
-    dispatch, showModal, showContextMenu, openJournalToday, openFile, view
+    dispatch, showModal, showContextMenu, openJournalToday, openFile, view, batchTrashFiles
   } = useApp()
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
   const importInputRef = useRef(null)
 
   const handleSearch = useCallback(async (q) => {
@@ -28,12 +30,12 @@ export default function Sidebar() {
     try {
       let result
       try {
-        result = await api.importObsidian(file)
+        result = await api.importObsidian(file, 'overwrite')
       } catch (error) {
         if (error.code !== 'VAULT_PASSWORD_REQUIRED_FOR_IMPORT') throw error
         const password = window.prompt('Ce ZIP contient des dossiers chiffrés. Mot de passe du coffre :')
         if (!password) throw new Error('Import annulé : mot de passe du coffre requis')
-        result = await api.importObsidian(file, 'rename', password)
+        result = await api.importObsidian(file, 'overwrite', password)
       }
       await loadTree()
       toast(`Import terminé : ${result.report.imported} fichiers, ${result.report.linksResolved} liens résolus`)
@@ -44,6 +46,38 @@ export default function Sidebar() {
       e.target.value = ''
     }
   }, [loadTree, toast])
+
+  const toggleSelected = useCallback((id) => {
+    setSelectedIds(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode(current => !current)
+    setSelectedIds(new Set())
+  }, [])
+
+  const selectAllOwned = useCallback(() => {
+    setSelectedIds(new Set(collectOwnedIds(tree)))
+  }, [tree])
+
+  const trashSelection = useCallback(async () => {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    if (!window.confirm(`Mettre ${ids.length} élément(s) sélectionné(s) à la corbeille ?\n\nIls pourront être restaurés pendant 30 jours.`)) return
+    try {
+      const result = await batchTrashFiles(ids)
+      toast(`${result.selected} élément(s) placé(s) dans la corbeille`)
+      setSelectedIds(new Set())
+      setSelectionMode(false)
+    } catch (error) {
+      toast(error.message, 'error')
+    }
+  }, [batchTrashFiles, selectedIds, toast])
 
   const handleAreaContextMenu = useCallback((e) => {
     e.preventDefault()
@@ -164,8 +198,25 @@ export default function Sidebar() {
           </div>
         ) : (
           <>
-            <div className="file-section-label">Mes fichiers</div>
-            <FileTree nodes={tree.filter(node => !node.shared_root)} />
+            <div className="file-section-label file-section-heading">
+              <span>Mes fichiers</span>
+              <button type="button" className={`file-selection-button ${selectionMode ? 'active' : ''}`} onClick={toggleSelectionMode}>
+                {selectionMode ? 'Annuler' : 'Sélectionner'}
+              </button>
+            </div>
+            {selectionMode && (
+              <div className="batch-actions" role="toolbar" aria-label="Actions groupées">
+                <span>{selectedIds.size} sélectionné(s)</span>
+                <button type="button" onClick={selectAllOwned}>Tout</button>
+                <button type="button" className="danger" disabled={selectedIds.size === 0} onClick={trashSelection}>Corbeille</button>
+              </div>
+            )}
+            <FileTree
+              nodes={tree.filter(node => !node.shared_root)}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+            />
             {tree.some(node => node.shared_root) && (
               <>
                 <div className="file-section-label shared"><Icon name="cloud" size={13} /> Partagés avec moi</div>
@@ -189,6 +240,13 @@ export default function Sidebar() {
       </button>
     </aside>
   )
+}
+
+function collectOwnedIds(nodes) {
+  return nodes.flatMap(node => [
+    ...(node.is_owner !== false && !node.is_locked ? [node.id] : []),
+    ...collectOwnedIds(node.children || []),
+  ])
 }
 
 function FeatureGroup({ title, actions, runFeature }) {

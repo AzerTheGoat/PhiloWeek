@@ -353,6 +353,12 @@ export function AppProvider({ children }) {
     await loadTree()
   }, [loadTree, state.openFileId])
 
+  const batchTrashFiles = useCallback(async (ids) => {
+    const result = await api.batchTrashFiles(ids)
+    await loadTree()
+    return result
+  }, [loadTree])
+
   const closeTab = useCallback(async (id) => {
     const index = state.tabs.findIndex(tab => tab.id === id)
     const isActive = state.view === 'editor' && state.openFileId === id
@@ -463,6 +469,7 @@ export function AppProvider({ children }) {
     redoFile: id => stepFileHistory(id, 'redo'),
     resolveFileConflict,
     deleteFile,
+    batchTrashFiles,
     toast,
     showContextMenu,
     hideContextMenu,

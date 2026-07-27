@@ -2247,6 +2247,35 @@ a { color: var(--link) }
   letter-spacing: .06em;
 }
 .file-section-label.shared { margin-top: 8px; border-top: 1px solid var(--border); color: var(--accent) }
+.file-section-heading { justify-content: space-between; gap: 8px; }
+.file-selection-button,
+.batch-actions button {
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-2);
+  border-radius: 7px;
+  padding: 3px 7px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.file-selection-button.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-hover); }
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 10px 5px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-hover);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.batch-actions span { flex: 1; }
+.batch-actions button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.batch-actions button:disabled { opacity: .45; cursor: not-allowed; }
 
 .sidebar-footer {
   display: flex;
@@ -2324,6 +2353,24 @@ a { color: var(--link) }
   overflow: hidden;
 }
 .file-row:hover { background: var(--bg-hover) }
+.file-row.selection-mode { cursor: default; }
+.file-row.is-selected { background: var(--accent-dim); color: var(--accent-hover); }
+.file-select-toggle {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border-focus);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.file-row.is-selected .file-select-toggle { background: var(--accent); border-color: var(--accent); color: #fff; }
+.file-select-toggle:disabled { opacity: .4; cursor: not-allowed; }
 .file-node.active > .file-row { background: var(--accent-dim); color: var(--accent-hover) }
 .file-row.is-dragging {
   opacity: 0.45;

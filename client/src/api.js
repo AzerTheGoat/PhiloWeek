@@ -36,6 +36,7 @@ export const createFile = data => req('POST', '/files', data)
 export const updateFile = (id, data) => req('PUT', `/files/${id}`, data)
 export const deleteFile = (id, confirmChildren = false) =>
   req('DELETE', `/files/${id}${confirmChildren ? '?confirm_children=1' : ''}`)
+export const batchTrashFiles = ids => req('POST', '/files/batch-trash', { ids, confirm_children: true })
 export const undoFile = (id, base_version) => req('POST', `/files/${id}/history/undo`, { base_version })
 export const redoFile = (id, base_version) => req('POST', `/files/${id}/history/redo`, { base_version })
 export const getTrash = () => req('GET', '/files/trash')
@@ -92,7 +93,7 @@ export const exportObsidian = async (password = '') => {
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-export const importObsidian = (file, conflict = 'rename', vaultPassword = '') => {
+export const importObsidian = (file, conflict = 'overwrite', vaultPassword = '') => {
   const fd = new FormData()
   fd.append('vault', file)
   fd.append('conflict', conflict)

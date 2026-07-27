@@ -376,6 +376,57 @@ router.put('/:id', (req, res) => {
 router.post('/:id/history/undo', (req, res) => applyHistoryStep(req, res, 'undo'))
 router.post('/:id/history/redo', (req, res) => applyHistoryStep(req, res, 'redo'))
 
+// POST /api/files/batch-trash — déplace plusieurs éléments à la corbeille.
+// Les descendants explicitement sélectionnés sont couverts par leur parent.
+router.post('/batch-trash', (req, res) => {
+  const requestedIds = [...new Set(Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [])]
+  if (!requestedIds.length) return res.status(400).json({ error: 'Sélectionne au moins un élément' })
+  if (requestedIds.length > 200) return res.status(400).json({ error: 'La sélection est limitée à 200 éléments' })
+  if (req.body?.confirm_children !== true) return res.status(400).json({ error: 'Confirmation de la suppression groupée requise' })
+
+  const db = getDb()
+  const selected = []
+  for (const id of requestedIds) {
+    const accessCheck = requireFileAccess(db, id, req.user.id, 'owner')
+    if (accessCheck.error) return res.status(accessCheck.status).json({ error: accessCheck.error })
+    let file
+    try { file = materializeFile(db, accessCheck.access.file, req.user.session_id) }
+    catch (error) { return res.status(error.status || 423).json({ error: error.message, code: error.code }) }
+    if (!file.parent_id && file.name === 'Journal' && file.type !== 'file') {
+      return res.status(403).json({ error: 'Le dossier Journal est protege' })
+    }
+    if (isGeneratedQuizStructure(db, file.id, req.user.id)) {
+      return res.status(409).json({ error: 'Cette arborescence de quiz est geree automatiquement' })
+    }
+    selected.push(file)
+  }
+
+  const selectedIds = new Set(selected.map(file => file.id))
+  const roots = selected.filter(file => {
+    let parentId = file.parent_id
+    while (parentId) {
+      if (selectedIds.has(parentId)) return false
+      const parent = db.prepare('SELECT parent_id FROM files WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(parentId, req.user.id)
+      parentId = parent?.parent_id || null
+    }
+    return true
+  })
+  const deletedAt = new Date().toISOString()
+  const trashRoots = db.transaction(() => {
+    const trashSubtree = db.prepare(`
+      WITH RECURSIVE subtree(id) AS (
+        SELECT id FROM files WHERE id = ? AND user_id = ?
+        UNION ALL
+        SELECT child.id FROM files child JOIN subtree s ON child.parent_id = s.id WHERE child.user_id = ?
+      )
+      UPDATE files SET deleted_at = ?, updated_at = ? WHERE id IN (SELECT id FROM subtree)
+    `)
+    for (const file of roots) trashSubtree.run(file.id, req.user.id, req.user.id, deletedAt, deletedAt)
+  })
+  trashRoots()
+  res.json({ ok: true, trashed: roots.length, selected: selected.length, purge_at: new Date(Date.now() + 30 * 86400000).toISOString() })
+})
+
 // DELETE /api/files/:id
 router.delete('/:id', (req, res) => {
   const db = getDb()

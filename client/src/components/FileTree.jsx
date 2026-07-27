@@ -2,7 +2,10 @@ import { useState, useCallback } from 'react'
 import { useApp } from '../context/useApp'
 import * as api from '../api'
 
-export default function FileTree({ nodes, depth = 0, dragState, setDragState, dropTargetId, setDropTargetId }) {
+export default function FileTree({
+  nodes, depth = 0, dragState, setDragState, dropTargetId, setDropTargetId,
+  selectionMode = false, selectedIds = new Set(), onToggleSelected,
+}) {
   const [localDragState, setLocalDragState] = useState(null)
   const [localDropTargetId, setLocalDropTargetId] = useState(null)
   const currentDragState = dragState ?? localDragState
@@ -21,13 +24,19 @@ export default function FileTree({ nodes, depth = 0, dragState, setDragState, dr
           setDragState={updateDragState}
           dropTargetId={currentDropTargetId}
           setDropTargetId={updateDropTargetId}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelected={onToggleSelected}
         />
       ))}
     </ul>
   )
 }
 
-function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropTargetId }) {
+function FileNode({
+  node, depth, dragState, setDragState, dropTargetId, setDropTargetId,
+  selectionMode, selectedIds, onToggleSelected,
+}) {
   const {
     openFileId, openFile, loadTree, deleteFile, toast, showContextMenu, showModal, dispatch
   } = useApp()
@@ -58,8 +67,14 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     !dragState.descendantIds?.includes(node.id)
   )
   const isDropTarget = canReceiveDrop && dropTargetId === node.id
+  const isSelected = selectedIds.has(node.id)
+  const canSelect = isOwner && !isLocked
 
   const handleClick = useCallback(async () => {
+    if (selectionMode) {
+      if (canSelect) onToggleSelected?.(node.id)
+      return
+    }
     if (isLocked) {
       if (isOwner) setUnlocking(true)
       else toast('Ce dossier verrouillé doit être ouvert par son propriétaire', 'error')
@@ -70,7 +85,7 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
     } else {
       openFile(node.id)
     }
-  }, [isFolder, isLocked, isOwner, openFile, node.id, toast])
+  }, [canSelect, isFolder, isLocked, isOwner, node.id, onToggleSelected, openFile, selectionMode, toast])
 
   const handleDragStart = useCallback((e) => {
     if (!isOwner || renaming || unlocking) {
@@ -234,9 +249,9 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
         </form>
       ) : (
         <div
-          className={`file-row ${isFolder ? 'is-folder' : ''} ${isLocked ? 'is-locked' : ''} ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
+          className={`file-row ${isFolder ? 'is-folder' : ''} ${isLocked ? 'is-locked' : ''} ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${selectionMode ? 'selection-mode' : ''} ${isSelected ? 'is-selected' : ''}`}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
-          draggable={isOwner}
+          draggable={isOwner && !selectionMode}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
@@ -246,6 +261,18 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           onContextMenu={handleContextMenu}
           title={node.name}
         >
+          {selectionMode && (
+            <button
+              type="button"
+              className="file-select-toggle"
+              aria-label={`${isSelected ? 'Désélectionner' : 'Sélectionner'} ${node.name}`}
+              aria-pressed={isSelected}
+              disabled={!canSelect}
+              onClick={event => { event.stopPropagation(); onToggleSelected?.(node.id) }}
+            >
+              {isSelected ? '✓' : ''}
+            </button>
+          )}
           <span className="file-icon">{icon}</span>
           <span className="file-name">{node.name.replace(/\.(md|json|xlsx)$/i, '')}</span>
           {isEncrypted && <span className="file-encrypted-badge" title={isLocked ? 'Chiffré et verrouillé' : 'Chiffré en base, ouvert dans cette session'}>🛡</span>}
@@ -276,6 +303,9 @@ function FileNode({ node, depth, dragState, setDragState, dropTargetId, setDropT
           setDragState={setDragState}
           dropTargetId={dropTargetId}
           setDropTargetId={setDropTargetId}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelected={onToggleSelected}
         />
       )}
 
