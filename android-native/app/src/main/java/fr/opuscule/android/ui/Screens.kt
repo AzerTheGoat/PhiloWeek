@@ -1,5 +1,6 @@
 package fr.opuscule.android.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -8,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +52,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -87,21 +91,9 @@ private enum class RootTab(val label: String, val icon: ImageVector) {
     ARTICLES("Articles", Icons.AutoMirrored.Rounded.Article),
 }
 
-private fun rootTabAccent(tab: RootTab): Color = when (tab) {
-    RootTab.HOME -> Opuscule
-    RootTab.FILES -> KnowledgeBlue
-    RootTab.REVIEW -> Coral
-    RootTab.ORGANIZE -> Sage
-    RootTab.ARTICLES -> Amber
-}
+private fun rootTabAccent(@Suppress("UNUSED_PARAMETER") tab: RootTab): Color = Opuscule
 
-private fun rootTabAccentSoft(tab: RootTab): Color = when (tab) {
-    RootTab.HOME -> OpusculeSoft
-    RootTab.FILES -> KnowledgeBlueSoft
-    RootTab.REVIEW -> CoralSoft
-    RootTab.ORGANIZE -> SageSoft
-    RootTab.ARTICLES -> AmberSoft
-}
+private fun rootTabAccentSoft(@Suppress("UNUSED_PARAMETER") tab: RootTab): Color = OpusculeSoft
 
 @Composable
 fun AuthScreen(state: AppState) {
@@ -174,6 +166,14 @@ fun OpusculeApp(state: AppState) {
     var chromeHidden by remember { mutableStateOf(false) }
     val tab = RootTab.valueOf(tabName)
     val snackbars = remember { SnackbarHostState() }
+
+    BackHandler(enabled = settingsVisible || fileStack.isNotEmpty() || tab != RootTab.HOME) {
+        when {
+            settingsVisible -> settingsVisible = false
+            fileStack.isNotEmpty() -> fileStack = fileStack.dropLast(1)
+            tab != RootTab.HOME -> tabName = RootTab.HOME.name
+        }
+    }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -307,7 +307,7 @@ private fun HomeScreen(
                 Icon(Icons.Rounded.Person, "Réglages", tint = Ink)
             }
         }
-        Spacer(Modifier.height(44.dp))
+        Spacer(Modifier.height(26.dp))
         Text("Bienvenue, ${state.user?.username.orEmpty()}", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(8.dp))
         Text("Que voulez-vous faire aujourd’hui ?", style = MaterialTheme.typography.bodyLarge, color = Muted)
@@ -315,20 +315,20 @@ private fun HomeScreen(
         SurfaceGroup {
             ActionRow("Réviser maintenant", "Une série sur toutes vos connaissances", Icons.Rounded.Quiz, goReview, accent = Opuscule, accentSoft = OpusculeSoft)
             HorizontalDivider(color = Divider)
-            ActionRow("Ouvrir mes fichiers", "Notes et documents", Icons.Rounded.FolderOpen, goFiles, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
+            ActionRow("Ouvrir mes fichiers", "Notes et documents", Icons.Rounded.FolderOpen, goFiles)
             HorizontalDivider(color = Divider)
-            ActionRow("Lire les articles", "Les dernières publications", Icons.Rounded.AutoStories, goArticles, accent = Coral, accentSoft = CoralSoft)
+            ActionRow("Lire les articles", "Les dernières publications", Icons.Rounded.AutoStories, goArticles)
         }
         Spacer(Modifier.height(30.dp))
         SectionLabel("Capture rapide")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            QuickAction("Idée", Icons.Rounded.Lightbulb, Amber, AmberSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.IDEAS) }
-            QuickAction("Citation", Icons.Rounded.MenuBook, KnowledgeBlue, KnowledgeBlueSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.QUOTES) }
+            QuickAction("Idée", Icons.Rounded.Lightbulb, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.IDEAS) }
+            QuickAction("Citation", Icons.Rounded.MenuBook, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.QUOTES) }
         }
         Spacer(Modifier.height(9.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            QuickAction("Fact check", Icons.Rounded.Verified, Sage, SageSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.FACTS) }
-            QuickAction("Tâche", Icons.Rounded.Checklist, Coral, CoralSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.TODOS) }
+            QuickAction("Fact check", Icons.Rounded.Verified, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.FACTS) }
+            QuickAction("Tâche", Icons.Rounded.Checklist, Opuscule, OpusculeSoft, Modifier.weight(1f)) { quickCapture(OrganizationSection.TODOS) }
         }
         Spacer(Modifier.height(28.dp))
     }
@@ -351,6 +351,7 @@ private fun QuickAction(label: String, icon: ImageVector, accent: Color, accentS
 
 @Composable
 private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
+    var appearanceVisible by remember { mutableStateOf(false) }
     DetailScaffold("Réglages", onBack) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
@@ -366,13 +367,49 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                 }
             }
             SurfaceGroup {
-                ActionRow("Apparence", "Thème clair Opuscule", Icons.Rounded.TipsAndUpdates, onClick = {})
+                ActionRow(
+                    "Apparence",
+                    if (state.compactInterface) "Interface compacte · palette sobre" else "Interface confortable · palette sobre",
+                    Icons.Rounded.TipsAndUpdates,
+                    onClick = { appearanceVisible = true },
+                )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.1.0 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow("Version", "1.1.1 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})
             }
         }
+    }
+    if (appearanceVisible) {
+        AlertDialog(
+            onDismissRequest = { appearanceVisible = false },
+            title = { Text("Apparence") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Une seule couleur d’accent, avec du rouge et du vert réservés aux états.", color = Muted)
+                    Row(
+                        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .clickable { state.updateCompactInterface(true) }.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(state.compactInterface, { state.updateCompactInterface(true) })
+                        Text("Compact · plus d’espace utile")
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .clickable { state.updateCompactInterface(false) }.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(!state.compactInterface, { state.updateCompactInterface(false) })
+                        Text("Confort · éléments plus espacés")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { appearanceVisible = false }) { Text("Terminé", color = Opuscule) }
+            },
+            containerColor = Canvas,
+        )
     }
 }

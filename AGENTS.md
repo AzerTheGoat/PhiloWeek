@@ -205,6 +205,12 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   personnes des réseaux d'acteurs. La carte garde les actions en bas, utilise le
   rouge `Danger` pour `À revoir`, ouvre le fichier source et peut retirer une
   question non pertinente du JSON après confirmation.
+- Sur Android, une carte de révision non révélée ne garde qu'une action principale
+  `Afficher la réponse`. `Voir la source`, `Modifier`, `Marquer à modifier` et
+  `Supprimer` sont regroupés dans le menu compact `…` du header.
+- Pour un quiz généré situé dans `Quiz générés/X/Y.json`, la source implicite est
+  toujours recherchée dans `X/Y.md`, hors du dossier `Quiz générés`; si elle
+  n'existe pas, l'application affiche un avertissement court.
 - `Organiser` regroupe idées, citations, fact checks, tâches, agenda et habitudes,
   vie en semaines ou mois, et statistiques d’utilisation. La capture rapide
   utilise un sélecteur en haut à gauche pour basculer entre les types.
@@ -216,6 +222,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   les sauvegardes Android sont désactivées.
 - Le thème du client Kotlin est clair. Le backend Railway par défaut est défini
   via `API_BASE_URL` dans `android-native/app/build.gradle.kts`.
+- L'interface Android utilise une seule couleur d'accent Opuscule; rouge, vert et
+  orange restent réservés aux états. Le réglage `Apparence` permet de choisir une
+  densité compacte ou confortable et mémorise ce choix localement.
+- Les headers Android respectent les zones système mais restent compacts. Le bouton
+  Retour ferme d'abord un détail, un réglage ou une session, puis revient à
+  `Accueil` depuis un onglet racine avant de pouvoir quitter l'application.
+- Dans une note Markdown Android, sélectionner un seul mot ouvre directement le
+  dictionnaire gratuit français/anglais.
 - `android-native/build-debug.ps1` génère l'APK de test et
   `android-native/install-debug.ps1` le déploie par ADB sur un téléphone
   autorisé. Les prérequis et l'installation manuelle sont documentés dans

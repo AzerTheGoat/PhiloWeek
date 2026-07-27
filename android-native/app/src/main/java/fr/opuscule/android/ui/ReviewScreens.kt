@@ -281,16 +281,27 @@ private fun ReviewCard(
         containerColor = Canvas,
         topBar = {
             Column(Modifier.statusBarsPadding()) {
-                Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = stop) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreHoriz, "Options") }
                         DropdownMenu(menu, { menu = false }, shape = RoundedCornerShape(16.dp), containerColor = Canvas) {
                             DropdownMenuItem(
+                                text = { Text("Voir le fichier source") },
+                                leadingIcon = { Icon(Icons.Rounded.Source, null) },
+                                onClick = { menu = false; source() },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Modifier la question") },
                                 leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                                 onClick = { menu = false; edit() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (question.requireChange) "Déjà marquée à modifier" else "Marquer à modifier") },
+                                leadingIcon = { Icon(Icons.Rounded.Tune, null, tint = Warning) },
+                                enabled = !question.requireChange,
+                                onClick = { menu = false; requireChange() },
                             )
                             if (question.kind == "questionnaire") DropdownMenuItem(
                                 text = { Text("Supprimer", color = Danger) },
@@ -304,26 +315,7 @@ private fun ReviewCard(
             }
         },
         bottomBar = {
-            Column(Modifier.background(Canvas).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = edit, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Edit, null, modifier = Modifier.size(17.dp))
-                        Text(" Modifier", color = Ink)
-                    }
-                    TextButton(onClick = requireChange, enabled = !question.requireChange, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Tune, null, tint = Warning, modifier = Modifier.size(17.dp))
-                        Text(if (question.requireChange) " Marquée" else " À modifier", color = Warning)
-                    }
-                    if (question.kind == "questionnaire") TextButton(onClick = delete, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Delete, null, tint = Danger, modifier = Modifier.size(17.dp))
-                        Text(" Supprimer", color = Danger)
-                    }
-                }
-                SecondaryButton(
-                    "Voir le fichier source",
-                    source,
-                    Modifier.fillMaxWidth(),
-                )
+            Column(Modifier.background(Canvas).padding(horizontal = 16.dp, vertical = 10.dp)) {
                 AnimatedContent(
                     revealed,
                     transitionSpec = { fadeIn() + scaleIn(initialScale = .98f, animationSpec = spring()) togetherWith fadeOut() },

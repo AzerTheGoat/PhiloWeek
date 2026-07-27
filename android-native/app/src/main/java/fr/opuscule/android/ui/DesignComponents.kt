@@ -102,13 +102,28 @@ fun ScreenHeader(
     subtitle: String? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
+    val compact = LocalCompactInterface.current
     Row(
-        modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 18.dp),
+        modifier.fillMaxWidth().statusBarsPadding().padding(
+            horizontal = 20.dp,
+            vertical = if (compact) 7.dp else 13.dp,
+        ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineLarge)
-            subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Muted) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                title,
+                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+            )
+            subtitle?.takeUnless { compact }?.let {
+                Text(
+                    it,
+                    style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         action?.invoke()
     }
@@ -121,12 +136,13 @@ fun DetailScaffold(
     action: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val compact = LocalCompactInterface.current
     Scaffold(
         containerColor = Canvas,
         topBar = {
             Column(Modifier.background(Canvas).statusBarsPadding()) {
                 Row(
-                    Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 8.dp),
+                    Modifier.fillMaxWidth().height(if (compact) 46.dp else 54.dp).padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
@@ -275,18 +291,29 @@ fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((
                 setLineSpacing(0f, 1.22f)
                 movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
                 setTextIsSelectable(true)
+                fun selectedDictionaryWord(): String? {
+                    val start = selectionStart.coerceAtLeast(0)
+                    val end = selectionEnd.coerceAtLeast(start)
+                    val selected = text.substring(start, end).trim()
+                    return Regex("[\\p{L}]+(?:[-’'][\\p{L}]+)*").find(selected)?.value
+                        ?.takeIf { selected.matches(Regex("\\s*[^\\s]+\\s*")) && it.length <= 80 }
+                }
                 customSelectionActionModeCallback = object : ActionMode.Callback {
                     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
                         menu.add(0, 9137, 10, "Dictionnaire")
+                            .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                        post {
+                            selectedDictionaryWord()?.let { word ->
+                                selectedWord = word
+                                mode.finish()
+                            }
+                        }
                         return true
                     }
                     override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
                     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
                         if (item.itemId != 9137) return false
-                        val start = selectionStart.coerceAtLeast(0)
-                        val end = selectionEnd.coerceAtLeast(start)
-                        val word = text.substring(start, end).trim().trim { !it.isLetter() && it != '-' && it != '\'' }
-                        if (word.isNotBlank() && word.length <= 80) selectedWord = word
+                        selectedDictionaryWord()?.let { selectedWord = it }
                         mode.finish()
                         return true
                     }

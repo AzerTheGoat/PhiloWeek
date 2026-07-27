@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 class AppState(application: Application) : AndroidViewModel(application) {
     val api = ApiClient()
     private val tokenStore = SecureTokenStore(application)
+    private val appearancePreferences =
+        application.getSharedPreferences("opuscule_appearance", Application.MODE_PRIVATE)
 
     var user by mutableStateOf<User?>(null)
         private set
@@ -25,6 +27,8 @@ class AppState(application: Application) : AndroidViewModel(application) {
     var message by mutableStateOf<String?>(null)
         private set
     var messageTone by mutableStateOf("success")
+        private set
+    var compactInterface by mutableStateOf(appearancePreferences.getBoolean("compact_interface", true))
         private set
 
     var token: String? = null
@@ -67,6 +71,11 @@ class AppState(application: Application) : AndroidViewModel(application) {
     fun notify(value: String?, tone: String = "success") {
         message = value
         if (value != null) messageTone = tone
+    }
+
+    fun updateCompactInterface(compact: Boolean) {
+        compactInterface = compact
+        appearancePreferences.edit().putBoolean("compact_interface", compact).apply()
     }
 
     fun handle(error: Throwable) {

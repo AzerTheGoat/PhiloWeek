@@ -6,7 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -24,14 +26,14 @@ val Muted = Color(0xFF74717A)
 val Divider = Color(0xFFE7E0D6)
 val Opuscule = Color(0xFF6552C8)
 val OpusculeSoft = Color(0xFFEDE9FF)
-val KnowledgeBlue = Color(0xFF316B9E)
-val KnowledgeBlueSoft = Color(0xFFE7F2FB)
-val Sage = Color(0xFF4F7A65)
-val SageSoft = Color(0xFFE8F2EC)
-val Amber = Color(0xFFB36B22)
-val AmberSoft = Color(0xFFFFEFD9)
-val Coral = Color(0xFFC45752)
-val CoralSoft = Color(0xFFFFEAE7)
+val KnowledgeBlue = Opuscule
+val KnowledgeBlueSoft = OpusculeSoft
+val Sage = Opuscule
+val SageSoft = OpusculeSoft
+val Amber = Opuscule
+val AmberSoft = OpusculeSoft
+val Coral = Opuscule
+val CoralSoft = OpusculeSoft
 val Danger = Color(0xFFC83D4A)
 val DangerSoft = Color(0xFFFFE9EC)
 val Success = Color(0xFF287653)
@@ -66,8 +68,10 @@ private val AppTypography = Typography(
     labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, lineHeight = 16.sp),
 )
 
+val LocalCompactInterface = compositionLocalOf { true }
+
 @Composable
-fun OpusculeTheme(content: @Composable () -> Unit) {
+fun OpusculeTheme(compactInterface: Boolean = true, content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -83,5 +87,7 @@ fun OpusculeTheme(content: @Composable () -> Unit) {
                     android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         }
     }
-    MaterialTheme(colorScheme = Colors, typography = AppTypography, content = content)
+    CompositionLocalProvider(LocalCompactInterface provides compactInterface) {
+        MaterialTheme(colorScheme = Colors, typography = AppTypography, content = content)
+    }
 }

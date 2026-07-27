@@ -21,9 +21,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            OpusculeTheme {
+            val state: AppState = viewModel()
+            OpusculeTheme(compactInterface = state.compactInterface) {
                 Surface(Modifier.fillMaxSize()) {
-                    val state: AppState = viewModel()
                     Root(state)
                 }
             }

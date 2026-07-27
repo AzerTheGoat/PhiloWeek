@@ -335,7 +335,7 @@ function buildReviewSourceIndex(db, userId, sessionId) {
     byPath.set(normalizePath(file.name.replace(/\.[^.]+$/i, '')), entry)
     byParentAndName.set(`${file.parent_id || ''}|${normalizePath(file.name)}`, entry)
   })
-  return { byId, byPath, byParentAndName }
+  return { byId, byPath, byParentAndName, db, userId }
 }
 
 function resolveReviewSource(question, questionnaire, index, reviewFile) {
@@ -357,6 +357,13 @@ function resolveReviewSource(question, questionnaire, index, reviewFile) {
   for (const path of paths) {
     const source = index.byPath.get(path)
     if (source) return source
+  }
+  const reviewPath = normalizePath(getFilePath(index.db, reviewFile?.id, index.userId))
+  const reviewParts = reviewPath.split('/').filter(Boolean)
+  if (reviewParts.length > 1 && withoutDiacritics(reviewParts[0]) === 'quiz generes') {
+    const generatedSourcePath = reviewParts.slice(1).join('/').replace(/\.json$/i, '.md')
+    const generatedSource = index.byPath.get(generatedSourcePath)
+    if (generatedSource) return generatedSource
   }
   const siblingName = normalizePath(String(reviewFile?.name || '').replace(/\.json$/i, '.md'))
   const sibling = index.byParentAndName.get(`${reviewFile?.parent_id || ''}|${siblingName}`)
@@ -530,4 +537,8 @@ function getFilePath(db, fileId, userId) {
 
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').trim().toLowerCase()
+}
+
+function withoutDiacritics(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
