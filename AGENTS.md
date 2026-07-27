@@ -230,6 +230,16 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   `Accueil` depuis un onglet racine avant de pouvoir quitter l'application.
 - Dans une note Markdown Android, sélectionner un seul mot ouvre directement le
   dictionnaire gratuit français/anglais.
+- Le dictionnaire Android s'affiche dans un panneau bas natif; les définitions
+  utilisent une typographie contrastée et restent défilables sans masquer la note.
+- Le lecteur Markdown Android reprend la hiérarchie visuelle du web : titres
+  colorés, liens, citations, listes, code et tableaux stylés. Les blocs fenced
+  `mermaid` sont isolés du texte puis rendus en image native via la route
+  authentifiée `POST /api/markdown/mermaid`, avec limites de taille et erreur
+  locale si le diagramme est invalide.
+- Le rendu Mermaid Android transmet uniquement le code du diagramme au service
+  public Kroki à travers le serveur Opuscule; aucun autre contenu de la note
+  n'est envoyé à ce service.
 - `android-native/build-debug.ps1` génère l'APK de test et
   `android-native/install-debug.ps1` le déploie par ADB sur un téléphone
   autorisé. Les prérequis et l'installation manuelle sont documentés dans

@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -406,12 +407,12 @@ private fun ReaderTitle(title: String, description: String, icon: ImageVector) {
 
 @Composable
 private fun ReaderPaper(content: @Composable () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(ReadingPaper),
-        verticalAlignment = Alignment.Top,
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(ReadingPaper)
+            .border(1.dp, Divider.copy(alpha = .7f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 19.dp, vertical = 18.dp),
     ) {
-        Box(Modifier.width(5.dp).height(140.dp).background(Opuscule))
-        Box(Modifier.weight(1f).padding(horizontal = 18.dp, vertical = 17.dp)) { content() }
+        content()
     }
 }
 

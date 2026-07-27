@@ -96,7 +96,7 @@ export default function SecurityPage() {
           </article>
           <article className="security-info-block">
             <h4><Icon name="alert" size={18} /> Limites à connaître</h4>
-            <p>Les noms et la structure des dossiers restent visibles. Les audios et photos ne suivent pas encore le chiffrement d’un dossier. Une personne contrôlant le serveur ou une session ouverte pourrait lire les données utilisées à cet instant.</p>
+            <p>Les noms et la structure des dossiers restent visibles. Les audios et photos ne suivent pas encore le chiffrement d’un dossier. Sur Android, le code d’un bloc Mermaid est transmis par le serveur au service public Kroki pour produire le diagramme; le reste de la note n’est pas envoyé. Une personne contrôlant le serveur ou une session ouverte pourrait lire les données utilisées à cet instant.</p>
           </article>
         </div>
       </section>

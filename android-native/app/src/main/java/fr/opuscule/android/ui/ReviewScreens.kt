@@ -47,6 +47,8 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -281,11 +283,11 @@ private fun ReviewCard(
         containerColor = Canvas,
         topBar = {
             Column(Modifier.statusBarsPadding()) {
-                Row(Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = stop) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
+                Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = stop, modifier = Modifier.size(38.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreHoriz, "Options") }
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.MoreHoriz, "Options") }
                         DropdownMenu(menu, { menu = false }, shape = RoundedCornerShape(16.dp), containerColor = Canvas) {
                             DropdownMenuItem(
                                 text = { Text("Voir le fichier source") },
@@ -341,39 +343,73 @@ private fun ReviewCard(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp).animateContentSize(),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 18.dp).animateContentSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(CircleShape).background(kindSoft), contentAlignment = Alignment.Center) {
-                    Icon(kindIcon(question.kind), null, tint = kindAccent, modifier = Modifier.size(18.dp))
-                }
-                Text(kindLabel(question.kind), Modifier.padding(start = 9.dp), color = kindAccent, style = MaterialTheme.typography.labelLarge)
-            }
-            Text(question.questionnaireTitle, color = Muted, style = MaterialTheme.typography.bodyMedium)
-            question.image?.let {
-                AsyncImage(it, question.imageAlt, Modifier.fillMaxWidth().height(290.dp).clip(RoundedCornerShape(20.dp)).background(Surface))
-            }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(ReadingPaper).padding(19.dp)) {
-                Text(
-                    question.prompt,
-                    style = if (question.prompt.length > 180) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
-                )
-            }
-            AnimatedContent(
-                revealed,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "answer",
-            ) { visible ->
-                if (visible) {
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(SuccessSoft).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("RÉPONSE", style = MaterialTheme.typography.labelMedium, color = Success)
-                        Text(question.answer.ifBlank { "Aucune réponse renseignée." }, style = MaterialTheme.typography.titleLarge)
-                        if (question.explanation.isNotBlank()) Text(question.explanation, style = MaterialTheme.typography.bodyLarge, color = Muted)
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = ReadingPaper),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Divider),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(30.dp).clip(CircleShape).background(kindSoft), contentAlignment = Alignment.Center) {
+                            Icon(kindIcon(question.kind), null, tint = kindAccent, modifier = Modifier.size(16.dp))
+                        }
+                        Column(Modifier.padding(start = 9.dp).weight(1f)) {
+                            Text(kindLabel(question.kind), color = kindAccent, style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                question.questionnaireTitle,
+                                color = Ink.copy(alpha = .65f),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                } else Text("Prenez un instant pour formuler votre réponse mentalement.", style = MaterialTheme.typography.bodyMedium, color = Muted)
+                    HorizontalDivider(color = Divider)
+                    question.image?.let {
+                        AsyncImage(
+                            it,
+                            question.imageAlt,
+                            Modifier.fillMaxWidth().height(230.dp).clip(RoundedCornerShape(16.dp)).background(Surface),
+                        )
+                    }
+                    Text(
+                        question.prompt,
+                        color = Ink,
+                        style = if (question.prompt.length > 180) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                    )
+                    AnimatedContent(
+                        revealed,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "answer",
+                    ) { visible ->
+                        if (visible) {
+                            Column(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OpusculeSoft).padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(9.dp),
+                            ) {
+                                Text("RÉPONSE", style = MaterialTheme.typography.labelMedium, color = Opuscule)
+                                Text(question.answer.ifBlank { "Aucune réponse renseignée." }, color = Ink, style = MaterialTheme.typography.titleLarge)
+                                if (question.explanation.isNotBlank()) {
+                                    Text(question.explanation, style = MaterialTheme.typography.bodyLarge, color = Ink.copy(alpha = .78f))
+                                }
+                            }
+                        } else {
+                            Text(
+                                "Formulez votre réponse mentalement.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Ink.copy(alpha = .62f),
+                            )
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

@@ -1,7 +1,12 @@
 package fr.opuscule.android.ui
 
+import android.graphics.BitmapFactory
+import android.graphics.Typeface
+import android.text.SpannableStringBuilder
 import android.text.method.LinkMovementMethod
 import android.text.Spannable
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.text.style.URLSpan
 import android.net.Uri
 import android.view.ActionMode
@@ -16,6 +21,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,29 +33,33 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,6 +83,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.DictionaryEntry
 import io.noties.markwon.Markwon
+import io.noties.markwon.AbstractMarkwonPlugin
+import io.noties.markwon.core.MarkwonTheme
+import io.noties.markwon.core.spans.HeadingSpan
 import io.noties.markwon.ext.tables.TablePlugin
 import kotlinx.coroutines.launch
 
@@ -103,29 +117,31 @@ fun ScreenHeader(
     action: (@Composable () -> Unit)? = null,
 ) {
     val compact = LocalCompactInterface.current
-    Row(
-        modifier.fillMaxWidth().statusBarsPadding().padding(
-            horizontal = 20.dp,
-            vertical = if (compact) 7.dp else 13.dp,
-        ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                title,
-                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
-            )
-            subtitle?.takeUnless { compact }?.let {
+    Column(modifier.fillMaxWidth().background(Canvas).statusBarsPadding()) {
+        Row(
+            Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    it,
-                    style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
-                    color = Muted,
+                    title,
+                    style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                subtitle?.takeUnless { compact }?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+            Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) { action?.invoke() }
         }
-        action?.invoke()
+        HorizontalDivider(color = Divider.copy(alpha = .65f))
     }
 }
 
@@ -142,16 +158,22 @@ fun DetailScaffold(
         topBar = {
             Column(Modifier.background(Canvas).statusBarsPadding()) {
                 Row(
-                    Modifier.fillMaxWidth().height(if (compact) 46.dp else 54.dp).padding(horizontal = 6.dp),
+                    Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(38.dp)) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Retour", tint = Ink)
                     }
-                    Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    action?.invoke()
+                    Text(
+                        title,
+                        Modifier.weight(1f).padding(horizontal = 6.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Box(Modifier.height(38.dp), contentAlignment = Alignment.Center) { action?.invoke() }
                 }
-                HorizontalDivider(color = Divider)
+                HorizontalDivider(color = Divider.copy(alpha = .65f))
             }
         },
         content = content,
@@ -276,19 +298,55 @@ fun InlineNotice(message: String, visible: Boolean) {
 
 @Composable
 fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((String) -> Unit)? = null) {
+    val parts = remember(markdown) { splitMarkdown(markdown) }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        parts.forEachIndexed { index, part ->
+            when (part) {
+                is MarkdownPart.Text -> if (part.value.isNotBlank()) {
+                    NativeMarkdownText(part.value, Modifier.fillMaxWidth(), onWikiLink)
+                }
+                is MarkdownPart.Mermaid -> MermaidDiagram(part.value, index)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink: ((String) -> Unit)?) {
     val context = LocalContext.current
     val state: AppState = viewModel()
     var selectedWord by remember { mutableStateOf<String?>(null) }
     val markwon = remember {
-        Markwon.builder(context).usePlugin(TablePlugin.create(context)).build()
+        Markwon.builder(context)
+            .usePlugin(object : AbstractMarkwonPlugin() {
+                override fun configureTheme(builder: MarkwonTheme.Builder) {
+                    builder
+                        .linkColor(Opuscule.toArgbCompat())
+                        .isLinkUnderlined(false)
+                        .blockQuoteColor(Opuscule.toArgbCompat())
+                        .listItemColor(Opuscule.toArgbCompat())
+                        .codeTextColor(Opuscule.toArgbCompat())
+                        .codeBlockTextColor(Ink.toArgbCompat())
+                        .codeBackgroundColor(Surface.toArgbCompat())
+                        .codeBlockBackgroundColor(Surface.toArgbCompat())
+                        .headingBreakColor(Divider.toArgbCompat())
+                        .thematicBreakColor(Divider.toArgbCompat())
+                        .headingTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD))
+                        .headingTextSizeMultipliers(floatArrayOf(1.75f, 1.42f, 1.22f, 1.08f, 1f, .96f))
+                }
+            })
+            .usePlugin(TablePlugin.create(context))
+            .build()
     }
     AndroidView(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         factory = {
             TextView(it).apply {
                 setTextColor(Ink.toArgbCompat())
-                textSize = 17f
-                setLineSpacing(0f, 1.22f)
+                setLinkTextColor(Opuscule.toArgbCompat())
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 17.5f)
+                setLineSpacing(4f, 1.28f)
+                highlightColor = OpusculeSoft.toArgbCompat()
                 movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
                 setTextIsSelectable(true)
                 fun selectedDictionaryWord(): String? {
@@ -323,10 +381,87 @@ fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((
         },
         update = {
             it.movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
-            markwon.setMarkdown(it, expandWikiLinks(markdown))
+            val rendered = SpannableStringBuilder(markwon.toMarkdown(expandWikiLinks(markdown)))
+            rendered.getSpans(0, rendered.length, HeadingSpan::class.java).forEach { heading ->
+                val color = if (heading.level <= 2) Opuscule else Ink
+                rendered.setSpan(
+                    ForegroundColorSpan(color.toArgbCompat()),
+                    rendered.getSpanStart(heading),
+                    rendered.getSpanEnd(heading),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+            markwon.setParsedMarkdown(it, rendered)
         },
     )
-    selectedWord?.let { DictionaryDialog(state, it) { selectedWord = null } }
+    selectedWord?.let { DictionarySheet(state, it) { selectedWord = null } }
+}
+
+private sealed interface MarkdownPart {
+    data class Text(val value: String) : MarkdownPart
+    data class Mermaid(val value: String) : MarkdownPart
+}
+
+private fun splitMarkdown(markdown: String): List<MarkdownPart> {
+    val pattern = Regex("```mermaid\\s*\\n?([\\s\\S]*?)```", RegexOption.IGNORE_CASE)
+    val result = mutableListOf<MarkdownPart>()
+    var cursor = 0
+    pattern.findAll(markdown).take(20).forEach { match ->
+        if (match.range.first > cursor) result += MarkdownPart.Text(markdown.substring(cursor, match.range.first))
+        result += MarkdownPart.Mermaid(match.groupValues[1].trim())
+        cursor = match.range.last + 1
+    }
+    if (cursor < markdown.length) result += MarkdownPart.Text(markdown.substring(cursor))
+    return result.ifEmpty { listOf(MarkdownPart.Text(markdown)) }
+}
+
+@Composable
+private fun MermaidDiagram(source: String, key: Int) {
+    val state: AppState = viewModel()
+    val token = state.token
+    var image by remember(source) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var error by remember(source) { mutableStateOf<String?>(null) }
+    var retry by remember(source) { mutableStateOf(0) }
+    LaunchedEffect(source, retry, token) {
+        if (token == null || source.isBlank()) {
+            error = "Diagramme Mermaid vide."
+            return@LaunchedEffect
+        }
+        image = null
+        error = null
+        runCatching { state.api.renderMermaid(token, source) }
+            .onSuccess { bytes ->
+                image = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                if (image == null) error = "Image Mermaid illisible."
+            }
+            .onFailure { error = it.message ?: "Rendu Mermaid indisponible." }
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(Surface).border(1.dp, Divider, RoundedCornerShape(16.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("DIAGRAMME", style = MaterialTheme.typography.labelMedium, color = Opuscule)
+            Text("  Mermaid", style = MaterialTheme.typography.labelMedium, color = Ink)
+        }
+        when {
+            image != null -> androidx.compose.foundation.Image(
+                image!!,
+                contentDescription = "Diagramme Mermaid ${key + 1}",
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 520.dp),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+            error != null -> {
+                Text(error.orEmpty(), color = Danger, style = MaterialTheme.typography.bodyMedium)
+                Text(source, color = Ink, style = MaterialTheme.typography.bodySmall, maxLines = 10, overflow = TextOverflow.Ellipsis)
+                TextButton(onClick = { retry++ }) { Text("Réessayer", color = Opuscule) }
+            }
+            else -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(26.dp), color = Opuscule, strokeWidth = 2.5.dp)
+            }
+        }
+    }
 }
 
 private fun expandWikiLinks(markdown: String): String =
@@ -358,8 +493,9 @@ private class WikiLinkMovementMethod(private val openWikiLink: (String) -> Unit)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DictionaryDialog(state: AppState, word: String, dismiss: () -> Unit) {
+private fun DictionarySheet(state: AppState, word: String, dismiss: () -> Unit) {
     val token = state.token ?: return
     var language by remember(word) { mutableStateOf("fr") }
     var entry by remember(word) { mutableStateOf<DictionaryEntry?>(null) }
@@ -379,36 +515,58 @@ private fun DictionaryDialog(state: AppState, word: String, dismiss: () -> Unit)
         }
     }
     androidx.compose.runtime.LaunchedEffect(word) { lookup("fr") }
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = dismiss,
-        title = { Text("Dictionnaire · $word") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { lookup("fr") }, colors = ButtonDefaults.textButtonColors(contentColor = if (language == "fr") Opuscule else Muted)) { Text("Français") }
-                    TextButton(onClick = { lookup("en") }, colors = ButtonDefaults.textButtonColors(contentColor = if (language == "en") Opuscule else Muted)) { Text("English") }
+        containerColor = ReadingPaper,
+        contentColor = Ink,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 22.dp).padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(word, style = MaterialTheme.typography.headlineMedium, color = Ink)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("fr" to "Français", "en" to "English").forEach { (code, label) ->
+                    Text(
+                        label,
+                        color = if (language == code) Opuscule else Ink,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(if (language == code) OpusculeSoft else Surface)
+                            .clickable { lookup(code) }.padding(horizontal = 15.dp, vertical = 9.dp),
+                    )
                 }
+            }
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 520.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
                 when {
                     loading -> CircularProgressIndicator(Modifier.size(28.dp), color = Opuscule)
-                    error != null -> Text(error.orEmpty(), color = Danger)
-                    entry != null -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        entry!!.phonetic.takeIf(String::isNotBlank)?.let { Text(it, color = Muted) }
+                    error != null -> Text(error.orEmpty(), color = Danger, style = MaterialTheme.typography.bodyLarge)
+                    entry != null -> Column(verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                        entry!!.phonetic.takeIf(String::isNotBlank)?.let {
+                            Text(it, color = Ink, style = MaterialTheme.typography.bodyLarge)
+                        }
                         entry!!.definitions.take(6).forEachIndexed { index, definition ->
-                            Column {
-                                Text("${index + 1}. ${definition.definition}", style = MaterialTheme.typography.bodyMedium)
-                                definition.partOfSpeech.takeIf(String::isNotBlank)?.let { Text(it, color = Opuscule, style = MaterialTheme.typography.labelMedium) }
-                                definition.example.takeIf(String::isNotBlank)?.let { Text("« $it »", color = Muted, style = MaterialTheme.typography.bodySmall) }
+                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                definition.partOfSpeech.takeIf(String::isNotBlank)?.let {
+                                    Text(it.uppercase(), color = Opuscule, style = MaterialTheme.typography.labelMedium)
+                                }
+                                Text("${index + 1}. ${definition.definition}", color = Ink, style = MaterialTheme.typography.bodyLarge)
+                                definition.example.takeIf(String::isNotBlank)?.let {
+                                    Text("« $it »", color = Ink.copy(alpha = .78f), style = MaterialTheme.typography.bodyMedium)
+                                }
                             }
                         }
-                        Text("Source : ${entry!!.source}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        HorizontalDivider(color = Divider)
+                        Text("Source : ${entry!!.source}", color = Ink.copy(alpha = .65f), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = dismiss) { Text("Fermer", color = Opuscule) } },
-        shape = RoundedCornerShape(22.dp),
-        containerColor = Canvas,
-    )
+        }
+    }
 }
 
 private fun Color.toArgbCompat(): Int =

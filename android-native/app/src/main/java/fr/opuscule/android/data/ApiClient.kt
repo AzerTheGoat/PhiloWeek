@@ -250,6 +250,13 @@ class ApiClient {
         )
     }
 
+    suspend fun renderMermaid(token: String, source: String): ByteArray =
+        callBytes(
+            "/markdown/mermaid",
+            JSONObject().put("source", source),
+            token,
+        )
+
     suspend fun ideas(token: String): List<Idea> =
         callArray("/inbox/ideas", token = token).objects().map {
             Idea(it.getString("id"), it.optString("content"), it.optString("tags"), it.nullable("created_at"))
@@ -486,6 +493,24 @@ class ApiClient {
                 throw ApiException(response.code, message.ifBlank { "Erreur réseau (${response.code})." })
             }
             text
+        }
+    }
+
+    private suspend fun callBytes(path: String, body: JSONObject, token: String): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL.trimEnd('/') + path)
+            .header("Accept", "image/png")
+            .header("Authorization", "Bearer $token")
+            .post(body.toString().toRequestBody(jsonType))
+            .build()
+        http.newCall(request).execute().use { response ->
+            val bytes = response.body?.bytes() ?: ByteArray(0)
+            if (!response.isSuccessful) {
+                val text = bytes.toString(Charsets.UTF_8)
+                val message = runCatching { JSONObject(text).optString("error") }.getOrNull().orEmpty()
+                throw ApiException(response.code, message.ifBlank { "Erreur réseau (${response.code})." })
+            }
+            bytes
         }
     }
 }
