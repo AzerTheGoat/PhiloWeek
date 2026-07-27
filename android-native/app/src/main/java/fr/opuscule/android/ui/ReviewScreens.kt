@@ -283,7 +283,7 @@ private fun ReviewCard(
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.background(Surface).opusculeStatusBarsPadding()) {
+            Column(Modifier.fillMaxWidth().background(Surface)) {
                 Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = stop, modifier = Modifier.size(38.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)

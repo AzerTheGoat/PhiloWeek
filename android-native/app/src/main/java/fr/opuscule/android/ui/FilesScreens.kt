@@ -239,6 +239,7 @@ fun FileViewerScreen(state: AppState, id: String, onBack: () -> Unit, openLinked
                 }
             }
         },
+        applyStatusInset = true,
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding)) { LoadingPane() }

@@ -304,7 +304,7 @@ private fun HomeScreen(
     openSettings: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Column(Modifier.fillMaxWidth().background(Surface).opusculeStatusBarsPadding()) {
+        Column(Modifier.fillMaxWidth().background(Surface)) {
             Row(
                 Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -370,7 +370,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
         "light" -> "Clair"
         else -> "Système"
     }
-    DetailScaffold("Réglages", onBack) { padding ->
+    DetailScaffold("Réglages", onBack, applyStatusInset = true) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -403,7 +403,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                     onClick = { readingVisible = true },
                 )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.3.1 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow("Version", "1.3.2 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})

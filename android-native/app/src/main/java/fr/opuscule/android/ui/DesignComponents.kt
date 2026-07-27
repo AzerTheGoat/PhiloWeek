@@ -30,8 +30,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,7 +37,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -92,12 +90,6 @@ import io.noties.markwon.ext.tables.TablePlugin
 import kotlinx.coroutines.launch
 
 @Composable
-fun Modifier.opusculeStatusBarsPadding(): Modifier {
-    val systemInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    return padding(top = systemInset.coerceAtMost(36.dp))
-}
-
-@Composable
 fun OpusculeLogo(modifier: Modifier = Modifier, compact: Boolean = false) {
     val logoSize = if (compact) 36.dp else 76.dp
     val foreground = MaterialTheme.colorScheme.onPrimary
@@ -126,7 +118,7 @@ fun ScreenHeader(
     action: (@Composable () -> Unit)? = null,
 ) {
     val compact = LocalCompactInterface.current
-    Column(modifier.fillMaxWidth().background(Surface).opusculeStatusBarsPadding()) {
+    Column(modifier.fillMaxWidth().background(Surface)) {
         Row(
             Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -159,13 +151,19 @@ fun DetailScaffold(
     title: String,
     onBack: () -> Unit,
     action: (@Composable () -> Unit)? = null,
+    applyStatusInset: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val compact = LocalCompactInterface.current
     Scaffold(
         containerColor = Canvas,
         topBar = {
-            Column(Modifier.background(Surface).opusculeStatusBarsPadding()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Surface)
+                    .then(if (applyStatusInset) Modifier.statusBarsPadding() else Modifier),
+            ) {
                 Row(
                     Modifier.fillMaxWidth().height(if (compact) 44.dp else 50.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
