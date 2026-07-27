@@ -4,6 +4,9 @@ node_modules/
 __pycache__/
 *.py
 *.py[cod]
+# L'ancien backend Python reste local uniquement. Sa présence dans Git fait
+# détecter Python à Railpack à la place du backend Node.js de production.
+requirements.txt
 *.db
 *.db-shm
 *.db-wal
