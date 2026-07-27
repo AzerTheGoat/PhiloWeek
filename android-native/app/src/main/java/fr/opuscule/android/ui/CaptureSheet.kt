@@ -2,6 +2,7 @@ package fr.opuscule.android.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,12 +13,15 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +52,7 @@ import java.time.LocalDate
 
 private enum class CaptureKind(val label: String, val icon: ImageVector) {
     IDEA("Idée", Icons.Rounded.Lightbulb),
+    DEFINITION("Définition", Icons.Rounded.Translate),
     QUOTE("Citation", Icons.AutoMirrored.Rounded.MenuBook),
     FACT("Vérifier", Icons.Rounded.Verified),
     TODO("Tâche", Icons.Rounded.Checklist),
@@ -89,20 +94,26 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
         ) {
             Text("Capturer", style = MaterialTheme.typography.headlineMedium)
             Text("Gardez l’élan. Vous pourrez organiser plus tard.", color = Muted)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
                 CaptureKind.entries.forEach { item ->
                     Row(
-                        Modifier.weight(1f).background(
+                        Modifier.widthIn(min = 94.dp).background(
                             if (kind == item) OpusculeSoft else Surface,
                             RoundedCornerShape(13.dp),
-                        ).clickable { kind = item }.padding(vertical = 10.dp),
+                        ).clickable { kind = item }.padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(item.icon, null, tint = if (kind == item) Opuscule else Muted, modifier = Modifier.size(18.dp))
-                        if (kind == item) {
-                            Text(item.label, Modifier.padding(start = 6.dp), color = Opuscule, style = MaterialTheme.typography.labelMedium)
-                        }
+                        Text(
+                            item.label,
+                            Modifier.padding(start = 6.dp),
+                            color = if (kind == item) Opuscule else Muted,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
                 }
             }
@@ -111,14 +122,19 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
                 onValueChange = { main = it },
                 placeholder = when (kind) {
                     CaptureKind.IDEA -> "Quelle idée voulez-vous garder ?"
+                    CaptureKind.DEFINITION -> "Quel terme voulez-vous retenir ?"
                     CaptureKind.QUOTE -> "Collez ou écrivez la citation…"
                     CaptureKind.FACT -> "Quelle affirmation faut-il vérifier ?"
                     CaptureKind.TODO -> "Que faut-il faire ?"
                 },
                 modifier = Modifier.focusRequester(focusRequester),
-                minLines = 4,
+                minLines = if (kind == CaptureKind.DEFINITION) 1 else 4,
             )
             when (kind) {
+                CaptureKind.DEFINITION -> {
+                    OpusculeField(secondary, { secondary = it }, "Définition claire", minLines = 3)
+                    OpusculeField(extra, { extra = it }, "Exemple ou nuance", minLines = 2)
+                }
                 CaptureKind.QUOTE -> {
                     OpusculeField(secondary, { secondary = it }, "Auteur, si connu")
                     OpusculeField(extra, { extra = it }, "Source")
@@ -141,6 +157,7 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
                         runCatching {
                             when (kind) {
                                 CaptureKind.IDEA -> state.api.createIdea(token, main.trim())
+                                CaptureKind.DEFINITION -> state.api.addQuickDefinition(token, main.trim(), secondary.trim(), extra.trim())
                                 CaptureKind.QUOTE -> state.api.createQuote(token, main.trim(), secondary.trim(), extra.trim())
                                 CaptureKind.FACT -> state.api.createFact(token, main.trim(), secondary.trim(), extra.trim())
                                 CaptureKind.TODO -> state.api.createTodo(token, main.trim(), secondary.trim(), extra.trim())
@@ -149,6 +166,7 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
                             state.notify(
                                 when (kind) {
                                     CaptureKind.IDEA -> "Idée capturée"
+                                    CaptureKind.DEFINITION -> "Définition ajoutée aux révisions"
                                     CaptureKind.QUOTE -> "Citation enregistrée"
                                     CaptureKind.FACT -> "Enquête ouverte"
                                     CaptureKind.TODO -> "Tâche ajoutée"
@@ -160,7 +178,9 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = main.isNotBlank() && !saving && (kind != CaptureKind.TODO || runCatching { LocalDate.parse(secondary) }.isSuccess),
+                enabled = main.isNotBlank() && !saving &&
+                    (kind != CaptureKind.DEFINITION || secondary.isNotBlank()) &&
+                    (kind != CaptureKind.TODO || runCatching { LocalDate.parse(secondary) }.isSuccess),
             )
             Spacer(Modifier.height(6.dp))
         }

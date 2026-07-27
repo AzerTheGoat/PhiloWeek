@@ -261,16 +261,28 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   moteur diversifie les types et présente des chapitres de cinq éléments.
 - Une réponse donnée depuis `Aujourd’hui` utilise les mêmes routes de résultat
   et la même pondération que la session complète de révision.
+- Après révélation d’une réponse dans `Aujourd’hui`, glisser la carte à gauche
+  enregistre `À revoir` et glisser à droite enregistre `Je savais`, puis avance
+  vers la carte verticale suivante. La correction reste défilable dans la carte.
+  Le pager est continu et remasque une réponse lorsqu’une carte revient plus tard.
+- Le flux distingue questionnaires, définitions et personnes afin d’insérer
+  régulièrement chaque famille entre les idées, articles, citations et enquêtes.
 - `Bibliothèque` regroupe notes et articles dans un sélecteur commun. Ouvrir une
   note depuis la recherche ferme le clavier avant d’afficher le lecteur.
 - `Capturer` ouvre un panneau bas avec focus immédiat et crée réellement une
   idée, une citation, un fact check ou une tâche via les routes existantes.
+- `Capturer > Définition` ajoute ou met à jour un terme dans
+  `/Définitions capturées/Mes définitions.json`. Ce fichier garde le format
+  `philoweek_type: definitions`, passe automatiquement dans les révisions et
+  reste compatible avec l’export/import Obsidian.
 - `Vous` regroupe le compte, les collections personnelles, les tâches, l’agenda,
   la vie en perspective et les statistiques.
 - Sur `Aujourd’hui`, quitter demande deux pressions Retour. Dans un détail,
   Retour ferme le détail sans perdre la racine active.
 - Le lecteur affiche les images Markdown HTTP(S) et data URI. Une image locale
   inaccessible produit un état explicite au lieu d’un nom de fichier brut.
+- Les listes et cartes d’articles placent les contenus non lus avant les contenus
+  déjà ouverts; ouvrir un article conserve le marquage de lecture existant.
 
 ### Dictionnaire et suivi des cartes à corriger
 

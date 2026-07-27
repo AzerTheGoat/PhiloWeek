@@ -39,6 +39,10 @@ class ApiClient {
 
     suspend fun articles(token: String): List<Article> =
         callArray("/social-journal/articles?scope=feed", token = token).objects().map(::article)
+            .sortedWith(
+                compareBy<Article> { it.readByMe }
+                    .thenByDescending { it.publishedOn.orEmpty() }
+            )
 
     suspend fun article(token: String, id: String): Article {
         val json = call("/social-journal/articles/$id", token = token)
@@ -136,6 +140,93 @@ class ApiClient {
             true,
             row.optBoolean("is_encrypted"),
         )
+    }
+
+    suspend fun addQuickDefinition(
+        token: String,
+        term: String,
+        definition: String,
+        example: String,
+    ) {
+        val folderName = "Définitions capturées"
+        val fileName = "Mes définitions.json"
+        var roots = files(token)
+        var folder = roots.firstOrNull { it.isFolder && it.name.equals(folderName, ignoreCase = true) }
+        if (folder == null) {
+            call(
+                "/files",
+                "POST",
+                JSONObject().put("name", folderName).put("type", "folder"),
+                token,
+            )
+            roots = files(token)
+            folder = roots.firstOrNull { it.isFolder && it.name.equals(folderName, ignoreCase = true) }
+                ?: throw ApiException(500, "Le dossier de définitions n’a pas pu être créé.")
+        }
+
+        val existing = folder.children.firstOrNull {
+            !it.isFolder && it.name.equals(fileName, ignoreCase = true)
+        }
+        val now = Instant.now().toString()
+        if (existing == null) {
+            val content = JSONObject()
+                .put("philoweek_type", "definitions")
+                .put("version", 1)
+                .put("id", "definitions-capturees")
+                .put("title", "Mes définitions")
+                .put("description", "Définitions capturées depuis l’application mobile.")
+                .put("tags", JSONArray())
+                .put("created", now)
+                .put("modified", now)
+                .put(
+                    "definitions",
+                    JSONArray().put(
+                        JSONObject()
+                            .put("id", "d-${System.currentTimeMillis()}")
+                            .put("term", term.trim())
+                            .put("definition", definition.trim())
+                            .put("example", example.trim())
+                            .put("tags", JSONArray())
+                    )
+                )
+            call(
+                "/files",
+                "POST",
+                JSONObject()
+                    .put("parent_id", folder.id)
+                    .put("name", fileName)
+                    .put("type", "file")
+                    .put("content", content.toString(2)),
+                token,
+            )
+            return
+        }
+
+        val detail = file(token, existing.id)
+        val json = runCatching { JSONObject(detail.content) }.getOrElse {
+            throw ApiException(400, "Le fichier de définitions rapides est invalide.")
+        }
+        val definitions = json.optJSONArray("definitions") ?: JSONArray().also {
+            json.put("definitions", it)
+        }
+        val normalizedTerm = term.trim()
+        val matching = definitions.objects().firstOrNull {
+            it.optString("term").equals(normalizedTerm, ignoreCase = true)
+        }
+        if (matching != null) {
+            matching.put("definition", definition.trim()).put("example", example.trim())
+        } else {
+            definitions.put(
+                JSONObject()
+                    .put("id", "d-${System.currentTimeMillis()}")
+                    .put("term", normalizedTerm)
+                    .put("definition", definition.trim())
+                    .put("example", example.trim())
+                    .put("tags", JSONArray())
+            )
+        }
+        json.put("modified", now)
+        updateFile(token, detail, json.toString(2))
     }
 
     suspend fun openEncryptedFolder(token: String, id: String, password: String) {
@@ -448,6 +539,7 @@ class ApiClient {
         commentCount = row.optInt("comment_count"),
         likeCount = row.optInt("like_count"),
         readCount = row.optInt("read_count"),
+        readByMe = row.optBoolean("read_by_me"),
         likedByMe = row.optBoolean("liked_by_me"),
         canEdit = row.optBoolean("can_edit"),
     )

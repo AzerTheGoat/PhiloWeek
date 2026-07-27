@@ -13,6 +13,7 @@ data class Article(
     val commentCount: Int,
     val likeCount: Int,
     val readCount: Int,
+    val readByMe: Boolean,
     val likedByMe: Boolean,
     val canEdit: Boolean,
     val comments: List<Comment> = emptyList(),

@@ -1,12 +1,9 @@
 package fr.opuscule.android.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
@@ -43,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +50,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +71,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 private sealed interface KnowledgeItem {
     val id: String
@@ -109,7 +111,7 @@ fun TodayScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var completed by remember { mutableIntStateOf(0) }
-    val revealed = remember { mutableStateMapOf<String, Boolean>() }
+    val revealed = remember { mutableStateMapOf<Int, Boolean>() }
     val scope = rememberCoroutineScope()
 
     suspend fun loadFeed() {
@@ -117,7 +119,7 @@ fun TodayScreen(
         error = null
         runCatching {
             coroutineScope {
-                val reviews = async { runCatching { state.api.review(token, limit = 8) }.getOrDefault(emptyList()) }
+                val reviews = async { runCatching { state.api.review(token, limit = 30) }.getOrDefault(emptyList()) }
                 val ideas = async { runCatching { state.api.ideas(token) }.getOrDefault(emptyList()) }
                 val quotes = async { runCatching { state.api.quotes(token) }.getOrDefault(emptyList()) }
                 val facts = async { runCatching { state.api.factChecks(token) }.getOrDefault(emptyList()) }
@@ -176,8 +178,8 @@ fun TodayScreen(
                     val item = items[page % items.size]
                     KnowledgePage(
                         item = item,
-                        revealed = revealed[item.id] == true,
-                        reveal = { revealed[item.id] = true },
+                        revealed = revealed[page] == true,
+                        reveal = { revealed[page] = true },
                         complete = {
                             completed += 1
                             scope.launch { pagerState.animateScrollToPage(page + 1) }
@@ -241,6 +243,11 @@ private fun KnowledgePage(
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
+    if (item is KnowledgeItem.Recall) {
+        RecallSwipePage(item.question, revealed, reveal, saveRecall, openReview)
+        return
+    }
+
     Box(
         Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
@@ -251,7 +258,6 @@ private fun KnowledgePage(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             when (item) {
-                is KnowledgeItem.Recall -> RecallKnowledgeCard(item.question, revealed, reveal, saveRecall, openReview)
                 is KnowledgeItem.Thought -> {
                     KnowledgeEyebrow("IDÉE À REPRENDRE", Icons.Rounded.Lightbulb)
                     Text(item.idea.content, style = MaterialTheme.typography.headlineMedium, maxLines = 9, overflow = TextOverflow.Ellipsis)
@@ -312,65 +318,139 @@ private fun KnowledgePage(
                         PrimaryButton("Lire", openArticles, Modifier.weight(1f))
                     }
                 }
+                is KnowledgeItem.Recall -> Unit
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.SwipeVertical, null, tint = Muted, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Balayez pour continuer", color = Muted, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    "Balayez vers le haut pour continuer",
+                    color = Muted,
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun RecallKnowledgeCard(
+private fun RecallSwipePage(
     question: ReviewQuestion,
     revealed: Boolean,
     reveal: () -> Unit,
     save: (Boolean) -> Unit,
     openReview: () -> Unit,
 ) {
-    KnowledgeEyebrow("RAPPEL ACTIF", Icons.Rounded.Quiz)
-    Text(question.questionnaireTitle.ifBlank { question.fileName }, color = Muted, style = MaterialTheme.typography.labelLarge)
-    Text(
-        question.prompt,
-        style = MaterialTheme.typography.titleLarge,
-        maxLines = 11,
-        overflow = TextOverflow.Ellipsis,
-    )
-    AnimatedContent(revealed, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "today-answer") { visible ->
-        if (visible) {
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(OpusculeSoft).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("RÉPONSE", color = Opuscule, style = MaterialTheme.typography.labelMedium)
-                Text(question.answer, style = MaterialTheme.typography.titleLarge)
-                question.explanation.takeIf(String::isNotBlank)?.let { Text(it, color = Muted) }
-            }
-        } else {
+    var horizontalDrag by remember(question.key, revealed) { mutableFloatStateOf(0f) }
+    val swipeThreshold = with(LocalDensity.current) { 92.dp.toPx() }
+    val swipeProgress = (abs(horizontalDrag) / swipeThreshold).coerceIn(0f, 1f)
+    val gesture = if (revealed) {
+        Modifier.pointerInput(question.key, revealed) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, amount ->
+                    change.consume()
+                    horizontalDrag = (horizontalDrag + amount).coerceIn(-size.width.toFloat(), size.width.toFloat())
+                },
+                onDragCancel = { horizontalDrag = 0f },
+                onDragEnd = {
+                    when {
+                        horizontalDrag <= -swipeThreshold -> save(false)
+                        horizontalDrag >= swipeThreshold -> save(true)
+                    }
+                    horizontalDrag = 0f
+                },
+            )
+        }
+    } else Modifier
+
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.fillMaxSize().then(gesture).graphicsLayer {
+                translationX = horizontalDrag
+                rotationZ = horizontalDrag / 80f
+                alpha = 1f - swipeProgress * .16f
+            }.clip(RoundedCornerShape(28.dp)).background(ReadingPaper)
+                .padding(horizontal = 22.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            KnowledgeEyebrow(
+                when (question.kind) {
+                    "definition" -> "DÉFINITION À RETROUVER"
+                    "actor" -> "PERSONNE À RECONNAÎTRE"
+                    else -> "RAPPEL ACTIF"
+                },
+                Icons.Rounded.Quiz,
+            )
             Text(
-                "Formulez la réponse mentalement avant de la révéler.",
+                question.questionnaireTitle.ifBlank { question.fileName },
                 color = Muted,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(question.prompt, style = MaterialTheme.typography.titleLarge)
+                if (revealed) {
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                            .background(OpusculeSoft).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("RÉPONSE", color = Opuscule, style = MaterialTheme.typography.labelMedium)
+                        Text(question.answer, style = MaterialTheme.typography.titleLarge)
+                        question.explanation.takeIf(String::isNotBlank)?.let { Text(it, color = Muted) }
+                    }
+                } else {
+                    Text(
+                        "Formulez la réponse mentalement avant de la révéler.",
+                        color = Muted,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+            if (!revealed) {
+                PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("← À revoir", { save(false) }, Modifier.weight(1f))
+                    PrimaryButton("Je savais →", { save(true) }, Modifier.weight(1f))
+                }
+            }
+            Text(
+                if (revealed) "Glissez la carte à gauche ou à droite"
+                else "La question et la correction restent défilables",
+                Modifier.fillMaxWidth(),
+                color = Muted,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Text(
+                "Ouvrir la session complète",
+                modifier = Modifier.fillMaxWidth().clickable(onClick = openReview).padding(vertical = 2.dp),
+                textAlign = TextAlign.Center,
+                color = Opuscule,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        if (revealed && swipeProgress > .08f) {
+            Text(
+                if (horizontalDrag < 0) "À REVOIR" else "JE SAVAIS",
+                modifier = Modifier.align(if (horizontalDrag < 0) Alignment.TopEnd else Alignment.TopStart)
+                    .padding(horizontal = 30.dp, vertical = 34.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (horizontalDrag < 0) Danger else Success)
+                    .padding(horizontal = 13.dp, vertical = 8.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
             )
         }
     }
-    if (!revealed) {
-        PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryButton("À revoir", { save(false) }, Modifier.weight(1f))
-            PrimaryButton("Je savais", { save(true) }, Modifier.weight(1f))
-        }
-    }
-    Text(
-        "Session complète",
-        modifier = Modifier.fillMaxWidth().clickable(onClick = openReview).padding(vertical = 4.dp),
-        textAlign = TextAlign.Center,
-        color = Opuscule,
-        style = MaterialTheme.typography.labelLarge,
-    )
 }
 
 @Composable
@@ -392,11 +472,13 @@ private fun buildKnowledgeFeed(
     articles: List<Article>,
 ): List<KnowledgeItem> {
     val buckets = listOf(
-        reviews.map(KnowledgeItem::Recall),
+        reviews.filter { it.kind == "questionnaire" }.map(KnowledgeItem::Recall),
+        reviews.filter { it.kind == "definition" }.map(KnowledgeItem::Recall),
+        reviews.filter { it.kind == "actor" }.map(KnowledgeItem::Recall),
         ideas.take(8).map(KnowledgeItem::Thought),
+        articles.filter { !it.readByMe }.ifEmpty { articles }.take(8).map(KnowledgeItem::Reading),
         quotes.take(8).map(KnowledgeItem::Citation),
         facts.filter { it.status == "to_check" || it.status == "partial" }.take(8).map(KnowledgeItem::Investigation),
-        articles.take(8).map(KnowledgeItem::Reading),
     )
     val result = mutableListOf<KnowledgeItem>()
     val max = buckets.maxOfOrNull(List<*>::size) ?: 0

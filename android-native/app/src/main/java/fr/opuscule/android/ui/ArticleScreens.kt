@@ -125,6 +125,16 @@ private fun ArticleRow(article: Article, open: () -> Unit) {
                 Text(article.author?.take(1)?.uppercase().orEmpty(), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
             }
             Text(article.author ?: "Compte supprimé", Modifier.padding(start = 9.dp).weight(1f), style = MaterialTheme.typography.labelLarge)
+            if (!article.readByMe) {
+                Text(
+                    "NON LU",
+                    color = Opuscule,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(OpusculeSoft)
+                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                )
+                Spacer(Modifier.width(7.dp))
+            }
             Text(articleDate(article.publishedOn), color = Muted, style = MaterialTheme.typography.bodyMedium)
         }
         article.coverImage?.let { AsyncImage(articleImageModel(it), article.title, Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(18.dp)).background(Surface)) }
