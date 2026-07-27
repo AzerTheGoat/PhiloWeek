@@ -2,9 +2,10 @@ import { useCallback, useMemo, useState } from 'react'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 import * as api from '../api'
+import { recordActorReview, removeQuestionFromQuestionnaire, setReviewItemRequireChange } from '../utils/questionnaireFile'
 
 export default function GlobalQuizLauncher() {
-  const { tree, dispatch, toast } = useApp()
+  const { tree, dispatch, toast, openFile, openFileId } = useApp()
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [limit, setLimit] = useState(12)
   const [loading, setLoading] = useState(false)
@@ -70,6 +71,29 @@ export default function GlobalQuizLauncher() {
     }
   }, [limit, selectedFiles, toast])
 
+  const startAllQuiz = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await api.getQuestionnaireSession({ scope: 'all', limit: 12 })
+      if (!result.questions.length) {
+        toast('Aucune carte à réviser', 'error')
+        return
+      }
+      setSession(result.questions)
+      setCurrentIndex(0)
+      setAnswer('')
+      setRevealed(false)
+      setStartedAt(Date.now())
+      setSessionResults([])
+      setStopped(false)
+      toast(`${result.questions.length} carte(s) chargée(s)`)
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
   const recordResult = useCallback(async (correct) => {
     if (!currentQuestion) return
     try {
@@ -86,6 +110,18 @@ export default function GlobalQuizLauncher() {
         response_ms: Date.now() - startedAt,
       }
       await api.saveQuestionnaireResult(resultPayload)
+      if (currentQuestion.review_kind === 'actor') {
+        try {
+          const file = await api.getFile(currentQuestion.questionnaire_file_id)
+          await api.updateFile(file.id, {
+            content: recordActorReview(file.content || '', currentQuestion, correct),
+            base_version: Number(file.content_version || 0),
+          })
+          if (openFileId === file.id) await openFile(file.id)
+        } catch (err) {
+          toast(`Progression du réseau non enregistrée : ${err.message}`, 'error')
+        }
+      }
       setSessionResults(prev => [...prev, resultPayload])
       const nextIndex = currentIndex + 1
       setAnswer('')
@@ -100,13 +136,56 @@ export default function GlobalQuizLauncher() {
     } catch (err) {
       toast(err.message, 'error')
     }
-  }, [answer, currentIndex, currentQuestion, session.length, startedAt, toast])
+  }, [answer, currentIndex, currentQuestion, openFile, openFileId, session.length, startedAt, toast])
 
   const stopQuiz = useCallback(() => {
     setStopped(true)
     setAnswer('')
     setRevealed(false)
   }, [])
+
+  const openQuestionSource = useCallback(async () => {
+    if (!currentQuestion?.source_file_id) {
+      toast('Aucune note Markdown liée à cette carte.', 'error')
+      return
+    }
+    close()
+    await openFile(currentQuestion.source_file_id)
+  }, [close, currentQuestion?.source_file_id, openFile, toast])
+
+  const markCurrentQuestion = useCallback(async () => {
+    if (!currentQuestion) return
+    try {
+      const file = await api.getFile(currentQuestion.questionnaire_file_id)
+      await api.updateFile(file.id, {
+        content: setReviewItemRequireChange(file.content || '', currentQuestion, true),
+        base_version: Number(file.content_version || 0),
+      })
+      setSession(previous => previous.map((item, index) => index === currentIndex ? { ...item, require_change: true } : item))
+      if (openFileId === file.id) await openFile(file.id)
+      toast('Ajouté à la liste « À modifier »', 'success')
+    } catch (err) { toast(err.message, 'error') }
+  }, [currentIndex, currentQuestion, openFile, openFileId, toast])
+
+  const deleteCurrentQuestion = useCallback(async () => {
+    if (!currentQuestion) return
+    if (!window.confirm('Supprimer définitivement cette question du fichier JSON ?')) return
+    try {
+      const file = await api.getFile(currentQuestion.questionnaire_file_id)
+      const content = removeQuestionFromQuestionnaire(file.content || '', currentQuestion)
+      await api.updateFile(file.id, {
+        content,
+        base_version: Number(file.content_version || 0),
+      })
+      setSession(previous => previous.filter((_, index) => index !== currentIndex))
+      setAnswer('')
+      setRevealed(false)
+      if (openFileId === file.id) await openFile(file.id)
+      toast('Question supprimée du questionnaire')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }, [currentIndex, currentQuestion, openFile, openFileId, toast])
 
   const backToSources = useCallback(() => {
     setSession([])
@@ -135,6 +214,10 @@ export default function GlobalQuizLauncher() {
 
         {session.length === 0 && (
           <div className="global-quiz-settings">
+            <button type="button" className="btn-primary global-review-all-btn" onClick={startAllQuiz} disabled={loading}>
+              <Icon name="play" size={17} /> Réviser tous mes fichiers
+            </button>
+            <span className="global-review-or">ou choisir des sources</span>
             <label>
               Nombre de questions
               <input
@@ -194,6 +277,9 @@ export default function GlobalQuizLauncher() {
                     <strong>{currentQuestion.questionnaire_title}</strong>
                   </div>
                   <span className="quiz-type">{getQuestionTypeLabel(currentQuestion.type)}</span>
+                  {currentQuestion.image && (
+                    <img className="quiz-actor-image" src={currentQuestion.image} alt={currentQuestion.image_alt || ''} referrerPolicy="no-referrer" />
+                  )}
                   <h4>{currentQuestion.prompt}</h4>
                   {!revealed && choices.length > 0 && (
                     <div className="quiz-choices">
@@ -226,6 +312,22 @@ export default function GlobalQuizLauncher() {
                   )}
                 </div>
                 <div className="quiz-flashcard-actions">
+                  <div className="quiz-card-tools">
+                    {currentQuestion.review_kind !== 'actor' && (
+                      <button type="button" className="btn-ghost quiz-source-btn" onClick={openQuestionSource}>
+                        <Icon name="folder" size={16} /> Voir la source
+                        {currentQuestion.source_file_name && <span>{currentQuestion.source_file_name.replace(/\.md$/i, '')}</span>}
+                      </button>
+                    )}
+                    <button type="button" className={`btn-ghost ${currentQuestion.require_change ? 'active' : ''}`} onClick={markCurrentQuestion} disabled={currentQuestion.require_change}>
+                      <Icon name="edit" size={16} /> {currentQuestion.require_change ? 'Déjà à modifier' : 'À modifier'}
+                    </button>
+                    {currentQuestion.review_kind === 'questionnaire' && (
+                      <button type="button" className="btn-ghost danger quiz-delete-question" onClick={deleteCurrentQuestion}>
+                        <Icon name="trash" size={16} /> Supprimer la question
+                      </button>
+                    )}
+                  </div>
                   {!revealed ? (
                     <>
                     <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>
@@ -381,6 +483,7 @@ function getQuestionChoices(question) {
 
 function getQuestionTypeLabel(type) {
   if (type === 'definition') return 'Definition'
+  if (type === 'actor') return 'Personne'
   if (type === 'mcq') return 'QCM'
   if (type === 'true_false') return 'Vrai / Faux'
   return 'Question ouverte'

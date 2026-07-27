@@ -23,13 +23,15 @@ router.post('/session', (req, res) => {
   const { scope = 'all', folder_ids = [], file_id = null, file_ids = [], limit = 12 } = req.body || {}
   const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids }, req.user.id, req.user.session_id)
   const stats = getStats(db, req.user.id)
+  const sourceIndex = buildReviewSourceIndex(db, req.user.id, req.user.session_id)
   const questions = []
 
   for (const file of files) {
     const parsed = parseReviewFile(file.content)
     if (!parsed) continue
     parsed.questions.forEach((question, index) => {
-      const normalized = normalizeReviewQuestion(question, index, parsed, file)
+      const source = resolveReviewSource(question, parsed, sourceIndex, file)
+      const normalized = normalizeReviewQuestion(question, index, parsed, file, source)
       if (normalized) questions.push(withStats(normalized, stats.get(normalized.question_key)))
     })
   }
@@ -110,6 +112,13 @@ router.get('/results', (req, res) => {
   res.json(rows)
 })
 
+router.get('/required-changes', (req, res) => {
+  const db = getDb()
+  const items = readableRows(db, req.user.id, req.user.session_id)
+    .flatMap(collectRequiredChanges)
+  res.json(items)
+})
+
 module.exports = router
 
 function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId, sessionId) {
@@ -181,7 +190,7 @@ function isReviewContent(name, content) {
 }
 
 function parseReviewFile(content) {
-  return parseQuestionnaire(content) || parseDefinitions(content)
+  return parseQuestionnaire(content) || parseDefinitions(content) || parseActorNetwork(content)
 }
 
 function parseJsonContent(content) {
@@ -226,6 +235,46 @@ function parseDefinitions(content) {
   }
 }
 
+function parseActorNetwork(content) {
+  try {
+    const parsed = parseJsonContent(content)
+    if (!parsed || parsed.philoweek_type !== 'actor_network') return null
+    const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
+    const progress = parsed.learning?.progress && typeof parsed.learning.progress === 'object'
+      ? parsed.learning.progress
+      : {}
+    const questions = nodes.flatMap((node, index) => {
+      if (!node || !['person', 'organization'].includes(node.type)) return []
+      const images = Array.isArray(node.images) ? node.images.filter(image => image?.src) : []
+      if (!images.length || !String(node.name || '').trim()) return []
+      const key = String(node.id || `actor-${index + 1}`)
+      const seen = Number(progress[key]?.seen || 0)
+      const image = images[Math.abs(seen + index) % images.length]
+      return [{
+        id: key,
+        type: 'actor',
+        prompt: node.type === 'person' ? 'Qui est cette personne ?' : 'Quelle est cette organisation ?',
+        answer: String(node.name),
+        explanation: [node.subtitle, node.summary, node.details].filter(Boolean).join('\n\n'),
+        image: image.src,
+        image_alt: image.alt || image.caption || '',
+        actor_key: key,
+        tags: Array.isArray(node.tags) ? node.tags : [],
+      }]
+    })
+    return {
+      id: parsed.id || parsed.title || 'actor-network',
+      title: parsed.title || 'Réseau d’acteurs',
+      description: parsed.description || '',
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      questions,
+      review_kind: 'actor',
+    }
+  } catch (_) {
+    return null
+  }
+}
+
 function definitionToQuestion(item, index) {
   const term = item?.term || item?.word || item?.name || ''
   const definition = item?.definition || item?.answer || item?.meaning || ''
@@ -240,7 +289,7 @@ function definitionToQuestion(item, index) {
   }
 }
 
-function normalizeReviewQuestion(question, index, questionnaire, file) {
+function normalizeReviewQuestion(question, index, questionnaire, file, source = null) {
   if (!question || typeof question !== 'object') return null
   const prompt = question.prompt || question.question || question.text
   if (!prompt) return null
@@ -258,14 +307,117 @@ function normalizeReviewQuestion(question, index, questionnaire, file) {
     answer: String(answer || ''),
     explanation: String(question.explanation || question.details || ''),
     type: normalizeType(question.type),
+    review_kind: questionnaire.review_kind || (question.type === 'definition' ? 'definition' : 'questionnaire'),
+    image: typeof question.image === 'string' ? question.image : null,
+    image_alt: typeof question.image_alt === 'string' ? question.image_alt : '',
+    actor_key: typeof question.actor_key === 'string' ? question.actor_key : null,
+    source_file_id: source?.id || null,
+    source_file_name: source?.name || null,
+    source_missing: !source && questionnaire.review_kind !== 'actor',
+    require_change: Boolean(question.require_change),
     choices: Array.isArray(question.choices) ? question.choices.map(String) : [],
     tags: Array.isArray(question.tags) ? question.tags.map(String) : [],
     index,
   }
 }
 
+function buildReviewSourceIndex(db, userId, sessionId) {
+  const byId = new Map()
+  const byPath = new Map()
+  const byParentAndName = new Map()
+  readableRows(db, userId, sessionId).forEach(file => {
+    if (!/\.md$/i.test(file.name || '')) return
+    const path = normalizePath(getFilePath(db, file.id, userId))
+    const entry = { id: file.id, name: file.name, path, parent_id: file.parent_id || null }
+    byId.set(String(file.id), entry)
+    byPath.set(path, entry)
+    byPath.set(normalizePath(file.name), entry)
+    byPath.set(normalizePath(file.name.replace(/\.[^.]+$/i, '')), entry)
+    byParentAndName.set(`${file.parent_id || ''}|${normalizePath(file.name)}`, entry)
+  })
+  return { byId, byPath, byParentAndName }
+}
+
+function resolveReviewSource(question, questionnaire, index, reviewFile) {
+  if (questionnaire.review_kind === 'actor') return null
+  const ids = [
+    question?.source_file_id,
+    ...(Array.isArray(question?.source_file_ids) ? question.source_file_ids : []),
+    ...(questionnaire.source_file_ids || []),
+  ].filter(Boolean).map(String)
+  for (const id of ids) {
+    const source = index.byId.get(id)
+    if (source) return source
+  }
+  const paths = [
+    question?.source_path,
+    ...(Array.isArray(question?.source_paths) ? question.source_paths : []),
+    ...(questionnaire.source_paths || []),
+  ].filter(Boolean).map(normalizePath)
+  for (const path of paths) {
+    const source = index.byPath.get(path)
+    if (source) return source
+  }
+  const siblingName = normalizePath(String(reviewFile?.name || '').replace(/\.json$/i, '.md'))
+  const sibling = index.byParentAndName.get(`${reviewFile?.parent_id || ''}|${siblingName}`)
+  if (sibling) return sibling
+  return null
+}
+
+function collectRequiredChanges(file) {
+  let parsed
+  try { parsed = parseJsonContent(file.content) } catch (_) { return collectGraphChanges(file) }
+  const type = parsed?.philoweek_type
+  let rows = []
+  let kind = ''
+  if (type === 'questionnaire' || Array.isArray(parsed?.questions)) {
+    rows = parsed.questions || []
+    kind = 'questionnaire'
+  } else if (type === 'definitions' || Array.isArray(parsed?.definitions)) {
+    rows = parsed.definitions || []
+    kind = 'definition'
+  } else if (type === 'actor_network') {
+    rows = parsed.nodes || []
+    kind = 'actor'
+  } else if (type === 'graph') {
+    rows = parsed.nodes || parsed.cards || []
+    kind = 'graph'
+  }
+  return rows.flatMap((row, index) => row?.require_change ? [{
+    file_id: file.id,
+    file_name: file.name,
+    kind,
+    index,
+    item_id: String(row.id || ''),
+    title: String(row.prompt || row.term || row.name || row.title || `Élément ${index + 1}`),
+    answer: String(row.answer || row.definition || row.summary || row.body || ''),
+    explanation: String(row.explanation || row.example || row.details || ''),
+  }] : [])
+}
+
+function collectGraphChanges(file) {
+  const match = String(file.content || '').match(/```philoweek-graph\s*([\s\S]*?)```/i)
+  if (!match) return []
+  try {
+    const parsed = JSON.parse(match[1])
+    return (parsed.nodes || parsed.cards || []).flatMap((row, index) => row?.require_change ? [{
+      file_id: file.id,
+      file_name: file.name,
+      kind: 'graph',
+      index,
+      item_id: String(row.id || ''),
+      title: String(row.title || `Carte ${index + 1}`),
+      answer: String(row.body || row.content || ''),
+      explanation: '',
+    }] : [])
+  } catch (_) {
+    return []
+  }
+}
+
 function normalizeType(type) {
   if (type === 'definition') return 'definition'
+  if (type === 'actor') return 'actor'
   return ['open', 'mcq', 'true_false'].includes(type) ? type : 'open'
 }
 

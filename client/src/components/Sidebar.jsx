@@ -94,6 +94,7 @@ export default function Sidebar() {
 
   const toolActions = [
     { icon: 'play', label: 'Réviser', action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }) },
+    { icon: 'edit', label: 'À modifier', active: view === 'required-changes', action: () => dispatch({ type: 'SET_VIEW', payload: 'required-changes' }) },
     { icon: 'copy', label: 'Copier notes', action: () => dispatch({ type: 'TOGGLE_FILE_PICKER' }) },
     { icon: 'download', label: 'Exporter', action: () => showModal('export-vault', {}) },
     { icon: 'upload', label: importing ? 'Import...' : 'Importer', action: () => importInputRef.current?.click() },

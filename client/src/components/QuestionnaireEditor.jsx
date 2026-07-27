@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
-import { parseQuestionnaireJson } from '../utils/questionnaireFile'
+import { parseQuestionnaireJson, removeQuestionFromQuestionnaire } from '../utils/questionnaireFile'
 import Icon from './Icons'
 import FileHistoryControls, { useFileHistoryActions } from './FileHistoryControls'
 import * as api from '../api'
@@ -11,7 +11,7 @@ const AUTOSAVE_DELAY = 800
 const REVIEW_LIMIT = 12
 
 export default function QuestionnaireEditor() {
-  const { currentFile, openFileId, saveFile, tree, toast } = useApp()
+  const { currentFile, openFileId, openFile, saveFile, tree, toast } = useApp()
   const [content, setContent] = useState(currentFile?.content || '')
   const [mode, setMode] = useState('preview')
   const [dirty, setDirty] = useState(false)
@@ -152,6 +152,22 @@ export default function QuestionnaireEditor() {
     }
   }, [answer, currentIndex, currentQuestion, session.length, sessionStartedAt, toast])
 
+  const deleteCurrentQuestion = useCallback(() => {
+    if (!currentQuestion) return
+    if (!window.confirm('Supprimer définitivement cette question du fichier JSON ?')) return
+    try {
+      const nextContent = removeQuestionFromQuestionnaire(content, currentQuestion)
+      setContent(nextContent)
+      triggerSave(nextContent)
+      setSession(previous => previous.filter((_, index) => index !== currentIndex))
+      setAnswer('')
+      setRevealed(false)
+      toast('Question supprimée du questionnaire')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }, [content, currentIndex, currentQuestion, toast, triggerSave])
+
   const saveSourceFiles = useCallback((selectedFiles) => {
     if (parsed.error) {
       toast('Corrige le JSON avant de lier des fichiers', 'error')
@@ -257,6 +273,8 @@ export default function QuestionnaireEditor() {
               revealed={revealed}
               setRevealed={setRevealed}
               recordResult={recordResult}
+              openSource={() => currentQuestion?.source_file_id && openFile(currentQuestion.source_file_id)}
+              deleteCurrentQuestion={deleteCurrentQuestion}
             />
             <QuestionnairePreview parsed={parsed} />
           </div>
@@ -513,6 +531,8 @@ function QuizPanel({
   revealed,
   setRevealed,
   recordResult,
+  openSource,
+  deleteCurrentQuestion,
 }) {
   const done = session.length > 0 && currentIndex >= session.length
   const choices = getQuestionChoices(currentQuestion)
@@ -581,6 +601,17 @@ function QuizPanel({
             )}
           </div>
           <div className="quiz-flashcard-actions">
+            <div className="quiz-card-tools">
+              {currentQuestion.source_file_id && (
+                <button type="button" className="btn-ghost quiz-source-btn" onClick={openSource}>
+                  <Icon name="folder" size={16} /> Voir la source
+                  {currentQuestion.source_file_name && <span>{currentQuestion.source_file_name.replace(/\.md$/i, '')}</span>}
+                </button>
+              )}
+              <button type="button" className="btn-ghost danger quiz-delete-question" onClick={deleteCurrentQuestion}>
+                <Icon name="trash" size={16} /> Supprimer la question
+              </button>
+            </div>
             {!revealed ? (
               <>
                 <span className="quiz-mental-hint">Pense à ta réponse, puis retourne la carte.</span>

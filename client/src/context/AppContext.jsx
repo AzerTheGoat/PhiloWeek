@@ -14,7 +14,7 @@ const init = {
   openFileId: null,
   openFile: null,
   view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
-  theme: localStorage.getItem('pw-theme') || 'dark',
+  theme: localStorage.getItem('pw-theme') || 'light',
   sidebarOpen: !isMobileViewport(),
   featuresOpen: false,
   toasts: [],

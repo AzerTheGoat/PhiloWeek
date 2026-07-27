@@ -19,9 +19,11 @@ import SocialJournal from './components/SocialJournal'
 import PublicArticle from './components/PublicArticle'
 import Tutorial from './components/Tutorial'
 import SecurityPage from './components/SecurityPage'
+import MobileCapturePage from './components/MobileCapturePage'
 import Trash from './components/Trash'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
+import RequiredChanges from './components/RequiredChanges'
 import Toast from './components/Toast'
 import ContextMenu from './components/ContextMenu'
 import Modals from './components/Modals'
@@ -44,10 +46,13 @@ export default function App() {
 // donne accès à rien, puisque le serveur ne fait jamais confiance à ce que
 // le client prétend sur son identité, seulement au cookie de session.
 function AuthGate() {
-  const { currentUser, authChecked, checkSession } = useApp()
+  const { currentUser, authChecked, checkSession, theme } = useApp()
   const publicArticleId = getPublicArticleId()
 
   useEffect(() => { checkSession() }, [])
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   if (publicArticleId) return <PublicArticle articleId={publicArticleId} />
   if (!authChecked) return null
@@ -141,6 +146,10 @@ function AppShell() {
           <Tutorial />
         ) : view === 'security' ? (
           <SecurityPage />
+        ) : view === 'required-changes' ? (
+          <RequiredChanges />
+        ) : view === 'mobile-capture' ? (
+          <MobileCapturePage />
         ) : view === 'trash' ? (
           <Trash />
         ) : currentFile ? (
@@ -270,6 +279,8 @@ const VIEW_TABS = {
   'social-journal': { label: 'Journal public', icon: 'newspaper' },
   tutorial: { label: 'Aide', icon: 'thought' },
   security: { label: 'Sécurité', icon: 'shield' },
+  'required-changes': { label: 'À modifier', icon: 'edit' },
+  'mobile-capture': { label: 'Capturer', icon: 'idea' },
   trash: { label: 'Corbeille', icon: 'trash' },
 }
 
@@ -294,24 +305,24 @@ function MobileNav() {
   const { dispatch, view, sidebarOpen, featuresOpen, showQuizLauncher } = useApp()
   const items = [
     {
-      key: 'files', label: 'Fichiers', icon: 'folder',
-      active: sidebarOpen && !featuresOpen,
-      action: () => dispatch({ type: 'TOGGLE_MOBILE_SIDEBAR_MODE', payload: 'files' }),
-    },
-    {
-      key: 'features', label: 'Fonctions', icon: 'compass',
-      active: sidebarOpen && featuresOpen,
-      action: () => dispatch({ type: 'TOGGLE_MOBILE_SIDEBAR_MODE', payload: 'features' }),
-    },
-    {
       key: 'social', label: 'Articles', icon: 'newspaper',
       active: view === 'social-journal' && !sidebarOpen && !showQuizLauncher,
       action: () => dispatch({ type: 'SET_VIEW', payload: 'social-journal' }),
     },
     {
+      key: 'files', label: 'Fichiers', icon: 'folder',
+      active: sidebarOpen && !featuresOpen,
+      action: () => dispatch({ type: 'TOGGLE_MOBILE_SIDEBAR_MODE', payload: 'files' }),
+    },
+    {
       key: 'review', label: 'Réviser', icon: 'play',
       active: showQuizLauncher,
       action: () => dispatch({ type: 'TOGGLE_QUIZ_LAUNCHER' }),
+    },
+    {
+      key: 'capture', label: 'Capturer', icon: 'idea',
+      active: view === 'mobile-capture' && !sidebarOpen && !showQuizLauncher,
+      action: () => dispatch({ type: 'SET_VIEW', payload: 'mobile-capture' }),
     },
   ]
 

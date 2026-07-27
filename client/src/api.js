@@ -166,6 +166,7 @@ export const setPracticeCheck = (id, data) => req('PUT', `/todos/practices/${id}
 export const updateLifeProfile = data => req('PUT', '/todos/life-profile', data)
 // Questionnaires
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)
+export const getRequiredChanges = () => req('GET', '/questionnaires/required-changes')
 export const saveQuestionnaireResult = data => req('POST', '/questionnaires/results', data)
 export const getQuestionnaireResults = () => req('GET', '/questionnaires/results')
 export const getLinkedQuestionnaires = fileId => req('GET', `/questionnaires/linked/${fileId}`)

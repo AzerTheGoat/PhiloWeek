@@ -31,7 +31,7 @@ export default function PublicArticle({ articleId }) {
   })
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', localStorage.getItem('pw-theme') || 'dark')
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('pw-theme') || 'light')
     const root = document.documentElement
     const syncViewport = () => {
       const visual = window.visualViewport

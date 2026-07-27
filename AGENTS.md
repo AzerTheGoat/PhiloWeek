@@ -178,6 +178,108 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les sessions natives passent par les routes `POST /api/auth/mobile/login` et `POST /api/auth/mobile/register`. Le jeton opaque est stocke uniquement via `expo-secure-store` et les routes protegees acceptent `Authorization: Bearer <token>` en plus du cookie web HTTP-only.
 - Le premier MVP mobile couvre l'authentification, les onglets natifs, la consultation initiale des notes/taches/articles et la capture d'idees. Le plan produit complet est dans `docs/MVP_MOBILE_REACT_NATIVE.md`.
 
+## Client Android Kotlin
+
+- Le nouveau client Android cible vit dans `android-native/`. Il utilise Kotlin,
+  Jetpack Compose et Material 3, sans Expo, React Native ni WebView. L'ancien
+  prototype `mobile/` reste séparé et ne doit pas être embarqué dans ce client.
+- Le brief produit de référence est `docs/ANDROID_UI_UX_BRIEF.md`. Avant toute
+  évolution visuelle Android, définir le parcours, les états et la hiérarchie des
+  actions conformément à ce document; ne pas improviser une interface Material
+  générique directement dans le code.
+- Le périmètre fonctionnel retenu pour la refonte est
+  `docs/ANDROID_MOBILE_SCOPE.md`. Toute fonctionnalité Android absente de ce
+  document reste hors navigation mobile tant qu’une nouvelle décision produit ne
+  l’y ajoute pas.
+- L’architecture de navigation et les wireframes validés pour la V1 finale sont
+  décrits dans `docs/ANDROID_V1_ARCHITECTURE.md`. Les cinq racines sont Accueil,
+  Fichiers, Réviser, Organiser et Articles; les détails recouvrent la navigation
+  et doivent préserver le contexte au retour.
+- La V1 finale est organisée en cinq racines : `Accueil`, `Fichiers`, `Réviser`,
+  `Organiser` et `Articles`. Les écrans de détail et les sessions de révision
+  masquent la navigation basse pour conserver une surface de travail focalisée.
+- `Articles` couvre le fil publié, la lecture, les commentaires et la suppression
+  de ses propres contenus. `Notes` couvre l'arbre Markdown, la lecture/édition
+  rapide et la création d'une note.
+- `Réviser` lance une série globale issue des questionnaires, définitions et
+  personnes des réseaux d'acteurs. La carte garde les actions en bas, utilise le
+  rouge `Danger` pour `À revoir`, ouvre le fichier source et peut retirer une
+  question non pertinente du JSON après confirmation.
+- `Organiser` regroupe idées, citations, fact checks, tâches, agenda et habitudes,
+  vie en semaines ou mois, et statistiques d’utilisation. La capture rapide
+  utilise un sélecteur en haut à gauche pour basculer entre les types.
+- Le client Android comptabilise son temps actif vers les statistiques existantes
+  et permet à l’auteur connecté de supprimer son propre article après confirmation.
+- Les sessions utilisent `POST /api/auth/mobile/login` et
+  `POST /api/auth/mobile/register`, puis `Authorization: Bearer`. Le jeton est
+  chiffré localement avec une clé AES-GCM non exportable d'Android Keystore;
+  les sauvegardes Android sont désactivées.
+- Le thème du client Kotlin est clair. Le backend Railway par défaut est défini
+  via `API_BASE_URL` dans `android-native/app/build.gradle.kts`.
+- `android-native/build-debug.ps1` génère l'APK de test et
+  `android-native/install-debug.ps1` le déploie par ADB sur un téléphone
+  autorisé. Les prérequis et l'installation manuelle sont documentés dans
+  `android-native/README.md`.
+
+### Dictionnaire et suivi des cartes à corriger
+
+- Dans les lectures Android (notes, articles et contenus textuels des
+  questionnaires, définitions, réseaux d'acteurs et graphes), sélectionner un
+  mot ajoute l'action `Dictionnaire`. La fenêtre permet de choisir français ou
+  anglais. Le backend relaie des API gratuites sans clé : Wiktionnaire pour le
+  français et Free Dictionary API pour l'anglais; une indisponibilité externe
+  affiche un message local sans casser la lecture.
+- Les cartes de révision Android exposent directement `Modifier`, `À modifier`
+  et, pour les questions de questionnaire, `Supprimer`. `À modifier` écrit
+  `require_change: true` sur l'objet JSON concerné. Les suppressions restent
+  confirmées et les retours d'action Android utilisent vert pour le succès,
+  orange pour l'avertissement et rouge pour l'erreur.
+- `Voir le fichier source` ouvre exclusivement une note Markdown résolue via
+  les sources déclarées. Sans source déclarée, un `.md` de même nom dans le
+  même dossier que le JSON est accepté. Si aucune note n'existe, le client
+  affiche un avertissement et n'ouvre jamais le JSON de questions à la place.
+- Les couvertures d'articles Android acceptent les URL HTTPS et les images
+  `data:image/*;base64`, y compris pour les publications des autres comptes.
+- Le client web desktop expose `Fonctions > Outils > À modifier`. Cette vue
+  agrège les questions, définitions, nœuds de réseaux d'acteurs et cartes de
+  graphes portant `require_change: true`, sans nouvelle table SQLite. Corriger
+  puis enregistrer un élément retire ce marqueur du JSON ou du bloc
+  `philoweek-graph`; il reste donc compatible avec l'export/import Obsidian.
+- Tous les headers Android racine, détail et révision respectent les insets de
+  la barre d'état en mode edge-to-edge; aucun titre ne doit toucher la caméra ou
+  le bord supérieur.
+- Les lecteurs Android transforment les `[[liens-wiki]]` et
+  `[[chemin/cible|libellé]]` en liens cliquables. La résolution ignore
+  l'extension `.md`/`.json`, accepte un chemin ou un nom unique et empile le
+  fichier cible au-dessus du lecteur actuel afin que Retour restaure la lecture
+  précédente. Un lien absent affiche un avertissement sans quitter le fichier.
+- La vue Android `Vie en perspective` calcule semaines et mois entre la date de
+  naissance et la date exacte d'horizon, affiche vécu, restant et pourcentage,
+  refuse une naissance future et dessine tous les points sur un `Canvas` léger
+  sans grille défilante imbriquée ni plafond artificiel.
+- La direction visuelle Android utilise un fond papier chaud et une palette
+  éditoriale stable : violet Opuscule, bleu connaissance, vert sauge, ambre et
+  corail. Les couleurs identifient les familles de contenu, les captures,
+  l'organisation et la révision; les longs textes restent sur une surface de
+  lecture claire et fortement lisible.
+- Les sections Android d'organisation ne partagent pas une liste générique.
+  `Idées` est un jardin de graines colorées invitant à relier et développer les
+  pensées; `Citations` est une bibliothèque éditoriale centrée sur le texte,
+  l'auteur, la source et les notes; `Fact checks` est un tableau d'enquête avec
+  compteurs, statut, source et verdict; `Tâches` est une vue d'action regroupée
+  en retard, aujourd'hui, à venir et accomplies. Les suppressions demandent
+  confirmation et les créations, verdicts et changements de tâche affichent un
+  retour coloré.
+
+## Interface web mobile / PWA
+
+- Sous `768px`, la navigation principale de la PWA est volontairement reduite a quatre actions : `Articles`, `Fichiers`, `Reviser` et `Capturer`; le panneau complet `Fonctions` reste accessible depuis le header de la sidebar Fichiers.
+- `Capturer` ouvre une page web unique avec un selecteur en haut a gauche pour basculer entre Idee, Citation, Fact check, Agenda et Tache. Agenda permet de cocher les habitudes du jour et d'en creer rapidement.
+- Le lanceur global `Reviser` propose `Reviser tous mes fichiers`, qui tire jusqu'a 12 cartes ponderees parmi les questionnaires, definitions et personnes/organisations illustrees des reseaux d'acteurs.
+- Sur les cartes de questionnaire web, `Voir la source` ouvre directement la note Markdown liee. Une source declaree sur la question est prioritaire sur la premiere source globale du questionnaire.
+- Une question de questionnaire peut etre supprimee de son fichier JSON depuis la carte apres confirmation. Sur mobile, la suppression reste une icone compacte et le bouton `A revoir` utilise le rouge d'erreur plein.
+- Le theme clair est la valeur par defaut du client web et des articles publics tant que l'utilisateur n'a pas memorise un autre choix dans `pw-theme`.
+
 ## Déplacement des fichiers et dossiers
 
 - Dans la sidebar, un fichier ou un dossier peut être déplacé par glisser-déposer vers un autre dossier.
