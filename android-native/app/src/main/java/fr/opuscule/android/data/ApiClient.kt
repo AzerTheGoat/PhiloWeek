@@ -233,8 +233,14 @@ class ApiClient {
         call("/files/$id/encryption/open", "POST", JSONObject().put("password", password), token)
     }
 
-    suspend fun review(token: String, fileIds: List<String>? = null, limit: Int = 12): List<ReviewQuestion> {
+    suspend fun review(
+        token: String,
+        fileIds: List<String>? = null,
+        limit: Int = 12,
+        reviewKinds: List<String>? = null,
+    ): List<ReviewQuestion> {
         val payload = JSONObject().put("limit", limit)
+        if (!reviewKinds.isNullOrEmpty()) payload.put("review_kinds", JSONArray(reviewKinds))
         if (fileIds == null) {
             payload.put("scope", "all")
         } else {
@@ -243,6 +249,25 @@ class ApiClient {
         val json = call("/questionnaires/session", "POST", payload, token)
         return json.optJSONArray("questions").orEmpty().objects().map(::reviewQuestion)
     }
+
+    suspend fun historicalEvents(token: String): List<HistoricalEvent> =
+        callArray("/historical-timeline", token = token).objects().map { row ->
+            HistoricalEvent(
+                id = row.getString("id"),
+                title = row.optString("title"),
+                startLabel = row.nullable("start_label"),
+                startYear = row.nullableInt("start_year"),
+                startMonth = row.nullableInt("start_month"),
+                startDay = row.nullableInt("start_day"),
+                endLabel = row.nullable("end_label"),
+                endYear = row.nullableInt("end_year"),
+                endMonth = row.nullableInt("end_month"),
+                endDay = row.nullableInt("end_day"),
+                description = row.nullable("description"),
+                category = row.nullable("category"),
+                image = row.nullable("image_data"),
+            )
+        }
 
     suspend fun reviewResults(token: String): List<ReviewResult> =
         callArray("/questionnaires/results", token = token).objects().map {
@@ -611,3 +636,5 @@ private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
 private fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull(::optJSONObject)
 private fun JSONObject.nullable(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+private fun JSONObject.nullableInt(key: String): Int? =
+    if (!has(key) || isNull(key)) null else optInt(key)

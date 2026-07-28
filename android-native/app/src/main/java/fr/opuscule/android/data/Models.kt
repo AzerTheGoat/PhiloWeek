@@ -90,6 +90,22 @@ data class ReviewResult(
     val createdAt: String?,
 )
 
+data class HistoricalEvent(
+    val id: String,
+    val title: String,
+    val startLabel: String?,
+    val startYear: Int?,
+    val startMonth: Int?,
+    val startDay: Int?,
+    val endLabel: String?,
+    val endYear: Int?,
+    val endMonth: Int?,
+    val endDay: Int?,
+    val description: String?,
+    val category: String?,
+    val image: String?,
+)
+
 data class Idea(
     val id: String,
     val content: String,

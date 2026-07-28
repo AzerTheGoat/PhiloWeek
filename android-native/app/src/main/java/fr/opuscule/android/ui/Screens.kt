@@ -253,6 +253,7 @@ fun OpusculeApp(state: AppState) {
                             organizeTarget = it
                             tabName = RootTab.YOU.name
                         },
+                        openSource = { fileStack = listOf(it) },
                     )
                     RootTab.LIBRARY -> if (libraryArticles) {
                         ArticlesScreen(
@@ -486,7 +487,7 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
                     onClick = { readingVisible = true },
                 )
                 HorizontalDivider(color = Divider)
-                ActionRow("Version", "1.4.3 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
+                ActionRow("Version", "1.4.4 · Android natif", Icons.Rounded.Description, onClick = {}, trailing = {})
             }
             SurfaceGroup {
                 ActionRow("Se déconnecter", "Retirer la session de cet appareil", Icons.AutoMirrored.Rounded.Logout, state::logout, destructive = true, trailing = {})

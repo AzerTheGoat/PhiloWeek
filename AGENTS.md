@@ -273,6 +273,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le bandeau du flux affiche le nom réel de la catégorie courante, sans faux
   compteur ni notion de flux infini. Le header compte uniquement les éléments
   réellement évalués pendant la session.
+- Les questionnaires, définitions et personnes sont chargés séparément pour que
+  chaque catégorie dispose de sa propre pile et ne recycle pas une unique carte.
+- `Aujourd’hui` ajoute une catégorie `Dates historiques` issue de la frise :
+  chaque carte demande de retrouver la date ou la période d’un événement avant
+  de révéler la réponse et d’avancer dans la même catégorie.
+- Le menu `…` des cartes de rappel est un vrai menu d’actions : il ouvre la fiche
+  Markdown liée, permet de modifier ou marquer la carte à modifier et propose la
+  suppression confirmée pour les questions de questionnaire.
 - `Bibliothèque` regroupe notes et articles dans un sélecteur commun. Ouvrir une
   note depuis la recherche ferme le clavier avant d’afficher le lecteur.
 - `Capturer` ouvre un panneau bas avec focus immédiat et crée réellement une

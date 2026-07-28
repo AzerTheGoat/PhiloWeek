@@ -20,7 +20,19 @@ router.post('/generate-from-note/:fileId', (req, res) => {
 
 router.post('/session', (req, res) => {
   const db = getDb()
-  const { scope = 'all', folder_ids = [], file_id = null, file_ids = [], limit = 12 } = req.body || {}
+  const {
+    scope = 'all',
+    folder_ids = [],
+    file_id = null,
+    file_ids = [],
+    review_kinds = [],
+    limit = 12,
+  } = req.body || {}
+  const requestedKinds = new Set(
+    (Array.isArray(review_kinds) ? review_kinds : [])
+      .map(kind => String(kind || '').trim().toLowerCase())
+      .filter(kind => ['questionnaire', 'definition', 'actor'].includes(kind))
+  )
   const files = getQuestionnaireFiles(db, { scope, folderIds: folder_ids, fileId: file_id, fileIds: file_ids }, req.user.id, req.user.session_id)
   const stats = getStats(db, req.user.id)
   const sourceIndex = buildReviewSourceIndex(db, req.user.id, req.user.session_id)
@@ -36,9 +48,12 @@ router.post('/session', (req, res) => {
     })
   }
 
+  const eligibleQuestions = requestedKinds.size
+    ? questions.filter(question => requestedKinds.has(question.review_kind))
+    : questions
   res.json({
-    questions: pickWeighted(questions, clampLimit(limit)),
-    total: questions.length,
+    questions: pickWeighted(eligibleQuestions, clampLimit(limit)),
+    total: eligibleQuestions.length,
   })
 })
 
@@ -340,6 +355,16 @@ function buildReviewSourceIndex(db, userId, sessionId) {
 
 function resolveReviewSource(question, questionnaire, index, reviewFile) {
   if (questionnaire.review_kind === 'actor') return null
+  const generatedLink = index.db.prepare(`
+    SELECT source_file_id
+    FROM generated_quizzes
+    WHERE quiz_file_id = ? AND user_id = ?
+    LIMIT 1
+  `).get(reviewFile?.id, index.userId)
+  if (generatedLink?.source_file_id) {
+    const linkedSource = index.byId.get(String(generatedLink.source_file_id))
+    if (linkedSource) return linkedSource
+  }
   const ids = [
     question?.source_file_id,
     ...(Array.isArray(question?.source_file_ids) ? question.source_file_ids : []),
@@ -356,12 +381,14 @@ function resolveReviewSource(question, questionnaire, index, reviewFile) {
   ].filter(Boolean).map(normalizePath)
   for (const path of paths) {
     const source = index.byPath.get(path)
+      || index.byPath.get(path.replace(/\.json$/i, '.md'))
     if (source) return source
   }
   const reviewPath = normalizePath(getFilePath(index.db, reviewFile?.id, index.userId))
   const reviewParts = reviewPath.split('/').filter(Boolean)
-  if (reviewParts.length > 1 && withoutDiacritics(reviewParts[0]) === 'quiz generes') {
-    const generatedSourcePath = reviewParts.slice(1).join('/').replace(/\.json$/i, '.md')
+  const generatedRootIndex = reviewParts.findIndex(part => withoutDiacritics(part) === 'quiz generes')
+  if (generatedRootIndex >= 0 && generatedRootIndex < reviewParts.length - 1) {
+    const generatedSourcePath = reviewParts.slice(generatedRootIndex + 1).join('/').replace(/\.json$/i, '.md')
     const generatedSource = index.byPath.get(generatedSourcePath)
     if (generatedSource) return generatedSource
   }

@@ -34,17 +34,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Quiz
+import androidx.compose.material.icons.rounded.Source
 import androidx.compose.material.icons.rounded.SwipeVertical
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,6 +81,7 @@ import coil.compose.AsyncImage
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.Article
 import fr.opuscule.android.data.FactCheck
+import fr.opuscule.android.data.HistoricalEvent
 import fr.opuscule.android.data.Idea
 import fr.opuscule.android.data.Quote
 import fr.opuscule.android.data.ReviewQuestion
@@ -103,6 +113,10 @@ private sealed interface KnowledgeItem {
     data class Reading(val article: Article) : KnowledgeItem {
         override val id = "article:${article.id}"
     }
+
+    data class HistoricalDate(val event: HistoricalEvent) : KnowledgeItem {
+        override val id = "historical:${event.id}"
+    }
 }
 
 private data class KnowledgeSection(
@@ -119,11 +133,14 @@ fun TodayScreen(
     openReview: () -> Unit,
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
+    openSource: (String) -> Unit,
 ) {
     val token = state.token ?: return
     var sections by remember { mutableStateOf<List<KnowledgeSection>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<ReviewQuestion?>(null) }
+    var deleting by remember { mutableStateOf<ReviewQuestion?>(null) }
     var completed by remember { mutableIntStateOf(0) }
     val sectionCursors = remember { mutableStateMapOf<String, Int>() }
     val transitionDirections = remember { mutableStateMapOf<String, Int>() }
@@ -136,14 +153,27 @@ fun TodayScreen(
         error = null
         runCatching {
             coroutineScope {
-                val reviews = async { runCatching { state.api.review(token, limit = 30) }.getOrDefault(emptyList()) }
+                val quiz = async {
+                    runCatching { state.api.review(token, limit = 50, reviewKinds = listOf("questionnaire")) }
+                        .getOrDefault(emptyList())
+                }
+                val definitions = async {
+                    runCatching { state.api.review(token, limit = 50, reviewKinds = listOf("definition")) }
+                        .getOrDefault(emptyList())
+                }
+                val actors = async {
+                    runCatching { state.api.review(token, limit = 30, reviewKinds = listOf("actor")) }
+                        .getOrDefault(emptyList())
+                }
+                val history = async { runCatching { state.api.historicalEvents(token) }.getOrDefault(emptyList()) }
                 val ideas = async { runCatching { state.api.ideas(token) }.getOrDefault(emptyList()) }
                 val quotes = async { runCatching { state.api.quotes(token) }.getOrDefault(emptyList()) }
                 val facts = async { runCatching { state.api.factChecks(token) }.getOrDefault(emptyList()) }
                 val articles = async { runCatching { state.api.articles(token) }.getOrDefault(emptyList()) }
-                awaitAll(reviews, ideas, quotes, facts, articles)
+                awaitAll(quiz, definitions, actors, history, ideas, quotes, facts, articles)
                 buildKnowledgeSections(
-                    reviews.await(),
+                    quiz.await() + definitions.await() + actors.await(),
+                    history.await(),
                     ideas.await(),
                     quotes.await(),
                     facts.await(),
@@ -213,29 +243,99 @@ fun TodayScreen(
                         },
                         saveRecall = { known ->
                             val item = section.items[cursor % section.items.size]
-                            val question = (item as? KnowledgeItem.Recall)?.question
-                                ?: return@KnowledgeSectionPage
                             if (rated[occurrenceKey] == true) return@KnowledgeSectionPage
                             rated[occurrenceKey] = true
                             completed += 1
                             transitionDirections[section.id] = if (known) 1 else -1
                             sectionCursors[section.id] = cursor + 1
-                            scope.launch {
-                                runCatching { state.api.saveReview(token, question, known) }
-                                    .onFailure {
-                                        rated.remove(occurrenceKey)
-                                        completed = (completed - 1).coerceAtLeast(0)
-                                        state.handle(it)
+                            if (item is KnowledgeItem.Recall) {
+                                scope.launch {
+                                    runCatching { state.api.saveReview(token, item.question, known) }
+                                        .onFailure {
+                                            rated.remove(occurrenceKey)
+                                            completed = (completed - 1).coerceAtLeast(0)
+                                            state.handle(it)
+                                        }
                                     }
                             }
                         },
                         openReview = openReview,
+                        openSource = { question ->
+                            question.sourceFileId?.let(openSource)
+                                ?: state.notify("Aucune fiche Markdown liée à cette question.", "warning")
+                        },
+                        editQuestion = { editing = it },
+                        requireChange = { question ->
+                            scope.launch {
+                                runCatching { state.api.setRequireChange(token, question, true) }
+                                    .onSuccess {
+                                        sections = sections.map { section ->
+                                            section.copy(items = section.items.map { item ->
+                                                if (item is KnowledgeItem.Recall && item.question.key == question.key) {
+                                                    item.copy(question = item.question.copy(requireChange = true))
+                                                } else item
+                                            })
+                                        }
+                                        state.notify("Ajouté à « À modifier »")
+                                    }
+                                    .onFailure(state::handle)
+                            }
+                        },
+                        deleteQuestion = { deleting = it },
                         openArticles = openArticles,
                         openSection = openSection,
                     )
                 }
             }
         }
+    }
+
+    editing?.let { question ->
+        EditQuestionDialog(question, { editing = null }) { prompt, answer, explanation ->
+            scope.launch {
+                runCatching { state.api.editReviewQuestion(token, question, prompt, answer, explanation) }
+                    .onSuccess {
+                        sections = sections.map { section ->
+                            section.copy(items = section.items.map { item ->
+                                if (item is KnowledgeItem.Recall && item.question.key == question.key) {
+                                    item.copy(question = item.question.copy(prompt = prompt, answer = answer, explanation = explanation))
+                                } else item
+                            })
+                        }
+                        editing = null
+                        state.notify("Question modifiée")
+                    }
+                    .onFailure(state::handle)
+            }
+        }
+    }
+    deleting?.let { question ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("Supprimer cette question ?") },
+            text = { Text("Elle sera retirée définitivement du fichier ${question.fileName}.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleting = null
+                    scope.launch {
+                        runCatching { state.api.deleteQuestion(token, question) }
+                            .onSuccess {
+                                sections = sections.mapNotNull { section ->
+                                    val remaining = section.items.filterNot {
+                                        it is KnowledgeItem.Recall && it.question.key == question.key
+                                    }
+                                    if (remaining.isEmpty()) null else section.copy(items = remaining)
+                                }
+                                state.notify("Question supprimée")
+                            }
+                            .onFailure(state::handle)
+                    }
+                }) { Text("Supprimer", color = Danger) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Annuler", color = Muted) } },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = Canvas,
+        )
     }
 }
 
@@ -277,6 +377,10 @@ private fun KnowledgeSectionPage(
     complete: () -> Unit,
     saveRecall: (Boolean) -> Unit,
     openReview: () -> Unit,
+    openSource: (ReviewQuestion) -> Unit,
+    editQuestion: (ReviewQuestion) -> Unit,
+    requireChange: (ReviewQuestion) -> Unit,
+    deleteQuestion: (ReviewQuestion) -> Unit,
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
@@ -303,6 +407,10 @@ private fun KnowledgeSectionPage(
             complete = if (targetCursor == cursor) complete else ({ }),
             saveRecall = if (targetCursor == cursor) saveRecall else ({ _ -> }),
             openReview = openReview,
+            openSource = openSource,
+            editQuestion = editQuestion,
+            requireChange = requireChange,
+            deleteQuestion = deleteQuestion,
             openArticles = openArticles,
             openSection = openSection,
         )
@@ -318,11 +426,30 @@ private fun KnowledgePage(
     complete: () -> Unit,
     saveRecall: (Boolean) -> Unit,
     openReview: () -> Unit,
+    openSource: (ReviewQuestion) -> Unit,
+    editQuestion: (ReviewQuestion) -> Unit,
+    requireChange: (ReviewQuestion) -> Unit,
+    deleteQuestion: (ReviewQuestion) -> Unit,
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
     if (item is KnowledgeItem.Recall) {
-        RecallSwipePage(item.question, revealed, rating, reveal, saveRecall, openReview)
+        RecallSwipePage(
+            item.question,
+            revealed,
+            rating,
+            reveal,
+            saveRecall,
+            openReview,
+            { openSource(item.question) },
+            { editQuestion(item.question) },
+            { requireChange(item.question) },
+            { deleteQuestion(item.question) },
+        )
+        return
+    }
+    if (item is KnowledgeItem.HistoricalDate) {
+        HistoricalDatePage(item.event, revealed, rating, reveal, saveRecall)
         return
     }
 
@@ -396,7 +523,7 @@ private fun KnowledgePage(
                         PrimaryButton("Lire", openArticles, Modifier.weight(1f))
                     }
                 }
-                is KnowledgeItem.Recall -> Unit
+                is KnowledgeItem.Recall, is KnowledgeItem.HistoricalDate -> Unit
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.SwipeVertical, null, tint = Muted, modifier = Modifier.size(17.dp))
@@ -419,7 +546,12 @@ private fun RecallSwipePage(
     reveal: () -> Unit,
     save: (Boolean) -> Unit,
     openReview: () -> Unit,
+    openSource: () -> Unit,
+    edit: () -> Unit,
+    requireChange: () -> Unit,
+    delete: () -> Unit,
 ) {
+    var menu by remember(question.key) { mutableStateOf(false) }
     var horizontalDrag by remember(question.key, revealed) { mutableFloatStateOf(0f) }
     val swipeThreshold = with(LocalDensity.current) { 92.dp.toPx() }
     val swipeProgress = (abs(horizontalDrag) / swipeThreshold).coerceIn(0f, 1f)
@@ -459,6 +591,39 @@ private fun RecallSwipePage(
                     else -> "RAPPEL ACTIF"
                 },
                 Icons.Rounded.Quiz,
+                onMore = { menu = true },
+                menu = {
+                    DropdownMenu(
+                        expanded = menu,
+                        onDismissRequest = { menu = false },
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = Canvas,
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Voir la fiche liée") },
+                            leadingIcon = { Icon(Icons.Rounded.Source, null) },
+                            onClick = { menu = false; openSource() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Modifier") },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                            onClick = { menu = false; edit() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (question.requireChange) "Déjà marquée à modifier" else "Marquer à modifier") },
+                            leadingIcon = { Icon(Icons.Rounded.Tune, null, tint = Warning) },
+                            enabled = !question.requireChange,
+                            onClick = { menu = false; requireChange() },
+                        )
+                        if (question.kind == "questionnaire") {
+                            DropdownMenuItem(
+                                text = { Text("Supprimer", color = Danger) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = Danger) },
+                                onClick = { menu = false; delete() },
+                            )
+                        }
+                    }
+                },
             )
             Text(
                 question.questionnaireTitle.ifBlank { question.fileName },
@@ -530,18 +695,114 @@ private fun RecallSwipePage(
 }
 
 @Composable
-private fun KnowledgeEyebrow(label: String, icon: ImageVector) {
+private fun HistoricalDatePage(
+    event: HistoricalEvent,
+    revealed: Boolean,
+    rating: Boolean,
+    reveal: () -> Unit,
+    save: (Boolean) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(28.dp)).background(ReadingPaper)
+            .padding(horizontal = 22.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        KnowledgeEyebrow("DATE À RETROUVER", Icons.Rounded.Event)
+        event.category?.takeIf(String::isNotBlank)?.let {
+            Text(it.uppercase(), color = Muted, style = MaterialTheme.typography.labelMedium)
+        }
+        Column(
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            event.image?.let {
+                AsyncImage(
+                    model = articleImageModel(it),
+                    contentDescription = event.title,
+                    modifier = Modifier.fillMaxWidth().height(170.dp)
+                        .clip(RoundedCornerShape(18.dp)).background(Surface),
+                )
+            }
+            Text(event.title, style = MaterialTheme.typography.headlineMedium)
+            event.description?.takeIf(String::isNotBlank)?.let {
+                Text(it, color = Muted, maxLines = 6, overflow = TextOverflow.Ellipsis)
+            }
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Divider))
+                Box(
+                    Modifier.padding(start = 28.dp).size(18.dp).clip(CircleShape)
+                        .background(if (revealed) Opuscule else SurfacePressed),
+                )
+            }
+            Text(
+                if (revealed) "DATE" else "À quelle date situez-vous cet événement ?",
+                color = if (revealed) Opuscule else Ink,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (revealed) {
+                Text(historicalDateAnswer(event), style = MaterialTheme.typography.displaySmall, color = Opuscule)
+            } else {
+                Text("Essayez de donner l’année — ou la période — avant de révéler la réponse.", color = Muted)
+            }
+        }
+        if (!revealed) {
+            PrimaryButton("Afficher la date", reveal, Modifier.fillMaxWidth())
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryButton("À revoir", { save(false) }, Modifier.weight(1f), enabled = !rating)
+                PrimaryButton("Je savais", { save(true) }, Modifier.weight(1f), enabled = !rating)
+            }
+        }
+    }
+}
+
+private fun historicalDateAnswer(event: HistoricalEvent): String {
+    fun date(label: String?, year: Int?, month: Int?, day: Int?): String {
+        if (!label.isNullOrBlank()) return label
+        if (year == null) return "Date inconnue"
+        val months = listOf(
+            "", "janvier", "février", "mars", "avril", "mai", "juin",
+            "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+        )
+        return when {
+            day != null && month != null -> "$day ${months.getOrElse(month) { month.toString() }} $year"
+            month != null -> "${months.getOrElse(month) { month.toString() }} $year"
+            year < 0 -> "${-year} av. J.-C."
+            else -> year.toString()
+        }
+    }
+    val start = date(event.startLabel, event.startYear, event.startMonth, event.startDay)
+    val hasEnd = !event.endLabel.isNullOrBlank() || event.endYear != null
+    return if (hasEnd) "$start — ${date(event.endLabel, event.endYear, event.endMonth, event.endDay)}" else start
+}
+
+@Composable
+private fun KnowledgeEyebrow(
+    label: String,
+    icon: ImageVector,
+    onMore: (() -> Unit)? = null,
+    menu: @Composable (() -> Unit)? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(OpusculeSoft), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = Opuscule, modifier = Modifier.size(20.dp))
         }
         Text(label, Modifier.padding(start = 10.dp).weight(1f), color = Opuscule, style = MaterialTheme.typography.labelMedium)
-        Icon(Icons.Rounded.MoreHoriz, null, tint = Muted)
+        if (onMore != null) {
+            Box {
+                IconButton(onClick = onMore, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Rounded.MoreHoriz, "Options", tint = Ink)
+                }
+                menu?.invoke()
+            }
+        }
     }
 }
 
 private fun buildKnowledgeSections(
     reviews: List<ReviewQuestion>,
+    history: List<HistoricalEvent>,
     ideas: List<Idea>,
     quotes: List<Quote>,
     facts: List<FactCheck>,
@@ -565,6 +826,13 @@ private fun buildKnowledgeSections(
         "actors",
         "Personnes",
         reviews.filter { it.kind == "actor" }.map(KnowledgeItem::Recall),
+    )
+    addSection(
+        "history",
+        "Dates historiques",
+        history.filter { it.startYear != null || !it.startLabel.isNullOrBlank() }
+            .take(30)
+            .map(KnowledgeItem::HistoricalDate),
     )
     addSection("ideas", "Idées", ideas.take(12).map(KnowledgeItem::Thought))
     addSection(

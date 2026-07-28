@@ -108,7 +108,7 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
 
     fun start(ids: List<String>? = null, kinds: Set<String> = setOf("questionnaire", "definition", "actor")) = scope.launch {
         loading = true
-        runCatching { state.api.review(token, ids, 20) }
+        runCatching { state.api.review(token, ids, 50, kinds.toList()) }
             .onSuccess { rows ->
                 val filtered = rows.filter { kinds.contains(it.kind) }.take(12)
                 if (filtered.isEmpty()) state.notify("Aucune carte disponible pour cette sélection.")
@@ -545,7 +545,7 @@ private fun KindToggle(label: String, key: String, selected: Set<String>, update
 }
 
 @Composable
-private fun EditQuestionDialog(question: ReviewQuestion, dismiss: () -> Unit, save: (String, String, String) -> Unit) {
+internal fun EditQuestionDialog(question: ReviewQuestion, dismiss: () -> Unit, save: (String, String, String) -> Unit) {
     var prompt by remember { mutableStateOf(question.prompt) }
     var answer by remember { mutableStateOf(question.answer) }
     var explanation by remember { mutableStateOf(question.explanation) }
