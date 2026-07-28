@@ -104,6 +104,7 @@ data class HistoricalEvent(
     val description: String?,
     val category: String?,
     val image: String?,
+    val canEdit: Boolean,
 )
 
 data class Idea(

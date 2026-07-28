@@ -266,8 +266,13 @@ class ApiClient {
                 description = row.nullable("description"),
                 category = row.nullable("category"),
                 image = row.nullable("image_data"),
+                canEdit = row.optBoolean("can_edit"),
             )
         }
+
+    suspend fun deleteHistoricalEvent(token: String, id: String) {
+        call("/historical-timeline/$id", "DELETE", token = token)
+    }
 
     suspend fun reviewResults(token: String): List<ReviewResult> =
         callArray("/questionnaires/results", token = token).objects().map {

@@ -280,7 +280,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   chaque catégorie dispose de sa propre pile et ne recycle pas une unique carte.
 - `Aujourd’hui` ajoute une catégorie `Dates historiques` issue de la frise :
   chaque carte demande de retrouver la date ou la période d’un événement avant
-  de révéler la réponse et d’avancer dans la même catégorie.
+  de révéler la réponse et d’avancer dans la même catégorie. Les repères sont
+  mélangés à chaque chargement, sans suivre l’ordre chronologique de la frise.
+- Le menu `…` d’une carte historique appartenant à l’utilisateur permet de
+  supprimer le repère après confirmation; les repères d’autres comptes restent
+  consultables mais ne proposent jamais cette action.
 - Le menu `…` des cartes de rappel est un vrai menu d’actions : il ouvre la fiche
   Markdown liée, permet de modifier ou marquer la carte à modifier et propose la
   suppression confirmée pour les questions de questionnaire.

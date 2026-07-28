@@ -144,6 +144,7 @@ fun TodayScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<ReviewQuestion?>(null) }
     var deleting by remember { mutableStateOf<ReviewQuestion?>(null) }
+    var deletingHistorical by remember { mutableStateOf<HistoricalEvent?>(null) }
     var completed by remember { mutableIntStateOf(0) }
     val sectionCursors = remember { mutableStateMapOf<String, Int>() }
     val transitionDirections = remember { mutableStateMapOf<String, Int>() }
@@ -303,6 +304,7 @@ fun TodayScreen(
                             }
                         },
                         deleteQuestion = { deleting = it },
+                        deleteHistorical = { deletingHistorical = it },
                         openArticles = openArticles,
                         openSection = openSection,
                     )
@@ -358,6 +360,38 @@ fun TodayScreen(
             containerColor = Canvas,
         )
     }
+    deletingHistorical?.let { event ->
+        AlertDialog(
+            onDismissRequest = { deletingHistorical = null },
+            title = { Text("Supprimer ce repère historique ?") },
+            text = { Text("« ${event.title} » sera retiré définitivement de la frise.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deletingHistorical = null
+                    scope.launch {
+                        runCatching { state.api.deleteHistoricalEvent(token, event.id) }
+                            .onSuccess {
+                                sections = sections.mapNotNull { section ->
+                                    val remaining = section.items.filterNot {
+                                        it is KnowledgeItem.HistoricalDate && it.event.id == event.id
+                                    }
+                                    if (remaining.isEmpty()) null else section.copy(items = remaining)
+                                }
+                                state.notify("Repère historique supprimé")
+                            }
+                            .onFailure(state::handle)
+                    }
+                }) { Text("Supprimer", color = Danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingHistorical = null }) {
+                    Text("Annuler", color = Muted)
+                }
+            },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = Canvas,
+        )
+    }
 }
 
 @Composable
@@ -402,6 +436,7 @@ private fun KnowledgeSectionPage(
     editQuestion: (ReviewQuestion) -> Unit,
     requireChange: (ReviewQuestion) -> Unit,
     deleteQuestion: (ReviewQuestion) -> Unit,
+    deleteHistorical: (HistoricalEvent) -> Unit,
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
@@ -432,6 +467,7 @@ private fun KnowledgeSectionPage(
             editQuestion = editQuestion,
             requireChange = requireChange,
             deleteQuestion = deleteQuestion,
+            deleteHistorical = deleteHistorical,
             openArticles = openArticles,
             openSection = openSection,
         )
@@ -451,6 +487,7 @@ private fun KnowledgePage(
     editQuestion: (ReviewQuestion) -> Unit,
     requireChange: (ReviewQuestion) -> Unit,
     deleteQuestion: (ReviewQuestion) -> Unit,
+    deleteHistorical: (HistoricalEvent) -> Unit,
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
@@ -470,7 +507,9 @@ private fun KnowledgePage(
         return
     }
     if (item is KnowledgeItem.HistoricalDate) {
-        HistoricalDatePage(item.event, revealed, rating, reveal, saveRecall)
+        HistoricalDatePage(item.event, revealed, rating, reveal, saveRecall) {
+            deleteHistorical(item.event)
+        }
         return
     }
 
@@ -722,14 +761,34 @@ private fun HistoricalDatePage(
     rating: Boolean,
     reveal: () -> Unit,
     save: (Boolean) -> Unit,
+    delete: () -> Unit,
 ) {
+    var menu by remember(event.id) { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(28.dp)).background(ReadingPaper)
             .padding(horizontal = 22.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        KnowledgeEyebrow("DATE À RETROUVER", Icons.Rounded.Event)
+        KnowledgeEyebrow(
+            "DATE À RETROUVER",
+            Icons.Rounded.Event,
+            onMore = if (event.canEdit) ({ menu = true }) else null,
+            menu = if (event.canEdit) ({
+                DropdownMenu(
+                    expanded = menu,
+                    onDismissRequest = { menu = false },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = Canvas,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Supprimer ce repère", color = Danger) },
+                        leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = Danger) },
+                        onClick = { menu = false; delete() },
+                    )
+                }
+            }) else null,
+        )
         event.category?.takeIf(String::isNotBlank)?.let {
             Text(it.uppercase(), color = Muted, style = MaterialTheme.typography.labelMedium)
         }
@@ -852,6 +911,7 @@ private fun buildKnowledgeSections(
         "history",
         "Dates historiques",
         history.filter { it.startYear != null || !it.startLabel.isNullOrBlank() }
+            .shuffled()
             .take(30)
             .map(KnowledgeItem::HistoricalDate),
     )
