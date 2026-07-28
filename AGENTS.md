@@ -270,6 +270,9 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   un swipe ou un bouton d’évaluation, la prochaine carte de rappel remplace
   immédiatement la carte courante avec une transition horizontale; le pager
   vertical ne change jamais de catégorie à la suite d’une évaluation.
+- Dans `Aujourd’hui`, un déplacement vertical lent fait défiler le contenu d’une
+  grande carte, tandis qu’un fling vertical franc change immédiatement de
+  catégorie, même si l’énoncé ou la correction n’est pas arrivé à son extrémité.
 - Le bandeau du flux affiche le nom réel de la catégorie courante, sans faux
   compteur ni notion de flux infini. Le header compte uniquement les éléments
   réellement évalués pendant la session.

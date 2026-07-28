@@ -70,6 +70,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -77,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import coil.compose.AsyncImage
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.Article
@@ -208,6 +211,24 @@ fun TodayScreen(
             )
             else -> {
                 val pagerState = rememberPagerState(pageCount = { sections.size })
+                val categoryFlingThreshold = with(LocalDensity.current) { 550.dp.toPx() }
+                val categoryFlingConnection = remember(pagerState, sections.size, categoryFlingThreshold) {
+                    object : NestedScrollConnection {
+                        override suspend fun onPreFling(available: Velocity): Velocity {
+                            if (abs(available.y) < categoryFlingThreshold) return Velocity.Zero
+                            val target = if (available.y < 0f) {
+                                pagerState.currentPage + 1
+                            } else {
+                                pagerState.currentPage - 1
+                            }
+                            if (target !in sections.indices || target == pagerState.currentPage) {
+                                return Velocity.Zero
+                            }
+                            pagerState.animateScrollToPage(target)
+                            return available
+                        }
+                    }
+                }
                 val currentSection = sections[pagerState.currentPage.coerceIn(sections.indices)]
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
@@ -223,7 +244,7 @@ fun TodayScreen(
                 }
                 VerticalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().nestedScroll(categoryFlingConnection),
                     beyondViewportPageCount = 1,
                 ) { page ->
                     val section = sections[page]
