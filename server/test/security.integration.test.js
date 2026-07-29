@@ -79,8 +79,18 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   response = await request('GET', `/api/files/${encodeURIComponent(generatedQuizManifest.id)}`)
   assert.equal(response.status, 200)
   const generatedQuizContent = await response.json()
-  assert.equal(generatedQuizContent.access.can_edit, false)
+  assert.equal(generatedQuizContent.access.can_edit, true)
   assert.equal(JSON.parse(generatedQuizContent.content).philoweek_type, 'generated_quizzes')
+  const editedGeneratedQuizManifest = {
+    ...JSON.parse(generatedQuizContent.content),
+    note: 'manifeste modifiable',
+  }
+  response = await request('PUT', `/api/files/${generatedQuizManifest.id}`, {
+    content: JSON.stringify(editedGeneratedQuizManifest, null, 2),
+    base_version: generatedQuizContent.content_version,
+  })
+  assert.equal(response.status, 200, await response.clone().text())
+  assert.equal(JSON.parse((await response.json()).content).note, 'manifeste modifiable')
 
   const secret = 'CONTENU-TRES-SECRET-UNIQUE'
   response = await request('POST', '/api/files', {

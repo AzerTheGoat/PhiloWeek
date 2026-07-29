@@ -111,9 +111,11 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Le dossier racine `_Opuscule` est créé automatiquement lors du chargement de
   l’arbre et reste toujours visible dans la sidebar web, indépendamment des imports.
 - Ses manifests (`GeneratedQuizzes.json`, `Todos.json`, `Dashboard.json`, etc.)
-  sont exposés comme fichiers système virtuels en lecture seule, générés depuis
-  les tables actives; ils ne doivent jamais être enregistrés comme doublons dans
-  `files`.
+  sont initialisés dans `files` depuis les tables actives puis restent modifiables
+  dans l’éditeur. Leur contenu enregistré remplace le manifest correspondant dans
+  le ZIP exporté.
+- Enregistrer `_Opuscule/GeneratedQuizzes.json` valide tous les chemins puis
+  remplace immédiatement les liaisons de `generated_quizzes` pour l’utilisateur.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
 - Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Reseau d'acteurs, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Securite, Aide, revision, copie, import/export, theme et compte.

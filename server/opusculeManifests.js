@@ -1,23 +1,5 @@
 const matter = require('gray-matter')
-
-const PREFIX = 'virtual-opuscule:'
-const MANIFEST_NAMES = [
-  'EncryptedFolders.json',
-  'SpreadsheetMetadata.json',
-  'Citations.md',
-  'FactChecks.md',
-  'Todos.json',
-  'Dashboard.json',
-  'QuestionnaireResults.json',
-  'GeneratedQuizzes.json',
-  'AppUsage.json',
-  'HistoricalTimeline.json',
-  'SocialJournal.json',
-  'FileHistory.json',
-  'Trash.json',
-  'Shares.json',
-  'RoadTrips.json',
-]
+const { v4: uuidv4 } = require('uuid')
 
 function listOpusculeManifests(db, userId) {
   const exported = new Date().toISOString()
@@ -36,7 +18,6 @@ function listOpusculeManifests(db, userId) {
   }, null, 2)
   const manifests = []
   const add = (name, content) => manifests.push({
-    id: `${PREFIX}${name.toLocaleLowerCase()}`,
     name,
     type: 'file',
     content,
@@ -276,16 +257,97 @@ function inferGeneratedQuizLinks(files, pathMap, storedLinks) {
   return inferred
 }
 
-function findOpusculeManifest(db, userId, id) {
-  if (!String(id || '').startsWith(PREFIX)) return null
-  return listOpusculeManifests(db, userId).find(manifest => manifest.id === id) || null
+function ensureOpusculeManifestFiles(db, userId, rootId) {
+  const manifests = listOpusculeManifests(db, userId)
+  const existingNames = new Set(db.prepare(`
+    SELECT lower(name) AS name
+    FROM files
+    WHERE parent_id = ? AND user_id = ? AND type = 'file' AND deleted_at IS NULL
+  `).all(rootId, userId).map(row => row.name))
+  const insertFile = db.prepare(`
+    INSERT INTO files (
+      id, parent_id, name, type, content, user_id, last_edited_by, created_at, updated_at
+    ) VALUES (?, ?, ?, 'file', ?, ?, ?, ?, ?)
+  `)
+  const insertRevision = db.prepare(`
+    INSERT INTO file_revisions (
+      file_id, user_id, revision_no, content, created_at, actor_user_id
+    ) VALUES (?, ?, 0, ?, ?, ?)
+  `)
+  const now = new Date().toISOString()
+  const createMissing = db.transaction(() => {
+    for (const manifest of manifests) {
+      if (existingNames.has(manifest.name.toLocaleLowerCase())) continue
+      const id = uuidv4()
+      insertFile.run(id, rootId, manifest.name, manifest.content, userId, userId, now, now)
+      insertRevision.run(id, userId, manifest.content, now, userId)
+    }
+  })
+  createMissing()
 }
 
-function listOpusculeManifestHeaders() {
-  return MANIFEST_NAMES.map(name => ({
-    id: `${PREFIX}${name.toLocaleLowerCase()}`,
-    name,
-  }))
+function applyGeneratedQuizzesManifest(db, userId, content) {
+  let parsed
+  try { parsed = JSON.parse(content) } catch (_) {
+    throw manifestError('GeneratedQuizzes.json doit contenir un JSON valide')
+  }
+  if (parsed?.philoweek_type !== 'generated_quizzes' || !Array.isArray(parsed.links)) {
+    throw manifestError('Le manifeste doit contenir philoweek_type = generated_quizzes et un tableau links')
+  }
+  if (parsed.links.length > 1000) throw manifestError('Le manifeste est limité à 1000 liaisons')
+
+  const files = db.prepare(`
+    SELECT id, parent_id, name, type
+    FROM files
+    WHERE user_id = ? AND deleted_at IS NULL
+  `).all(userId)
+  const pathMap = buildPathMap(files)
+  const normalize = value => String(value || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLocaleLowerCase()
+  const idByPath = new Map(Object.entries(pathMap).map(([id, filePath]) => [normalize(filePath), id]))
+  const resolved = parsed.links.map((link, index) => {
+    const sourceId = idByPath.get(normalize(link?.source_path))
+    const quizId = idByPath.get(normalize(link?.quiz_path))
+    if (!sourceId || !quizId || sourceId === quizId) {
+      throw manifestError(`Liaison ${index + 1} introuvable : vérifie source_path et quiz_path`)
+    }
+    return {
+      sourceId,
+      quizId,
+      createdAt: validIsoDate(link?.created_at) || new Date().toISOString(),
+      updatedAt: validIsoDate(link?.updated_at) || new Date().toISOString(),
+    }
+  })
+  const uniqueSources = new Set(resolved.map(link => link.sourceId))
+  const uniqueQuizzes = new Set(resolved.map(link => link.quizId))
+  if (uniqueSources.size !== resolved.length || uniqueQuizzes.size !== resolved.length) {
+    throw manifestError('Chaque note source et chaque quiz ne peut apparaître qu’une seule fois')
+  }
+
+  const replaceLinks = db.transaction(() => {
+    db.prepare('DELETE FROM generated_quizzes WHERE user_id = ?').run(userId)
+    const insert = db.prepare(`
+      INSERT INTO generated_quizzes (
+        source_file_id, quiz_file_id, user_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+    `)
+    for (const link of resolved) {
+      insert.run(link.sourceId, link.quizId, userId, link.createdAt, link.updatedAt)
+    }
+  })
+  replaceLinks()
+  return resolved.length
+}
+
+function manifestError(message) {
+  const error = new Error(message)
+  error.status = 400
+  return error
+}
+
+function validIsoDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function buildPathMap(files) {
@@ -313,7 +375,7 @@ function isInsideOpuscule(id, files) {
 }
 
 module.exports = {
-  findOpusculeManifest,
-  listOpusculeManifestHeaders,
+  applyGeneratedQuizzesManifest,
+  ensureOpusculeManifestFiles,
   listOpusculeManifests,
 }

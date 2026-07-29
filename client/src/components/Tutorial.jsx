@@ -22,7 +22,7 @@ const SECTIONS = [
       {
         icon: 'folder',
         title: 'Dossier _Opuscule',
-        text: "Le dossier racine _Opuscule reste toujours visible dans l’arbre de la barre latérale gauche. Ses manifests système, dont GeneratedQuizzes.json, sont générés depuis les données actives et consultables en lecture seule.",
+        text: "Le dossier racine _Opuscule reste toujours visible dans l’arbre de la barre latérale gauche. Ses manifests système, dont GeneratedQuizzes.json, sont initialisés depuis les données actives puis restent modifiables comme les autres fichiers. Enregistrer GeneratedQuizzes.json actualise immédiatement les liaisons note–quiz.",
       },
       {
         icon: 'close',
