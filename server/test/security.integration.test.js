@@ -174,20 +174,6 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   assert.ok(restoredNote.encrypted_content)
   assert.equal(restoredNote.encrypted_content.includes(secret), false)
 
-  const opusculeFolder = db.prepare(
-    "SELECT * FROM files WHERE user_id = ? AND parent_id IS NULL AND name = '_Opuscule' AND type = 'folder'"
-  ).get(restoreUser.id)
-  assert.ok(opusculeFolder, 'le dossier _Opuscule importé doit apparaître dans l’arbre')
-  const encryptedManifest = db.prepare(
-    "SELECT * FROM files WHERE user_id = ? AND parent_id = ? AND name = 'EncryptedFolders.json'"
-  ).get(restoreUser.id, opusculeFolder.id)
-  assert.ok(encryptedManifest)
-  assert.match(encryptedManifest.content, /Privé/)
-
-  response = await request('GET', '/api/files')
-  assert.equal(response.status, 200)
-  assert.ok((await response.json()).some(node => node.id === opusculeFolder.id))
-
   response = await request('POST', '/api/social-journal/articles', {
     title: 'Article avec image distante',
     content: '![Illustration](https://images.example.com/article.webp)',

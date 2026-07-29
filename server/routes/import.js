@@ -185,49 +185,8 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
-      const revealOpusculeEntry = (relativePath, rawContent) => {
-        if (!/^_Opuscule\/[^/]+/i.test(relativePath)) return
-
-        const parts = relativePath.split('/')
-        const fileName = parts.pop()
-        let parentId = null
-        let pathAccum = ''
-        for (const dirName of parts) {
-          pathAccum = pathAccum ? `${pathAccum}/${dirName}` : dirName
-          let folderId = pathToId[pathAccum]
-          if (!folderId) {
-            const existingFolder = db.prepare(
-              "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ? AND deleted_at IS NULL"
-            ).get(dirName, parentId, req.user.id)
-            folderId = existingFolder?.id || uuidv4()
-            if (!existingFolder) insertFolder.run(folderId, parentId, dirName, req.user.id)
-            pathToId[pathAccum] = folderId
-          }
-          parentId = folderId
-        }
-
-        const existingFile = db.prepare(
-          "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'file' AND user_id = ? AND deleted_at IS NULL"
-        ).get(fileName, parentId, req.user.id)
-        if (existingFile) {
-          pathToId[relativePath] = existingFile.id
-          if (conflict === 'overwrite') {
-            db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(existingFile.id)
-            updateFile.run(rawContent, req.user.id, existingFile.id)
-            updateTags(db, existingFile.id, rawContent)
-          }
-          return
-        }
-
-        const fileId = uuidv4()
-        insertFile.run(fileId, parentId, fileName, rawContent, req.user.id, req.user.id)
-        pathToId[relativePath] = fileId
-        updateTags(db, fileId, rawContent)
-      }
-
       for (const { relativePath, rawContent } of decompressed) {
         try {
-          revealOpusculeEntry(relativePath, rawContent)
           const jsonSpecial = safeJson(rawContent)
           const parsedSpecial = /\.md$/i.test(relativePath) ? safeMatter(rawContent) : { data: {}, content: rawContent }
           if (jsonSpecial?.philoweek_type === 'file_history') {

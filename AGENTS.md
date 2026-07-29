@@ -377,9 +377,6 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - L’import Obsidian conserve toujours les noms et chemins des fichiers. Lorsqu’un
   fichier existe déjà au même emplacement, son contenu est remplacé; ne jamais
   créer de suffixe automatique tel que `-import-...`.
-- Le dossier `_Opuscule` d’un ZIP importé et ses manifests `.json`/`.md` restent
-  visibles dans l’arbre de fichiers web, tout en continuant à restaurer les tables
-  et relations correspondantes.
 - Dans la sidebar web, `Sélectionner` active une sélection explicite de plusieurs
   fichiers ou dossiers appartenant à l’utilisateur. `Tout` sélectionne les
   éléments disponibles et `Corbeille` demande une confirmation puis déplace le
