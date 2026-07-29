@@ -206,9 +206,6 @@ router.post('/', (req, res) => {
   if (!['file', 'folder'].includes(type)) return res.status(400).json({ error: 'Type de fichier invalide' })
   const safeName = validateFileName(name)
   if (!safeName) return res.status(400).json({ error: 'Nom invalide (180 caractères maximum, sans séparateur de chemin)' })
-  if (!parent_id && type === 'folder' && safeName.toLocaleLowerCase() === '_opuscule') {
-    return res.status(409).json({ error: 'Le dossier _Opuscule est réservé aux métadonnées de sauvegarde' })
-  }
   if (content !== undefined && typeof content !== 'string') return res.status(400).json({ error: 'Le contenu doit être du texte' })
   const parentId = parent_id || null
   const parentCheck = validateWritableParent(db, parentId, req.user.id, req.user.session_id)
@@ -937,16 +934,6 @@ function buildAccessibleTree(db, userId, sessionId) {
   const lockedEncryptedRoots = new Set(rawOwnedRows
     .filter(row => row.is_encrypted && !isFolderOpen(sessionId, row.id))
     .map(row => row.id))
-  const systemIds = new Set(rawOwnedRows
-    .filter(row => !row.parent_id && row.type === 'folder' && String(row.name).toLocaleLowerCase() === '_opuscule')
-    .map(row => row.id))
-  let systemCount = -1
-  while (systemIds.size !== systemCount) {
-    systemCount = systemIds.size
-    for (const row of rawOwnedRows) {
-      if (row.parent_id && systemIds.has(row.parent_id)) systemIds.add(row.id)
-    }
-  }
   const ownedRows = rawOwnedRows
     .filter(row => !row.encrypted_folder_id || row.id === row.encrypted_folder_id || !lockedEncryptedRoots.has(row.encrypted_folder_id))
     .map(row => ({
@@ -954,9 +941,8 @@ function buildAccessibleTree(db, userId, sessionId) {
     is_encrypted: Boolean(row.is_encrypted),
     is_locked: Boolean(row.is_encrypted && lockedEncryptedRoots.has(row.id)),
     is_owner: true,
-    can_edit: !systemIds.has(row.id),
-    can_share: !systemIds.has(row.id),
-    is_system: systemIds.has(row.id),
+    can_edit: true,
+    can_share: true,
     shared: false,
   }))
   const roots = assembleTree(ownedRows)

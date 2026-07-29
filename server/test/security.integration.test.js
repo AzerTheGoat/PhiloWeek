@@ -174,27 +174,6 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   assert.ok(restoredNote.encrypted_content)
   assert.equal(restoredNote.encrypted_content.includes(secret), false)
 
-  const opusculeFolder = db.prepare(
-    "SELECT * FROM files WHERE user_id = ? AND parent_id IS NULL AND name = '_Opuscule' AND type = 'folder'"
-  ).get(restoreUser.id)
-  assert.ok(opusculeFolder, 'le dossier technique importé doit rester visible dans l’arbre')
-  const encryptedManifest = db.prepare(
-    "SELECT * FROM files WHERE user_id = ? AND parent_id = ? AND name = 'EncryptedFolders.json'"
-  ).get(restoreUser.id, opusculeFolder.id)
-  assert.ok(encryptedManifest)
-  assert.match(encryptedManifest.content, /Privé/)
-
-  response = await request('GET', `/api/files/${encryptedManifest.id}`)
-  assert.equal(response.status, 200)
-  const visibleManifest = await response.json()
-  assert.equal(visibleManifest.access.can_edit, false)
-  assert.equal(visibleManifest.access.is_system, true)
-  response = await request('PUT', `/api/files/${encryptedManifest.id}`, {
-    content: '{}',
-    base_version: visibleManifest.content_version,
-  })
-  assert.equal(response.status, 403, 'les copies visibles de _Opuscule doivent rester en lecture seule')
-
   response = await request('POST', '/api/social-journal/articles', {
     title: 'Article avec image distante',
     content: '![Illustration](https://images.example.com/article.webp)',

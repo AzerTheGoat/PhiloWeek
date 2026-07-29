@@ -372,7 +372,7 @@ const SECTIONS = [
       {
         icon: 'upload',
         title: 'Import (.zip)',
-        text: "Réintègre un export précédent (ou un vault Obsidian) : fichiers, dossiers et liens [[wiki]] sont reconstruits. Le manifeste restaure les dossiers chiffrés et redemande le mot de passe du coffre avant de les rechiffrer en base. Le dossier technique _Opuscule apparaît aussi dans l’arbre en lecture seule pour consulter les métadonnées restaurées.",
+        text: "Réintègre un export précédent (ou un vault Obsidian) : fichiers, dossiers et liens [[wiki]] sont reconstruits. Le manifeste restaure les dossiers chiffrés et redemande le mot de passe du coffre avant de les rechiffrer en base.",
       },
     ],
   },
