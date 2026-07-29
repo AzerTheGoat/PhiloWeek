@@ -185,8 +185,60 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
+      const upsertVisibleFile = (relativePath, rawContent) => {
+        const parts = relativePath.split('/')
+        const fileName = parts[parts.length - 1]
+        const dirParts = parts.slice(0, -1)
+
+        let parentId = null
+        let pathAccum = ''
+        for (const dirName of dirParts) {
+          pathAccum = pathAccum ? pathAccum + '/' + dirName : dirName
+          if (!pathToId[pathAccum]) {
+            const existing = db.prepare(
+              "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ? AND deleted_at IS NULL"
+            ).get(dirName, parentId, req.user.id)
+            if (existing) {
+              pathToId[pathAccum] = existing.id
+            } else {
+              const id = uuidv4()
+              insertFolder.run(id, parentId, dirName, req.user.id)
+              pathToId[pathAccum] = id
+            }
+          }
+          parentId = pathToId[pathAccum]
+        }
+
+        const existing = db.prepare(
+          'SELECT id FROM files WHERE name = ? AND parent_id IS ? AND user_id = ? AND deleted_at IS NULL'
+        ).get(fileName, parentId, req.user.id)
+
+        let fileId
+        if (existing) {
+          fileId = existing.id
+          if (conflict === 'skip') {
+            pathToId[relativePath] = fileId
+            report.skipped++
+            return fileId
+          }
+          db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(existing.id)
+          updateFile.run(rawContent, req.user.id, existing.id)
+        } else {
+          fileId = uuidv4()
+          insertFile.run(fileId, parentId, fileName, rawContent, req.user.id, req.user.id)
+        }
+
+        pathToId[relativePath] = fileId
+        updateTags(db, fileId, rawContent)
+        report.imported++
+        return fileId
+      }
+
       for (const { relativePath, rawContent } of decompressed) {
         try {
+          const isVisibleOpusculeFile = /^_Opuscule\/[^/]+/i.test(relativePath)
+          if (isVisibleOpusculeFile) upsertVisibleFile(relativePath, rawContent)
+
           const jsonSpecial = safeJson(rawContent)
           const parsedSpecial = /\.md$/i.test(relativePath) ? safeMatter(rawContent) : { data: {}, content: rawContent }
           if (jsonSpecial?.philoweek_type === 'file_history') {
@@ -489,49 +541,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
             continue
           }
 
-          const parts = relativePath.split('/')
-          const fileName = parts[parts.length - 1]
-          const dirParts = parts.slice(0, -1)
-
-          let parentId = null
-          let pathAccum = ''
-          for (const dirName of dirParts) {
-            pathAccum = pathAccum ? pathAccum + '/' + dirName : dirName
-            if (!pathToId[pathAccum]) {
-              const existing = db.prepare(
-                "SELECT id FROM files WHERE name = ? AND parent_id IS ? AND type = 'folder' AND user_id = ? AND deleted_at IS NULL"
-              ).get(dirName, parentId, req.user.id)
-              if (existing) {
-                pathToId[pathAccum] = existing.id
-              } else {
-                const id = uuidv4()
-                insertFolder.run(id, parentId, dirName, req.user.id)
-                pathToId[pathAccum] = id
-              }
-            }
-            parentId = pathToId[pathAccum]
-          }
-
-          const existing = db.prepare(
-            'SELECT id FROM files WHERE name = ? AND parent_id IS ? AND user_id = ? AND deleted_at IS NULL'
-          ).get(fileName, parentId, req.user.id)
-
-          let fileId
-          if (existing) {
-            if (conflict === 'skip') { report.skipped++; continue }
-            if (conflict === 'overwrite') {
-              db.prepare('DELETE FROM file_revisions WHERE file_id = ?').run(existing.id)
-              updateFile.run(rawContent, req.user.id, existing.id)
-              fileId = existing.id
-            }
-          } else {
-            fileId = uuidv4()
-            insertFile.run(fileId, parentId, fileName, rawContent, req.user.id, req.user.id)
-          }
-
-          pathToId[relativePath] = fileId
-          updateTags(db, fileId, rawContent)
-          report.imported++
+          if (!isVisibleOpusculeFile) upsertVisibleFile(relativePath, rawContent)
         } catch (err) {
           report.errors.push(`${relativePath}: ${err.message}`)
         }

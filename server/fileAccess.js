@@ -19,12 +19,25 @@ function getFileAccess(db, fileId, userId, { includeDeleted = false } = {}) {
   `).get(fileId, fileId)
   if (lockedAncestor) return null
 
+  const isSystem = Boolean(db.prepare(`
+    WITH RECURSIVE ancestors(id, parent_id, name, user_id) AS (
+      SELECT id, parent_id, name, user_id FROM files WHERE id = ?
+      UNION ALL
+      SELECT parent.id, parent.parent_id, parent.name, parent.user_id
+      FROM files parent JOIN ancestors child ON parent.id = child.parent_id
+    )
+    SELECT 1 FROM ancestors
+    WHERE parent_id IS NULL AND lower(name) = lower('_Opuscule') AND user_id = ?
+    LIMIT 1
+  `).get(fileId, file.user_id))
+
   if (file.user_id === userId) {
     return {
       file,
       permission: 'owner',
       isOwner: true,
-      canEdit: true,
+      canEdit: !isSystem,
+      isSystem,
       sharedRootId: null,
     }
   }
@@ -50,7 +63,8 @@ function getFileAccess(db, fileId, userId, { includeDeleted = false } = {}) {
     file,
     permission: share.permission,
     isOwner: false,
-    canEdit: share.permission === 'edit',
+    canEdit: share.permission === 'edit' && !isSystem,
+    isSystem,
     sharedRootId: share.file_id,
     shareId: share.id,
   }
@@ -65,6 +79,7 @@ function decorateFileAccess(access) {
       permission: access.permission,
       is_owner: access.isOwner,
       can_edit: access.canEdit,
+      is_system: Boolean(access.isSystem),
       owner_username: access.file.owner_username || null,
       shared_root_id: access.sharedRootId,
     },
@@ -117,6 +132,7 @@ function getSharedTreeRoots(db, userId) {
 function requireFileAccess(db, fileId, userId, mode = 'read') {
   const access = getFileAccess(db, fileId, userId)
   if (!access) return { status: 404, error: 'Fichier introuvable' }
+  if (mode !== 'read' && access.isSystem) return { status: 403, error: 'Le dossier _Opuscule est consultable en lecture seule' }
   if (mode === 'edit' && !access.canEdit) return { status: 403, error: 'Acces en lecture seule' }
   if (mode === 'owner' && !access.isOwner) return { status: 403, error: 'Action reservee au proprietaire' }
   return { access }

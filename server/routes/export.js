@@ -49,6 +49,10 @@ router.all('/obsidian', async (req, res) => {
 
   for (const file of allFiles) {
     if (file.type !== 'file') continue
+    const originalPath = pathMap[file.id] || file.name
+    // `_Opuscule` est une copie consultable des métadonnées du dernier import.
+    // Les manifests sont régénérés plus bas depuis les données actives.
+    if (/^_Opuscule(?:\/|$)/i.test(originalPath)) continue
 
     let curr = file
     let locked = false
@@ -61,7 +65,6 @@ router.all('/obsidian', async (req, res) => {
     if (locked) continue
 
     const rawContent = file.content || ''
-    const originalPath = pathMap[file.id] || file.name
 
     if (/\.md$/i.test(file.name)) {
       let parsed
@@ -106,7 +109,11 @@ router.all('/obsidian', async (req, res) => {
     }, null, 2))
   }
 
-  const spreadsheetFiles = allFiles.filter(file => file.type === 'file' && /\.xlsx$/i.test(file.name || ''))
+  const spreadsheetFiles = allFiles.filter(file =>
+    file.type === 'file' &&
+    /\.xlsx$/i.test(file.name || '') &&
+    !/^_Opuscule(?:\/|$)/i.test(pathMap[file.id] || file.name)
+  )
   if (spreadsheetFiles.length > 0) {
     zip.file('_Opuscule/SpreadsheetMetadata.json', JSON.stringify({
       philoweek_type: 'spreadsheet_metadata',
@@ -280,6 +287,7 @@ router.all('/obsidian', async (req, res) => {
       philoweek_type: 'file_history',
       exported: new Date().toISOString(),
       files: allFiles
+        .filter(file => !/^_Opuscule(?:\/|$)/i.test(pathMap[file.id] || file.name))
         .filter(file => file.type === 'file')
         .map(file => ({
           path: pathMap[file.id] || file.name,
