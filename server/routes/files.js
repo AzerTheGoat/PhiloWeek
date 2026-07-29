@@ -33,6 +33,7 @@ const scryptAsync = promisify(crypto.scrypt)
 router.get('/', (req, res) => {
   const db = getDb()
   purgeExpiredTrash(db, req.user.id)
+  ensureOpusculeRoot(db, req.user.id)
   res.json(buildAccessibleTree(db, req.user.id, req.user.session_id))
 })
 
@@ -903,6 +904,23 @@ function validateFileName(value) {
   const name = String(value || '').trim()
   if (!name || name.length > 180 || name === '.' || name === '..' || /[\\/\0]/.test(name)) return null
   return name
+}
+
+function ensureOpusculeRoot(db, userId) {
+  const existing = db.prepare(`
+    SELECT id FROM files
+    WHERE parent_id IS NULL AND lower(name) = lower('_Opuscule')
+      AND type = 'folder' AND user_id = ? AND deleted_at IS NULL
+    LIMIT 1
+  `).get(userId)
+  if (existing) return existing.id
+
+  const id = uuidv4()
+  db.prepare(`
+    INSERT INTO files (id, parent_id, name, type, sort_order, user_id, created_at, updated_at)
+    VALUES (?, NULL, '_Opuscule', 'folder', 0, ?, datetime('now'), datetime('now'))
+  `).run(id, userId)
+  return id
 }
 
 function estimateStoredContentBytes(content, encrypted) {

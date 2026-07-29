@@ -20,6 +20,11 @@ const SECTIONS = [
         text: "Clic droit sur un dossier/fichier : nouvelle note, graphe d’idées, réseau d’acteurs, questionnaire, définitions ou tableur Excel ici, puis partager, renommer, chiffrer ou supprimer. Clic droit sur une zone vide : créer à la racine, importer ou exporter.",
       },
       {
+        icon: 'folder',
+        title: 'Dossier _Opuscule',
+        text: "Le dossier racine _Opuscule reste toujours visible dans l’arbre de la barre latérale gauche pour accueillir et consulter les fichiers techniques du vault.",
+      },
+      {
         icon: 'close',
         title: 'Chiffrement et verrouillage',
         text: "« Chiffrer » protège récursivement le dossier, ses fichiers et leur historique dans SQLite. Le petit bouclier reste visible même quand le dossier est ouvert. « Verrouiller maintenant » ferme seulement l'accès dans ta session : les données, elles, ne cessent jamais d'être chiffrées. Sans le mot de passe du coffre, elles sont irrécupérables.",

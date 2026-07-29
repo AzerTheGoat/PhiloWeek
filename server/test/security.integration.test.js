@@ -67,6 +67,13 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   assert.equal(response.status, 201, await response.clone().text())
   const folder = await response.json()
 
+  response = await request('GET', '/api/files')
+  assert.equal(response.status, 200)
+  const initialTree = await response.json()
+  assert.ok(initialTree.some(node =>
+    node.parent_id === null && node.type === 'folder' && node.name === '_Opuscule'
+  ), '_Opuscule doit toujours apparaître à la racine de la sidebar')
+
   const secret = 'CONTENU-TRES-SECRET-UNIQUE'
   response = await request('POST', '/api/files', {
     parent_id: folder.id,

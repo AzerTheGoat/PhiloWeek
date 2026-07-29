@@ -108,6 +108,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Navigation et panneau Fonctionnalites
 
 - La sidebar garde l'arbre de fichiers comme surface principale.
+- Le dossier racine `_Opuscule` est créé automatiquement lors du chargement de
+  l’arbre et reste toujours visible dans la sidebar web, indépendamment des imports.
 - Les actions permanentes de gauche sont regroupees dans le panneau `Fonctions`, ouvert depuis le bouton du header de la sidebar.
 - Le panneau `Fonctions` reste ouvert quand une action est lancee, pour permettre d'enchainer plusieurs vues ou outils sans le rouvrir.
 - Le panneau `Fonctions` regroupe `Creer`, `Vues` et `Outils` avec des libelles explicites : Note, Graphe d'idees, Reseau d'acteurs, Questionnaire, Definitions, Tableur Excel, Journal, Boite a idees, Citations, Taches, Agenda, Vie perso, Focus, Base de liens, Frise historique, Securite, Aide, revision, copie, import/export, theme et compte.
