@@ -22,6 +22,7 @@ const {
   requireFolderKey,
 } = require('../vaultCrypto')
 const { assertUserStorageQuota, securityLog, unlockLimiter } = require('../securityControls')
+const { findOpusculeManifest, listOpusculeManifestHeaders } = require('../opusculeManifests')
 
 // Ancien sel statique — conservé UNIQUEMENT pour déchiffrer les dossiers
 // verrouillés avant la migration vers le format GCM (sel aléatoire).
@@ -33,8 +34,29 @@ const scryptAsync = promisify(crypto.scrypt)
 router.get('/', (req, res) => {
   const db = getDb()
   purgeExpiredTrash(db, req.user.id)
-  ensureOpusculeRoot(db, req.user.id)
-  res.json(buildAccessibleTree(db, req.user.id, req.user.session_id))
+  const opusculeRootId = ensureOpusculeRoot(db, req.user.id)
+  const tree = buildAccessibleTree(db, req.user.id, req.user.session_id)
+  const opusculeRoot = tree.find(node => node.id === opusculeRootId)
+  if (opusculeRoot) {
+    const virtualChildren = listOpusculeManifestHeaders().map(manifest => ({
+      id: manifest.id,
+      parent_id: opusculeRootId,
+      name: manifest.name,
+      type: 'file',
+      sort_order: 0,
+      is_owner: true,
+      can_edit: false,
+      can_share: false,
+      is_system: true,
+      children: [],
+    }))
+    const virtualNames = new Set(virtualChildren.map(child => child.name.toLocaleLowerCase()))
+    opusculeRoot.children = [
+      ...(opusculeRoot.children || []).filter(child => !virtualNames.has(String(child.name).toLocaleLowerCase())),
+      ...virtualChildren,
+    ]
+  }
+  res.json(tree)
 })
 
 // GET /api/files/search?q=
@@ -154,6 +176,29 @@ router.delete('/trash', (req, res) => {
 // GET /api/files/:id
 router.get('/:id', (req, res) => {
   const db = getDb()
+  const systemManifest = findOpusculeManifest(db, req.user.id, req.params.id)
+  if (systemManifest) {
+    const parentId = ensureOpusculeRoot(db, req.user.id)
+    return res.json({
+      ...systemManifest,
+      parent_id: parentId,
+      content_version: 0,
+      history_revision: 0,
+      access: {
+        permission: 'owner',
+        is_owner: true,
+        can_edit: false,
+        is_system: true,
+        owner_username: req.user.username || null,
+        shared_root_id: null,
+      },
+      tags: [],
+      links: [],
+      backlinks: [],
+      can_undo: false,
+      can_redo: false,
+    })
+  }
   const access = getFileAccess(db, req.params.id, req.user.id)
   if (!access) return res.status(404).json({ error: 'Not found' })
   let file = access.file

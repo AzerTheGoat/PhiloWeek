@@ -70,9 +70,17 @@ test('un dossier reste chiffré en base lorsqu’il est ouvert', { timeout: 60_0
   response = await request('GET', '/api/files')
   assert.equal(response.status, 200)
   const initialTree = await response.json()
-  assert.ok(initialTree.some(node =>
+  const opusculeRoot = initialTree.find(node =>
     node.parent_id === null && node.type === 'folder' && node.name === '_Opuscule'
-  ), '_Opuscule doit toujours apparaître à la racine de la sidebar')
+  )
+  assert.ok(opusculeRoot, '_Opuscule doit toujours apparaître à la racine de la sidebar')
+  const generatedQuizManifest = opusculeRoot.children.find(node => node.name === 'GeneratedQuizzes.json')
+  assert.ok(generatedQuizManifest, '_Opuscule doit afficher ses manifests système')
+  response = await request('GET', `/api/files/${encodeURIComponent(generatedQuizManifest.id)}`)
+  assert.equal(response.status, 200)
+  const generatedQuizContent = await response.json()
+  assert.equal(generatedQuizContent.access.can_edit, false)
+  assert.equal(JSON.parse(generatedQuizContent.content).philoweek_type, 'generated_quizzes')
 
   const secret = 'CONTENU-TRES-SECRET-UNIQUE'
   response = await request('POST', '/api/files', {
