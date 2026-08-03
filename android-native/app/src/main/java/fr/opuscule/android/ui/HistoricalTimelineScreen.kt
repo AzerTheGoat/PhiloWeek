@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -182,7 +183,7 @@ private val historicalComparator = compareBy<HistoricalEvent> { it.startYear ?: 
 
 @Composable
 private fun TimelineHeader(back: () -> Unit, add: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(Surface)) {
+    Column(Modifier.fillMaxWidth().background(Surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Retour") }
             Column(Modifier.weight(1f)) {
@@ -225,7 +226,7 @@ private fun TimelineEventRow(event: HistoricalEvent, open: () -> Unit) {
 @Composable
 private fun HistoricalEventDetail(event: HistoricalEvent, back: () -> Unit, edit: () -> Unit, delete: () -> Unit) {
     Column(Modifier.fillMaxSize().background(Canvas)) {
-        Row(Modifier.fillMaxWidth().height(60.dp).background(Surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(Surface).statusBarsPadding().height(60.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Retour") }
             Text("Repère historique", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             if (event.canEdit) {
@@ -259,7 +260,7 @@ private fun HistoricalEventEditor(
     val validDate = Regex("^-?\\d{1,6}(-\\d{1,2})?(-\\d{1,2})?$")
     val valid = title.isNotBlank() && validDate.matches(start.trim()) && (end.isBlank() || validDate.matches(end.trim()))
     Column(Modifier.fillMaxSize().background(Canvas)) {
-        Row(Modifier.fillMaxWidth().height(60.dp).background(Surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(Surface).statusBarsPadding().height(60.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(close) { Icon(Icons.Rounded.Close, "Fermer") }
             Text(if (event == null) "Nouveau repère" else "Modifier le repère", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             TextButton(onClick = { save(title.trim(), start.trim(), end.trim(), description.trim(), category.trim()) }, enabled = valid) { Text("Enregistrer") }

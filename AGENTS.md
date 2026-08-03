@@ -327,6 +327,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   d’Aujourd’hui. Elle permet de rechercher et filtrer les repères, consulter leur
   détail et créer, modifier ou supprimer ses propres repères. Les cartes Dates
   historiques d’Aujourd’hui conservent aussi leur suppression confirmée.
+- Tous les headers de la frise Android, y compris le détail et l’éditeur de
+  repère, appliquent les insets de la barre d’état en mode edge-to-edge.
 - En thème sombre Android, le fond est noir franc et l’accent principal est doré;
   les surfaces ne doivent pas dériver vers le bleu Android.
 - Le changement vertical de catégorie dans Aujourd’hui exige un geste volontaire
