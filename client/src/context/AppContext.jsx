@@ -260,12 +260,14 @@ export function AppProvider({ children }) {
         initial_editor_mode: editorMode,
         initial_focus_part: focusPart,
       } })
+      return file
     } catch (err) {
       if (requestId === openRequestRef.current) {
         dispatch({ type: 'CLEAR_OPEN_FILE' })
         await loadTree()
       }
       toast(err.message, 'error')
+      return null
     }
   }, [loadTree, toast])
 

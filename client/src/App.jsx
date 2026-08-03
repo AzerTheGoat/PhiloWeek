@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppProvider } from './context/AppContext'
 import { useApp } from './context/useApp'
 import * as api from './api'
 import { pickNextQuote } from './utils/quoteBag'
+import { appPathForState, parseAppPath } from './utils/appRoute'
 import AuthScreen from './components/AuthScreen'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
@@ -71,10 +72,11 @@ function getPublicArticleId() {
 }
 
 function AppShell() {
-  const { theme, sidebarOpen, view, currentFile, currentUser, loadTree, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, articleReadingFocus } = useApp()
+  const { theme, sidebarOpen, view, currentFile, currentUser, loadTree, openFile, dispatch, contextMenu, hideContextMenu, showFilePicker, showQuizLauncher, articleReadingFocus } = useApp()
 
   useFocusRecovery()
   useAppUsageTracker(currentUser?.id)
+  useAppUrlNavigation({ view, currentFile, openFile, dispatch })
 
   useEffect(() => {
     loadTree()
@@ -266,6 +268,65 @@ function FileTabs() {
       </button>
     </div>
   )
+}
+
+function useAppUrlNavigation({ view, currentFile, openFile, dispatch }) {
+  const [hydrated, setHydrated] = useState(false)
+  const applyingPathRef = useRef(null)
+  const initialRouteAppliedRef = useRef(false)
+  const routeRequestRef = useRef(0)
+
+  const applyRoute = useCallback(async (route) => {
+    const requestId = ++routeRequestRef.current
+    applyingPathRef.current = route.path
+
+    if (route.kind === 'file') {
+      const openedFile = await openFile(route.fileId)
+      if (requestId !== routeRequestRef.current) return
+      if (openedFile === null) {
+        applyingPathRef.current = '/app'
+        window.history.replaceState(null, '', '/app')
+        dispatch({ type: 'CLEAR_OPEN_FILE' })
+        dispatch({ type: 'SET_VIEW', payload: 'editor' })
+      }
+    } else if (route.kind === 'view') {
+      dispatch({ type: 'SET_VIEW', payload: route.view })
+    } else {
+      dispatch({ type: 'CLEAR_OPEN_FILE' })
+      dispatch({ type: 'SET_VIEW', payload: 'editor' })
+    }
+
+    setHydrated(true)
+  }, [dispatch, openFile])
+
+  useEffect(() => {
+    if (!initialRouteAppliedRef.current) {
+      initialRouteAppliedRef.current = true
+      applyRoute(parseAppPath(window.location.pathname))
+    }
+
+    const handlePopState = () => applyRoute(parseAppPath(window.location.pathname))
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [applyRoute])
+
+  useEffect(() => {
+    if (!hydrated) return
+
+    const targetPath = appPathForState(view, currentFile?.id)
+    if (applyingPathRef.current) {
+      if (targetPath !== applyingPathRef.current) return
+      if (window.location.pathname !== targetPath) {
+        window.history.replaceState(null, '', targetPath)
+      }
+      applyingPathRef.current = null
+      return
+    }
+
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath)
+    }
+  }, [currentFile?.id, hydrated, view])
 }
 
 const VIEW_TABS = {

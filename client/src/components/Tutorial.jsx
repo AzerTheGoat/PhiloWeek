@@ -50,6 +50,11 @@ const SECTIONS = [
         text: "Les pages ouvertes depuis Fonctions ont aussi leur onglet. L'onglet réellement affiché est le seul marqué actif; ferme une page ou reviens à un fichier depuis la même barre.",
       },
       {
+        icon: 'file',
+        title: 'Recharger sans perdre sa place',
+        text: "Le fichier ou la page Fonction affichée est inscrit dans l'adresse. Tu peux recharger, mettre l'adresse en favori ou utiliser Précédent/Suivant : Opuscule restaure automatiquement le bon contenu.",
+      },
+      {
         icon: 'graph',
         title: 'Liens [[wiki]] et #tags',
         text: "Tape [[ dans une note pour lier une autre note (autocomplete). Utilise [[Fichier#Section|Libellé]] pour pointer précisément une section tout en choisissant le texte affiché. Dans l’aperçu, survole le lien pour lire la définition ou l’extrait lié sans quitter la note. Les #tags hors des liens restent indexés automatiquement.",

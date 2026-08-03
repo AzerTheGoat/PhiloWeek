@@ -108,6 +108,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Navigation et panneau Fonctionnalites
 
 - La sidebar garde l'arbre de fichiers comme surface principale.
+- La navigation web authentifiee inscrit l'ecran courant dans l'URL :
+  `/app/files/:id` pour un fichier et `/app/views/:slug` pour une vue speciale.
+  Un rechargement ainsi que les boutons precedent/suivant doivent restaurer le
+  fichier ou la vue, tandis qu'une cible absente revient proprement sur `/app`.
 - Le dossier racine `_Opuscule` est créé automatiquement lors du chargement de
   l’arbre et reste toujours visible dans la sidebar web, indépendamment des imports.
 - Ses manifests (`GeneratedQuizzes.json`, `Todos.json`, `Dashboard.json`, etc.)
