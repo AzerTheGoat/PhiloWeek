@@ -5,7 +5,7 @@ const matter = require('gray-matter')
 const fs = require('fs')
 const path = require('path')
 const { getDb } = require('../db')
-const { ROADTRIP_PHOTOS_DIR } = require('../paths')
+const { ROADTRIP_PHOTOS_DIR, RECORDINGS_DIR } = require('../paths')
 const { spreadsheetToXlsxBuffer } = require('../spreadsheetXlsx')
 const { loadFolderKeysForOperation, materializeFile, materializeRevision } = require('../vaultCrypto')
 const { securityLog } = require('../securityControls')
@@ -367,6 +367,25 @@ router.all('/obsidian', async (req, res) => {
       trips: roadTrips,
       photos: roadTripPhotos,
       notes: roadTripNotes,
+    }, null, 2))
+  }
+
+  const elocutionCourses = db.prepare('SELECT * FROM elocution_courses WHERE user_id = ? ORDER BY imported_at').all(req.user.id)
+  if (elocutionCourses.length > 0) {
+    const elocutionChapters = db.prepare('SELECT * FROM elocution_chapters WHERE user_id = ? ORDER BY course_id, number').all(req.user.id)
+    const elocutionExercises = db.prepare('SELECT * FROM elocution_exercises WHERE user_id = ? ORDER BY chapter_id, sort_order').all(req.user.id)
+    const elocutionAudios = db.prepare('SELECT * FROM elocution_audios WHERE user_id = ? ORDER BY recorded_at').all(req.user.id)
+    const elocutionEvaluations = db.prepare('SELECT * FROM elocution_ai_evaluations WHERE user_id = ? ORDER BY evaluated_at').all(req.user.id)
+    for (const audio of elocutionAudios) {
+      const safeName = path.basename(String(audio.filename || ''))
+      if (!safeName || safeName !== audio.filename) continue
+      const audioPath = path.join(RECORDINGS_DIR, safeName)
+      if (fs.existsSync(audioPath)) zip.file(`_Opuscule/elocution-audio/${safeName}`, fs.readFileSync(audioPath))
+    }
+    zip.file('_Opuscule/Elocution.json', JSON.stringify({
+      philoweek_type: 'elocution', version: 1, exported: new Date().toISOString(),
+      courses: elocutionCourses, chapters: elocutionChapters, exercises: elocutionExercises,
+      audios: elocutionAudios, evaluations: elocutionEvaluations,
     }, null, 2))
   }
 

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.HistoryEdu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Quiz
@@ -137,6 +139,7 @@ fun TodayScreen(
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
     openSource: (String) -> Unit,
+    openTimeline: () -> Unit,
 ) {
     val token = state.token ?: return
     var sections by remember { mutableStateOf<List<KnowledgeSection>>(emptyList()) }
@@ -192,7 +195,7 @@ fun TodayScreen(
     LaunchedEffect(token) { loadFeed() }
 
     Column(Modifier.fillMaxSize().background(Canvas)) {
-        TodayHeader(state, completed, openSettings)
+        TodayHeader(state, completed, openTimeline, openSettings)
         when {
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -212,7 +215,7 @@ fun TodayScreen(
             )
             else -> {
                 val pagerState = rememberPagerState(pageCount = { sections.size })
-                val categoryFlingThreshold = with(LocalDensity.current) { 550.dp.toPx() }
+                val categoryFlingThreshold = with(LocalDensity.current) { 1_350.dp.toPx() }
                 val categoryFlingConnection = remember(pagerState, sections.size, categoryFlingThreshold) {
                     object : NestedScrollConnection {
                         override suspend fun onPreFling(available: Velocity): Velocity {
@@ -242,11 +245,20 @@ fun TodayScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = Opuscule,
                     )
+                    if (currentSection.id == "history") {
+                        IconButton(onClick = openTimeline, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Rounded.HistoryEdu, "Ouvrir la frise", tint = Opuscule)
+                        }
+                    }
                 }
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize().nestedScroll(categoryFlingConnection),
                     beyondViewportPageCount = 1,
+                    flingBehavior = PagerDefaults.flingBehavior(
+                        state = pagerState,
+                        snapPositionalThreshold = 0.72f,
+                    ),
                 ) { page ->
                     val section = sections[page]
                     val cursor = sectionCursors[section.id] ?: 0
@@ -395,7 +407,7 @@ fun TodayScreen(
 }
 
 @Composable
-private fun TodayHeader(state: AppState, completed: Int, openSettings: () -> Unit) {
+private fun TodayHeader(state: AppState, completed: Int, openTimeline: () -> Unit, openSettings: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Surface)) {
         Row(
             Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 18.dp),
@@ -410,6 +422,13 @@ private fun TodayHeader(state: AppState, completed: Int, openSettings: () -> Uni
                     color = Muted,
                 )
             }
+            IconButton(
+                onClick = openTimeline,
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfacePressed),
+            ) {
+                Icon(Icons.Rounded.HistoryEdu, "Frise historique", tint = Opuscule)
+            }
+            Spacer(Modifier.width(8.dp))
             IconButton(
                 onClick = openSettings,
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfacePressed),

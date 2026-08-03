@@ -12,8 +12,8 @@ android {
         applicationId = "fr.opuscule.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.4.6"
+        versionCode = 15
+        versionName = "1.5.0"
         buildConfigField("String", "API_BASE_URL", "\"https://philoweek-production.up.railway.app/api\"")
     }
 

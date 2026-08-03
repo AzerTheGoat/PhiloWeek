@@ -36,7 +36,10 @@ function assertUserStorageQuota(db, userId, additionalBytes = 0) {
       COALESCE((SELECT SUM(LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(notes, ''))) FROM todos WHERE user_id = ?), 0)
       AS bytes
   `).get(userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId)
-  const recordings = db.prepare('SELECT filename FROM voice_notes WHERE user_id = ?').all(userId)
+  const recordings = [
+    ...db.prepare('SELECT filename FROM voice_notes WHERE user_id = ?').all(userId),
+    ...db.prepare('SELECT filename FROM elocution_audios WHERE user_id = ?').all(userId),
+  ]
   const recordingBytes = recordings.reduce((total, recording) => {
     const safeName = path.basename(String(recording.filename || ''))
     if (!safeName || safeName !== recording.filename) return total
@@ -62,6 +65,7 @@ function storageQuotaGuard(req, res, next) {
     pathName === '/api/import/obsidian' ||
     pathName === '/api/spreadsheets/import' ||
     pathName === '/api/voice' ||
+    /^\/api\/elocution\/exercises\/[^/]+\/audio$/.test(pathName) ||
     /^\/api\/roadtrips\/[^/]+\/photos$/.test(pathName) ||
     /^\/api\/files\/[^/]+\/(?:unlock|encryption\/(?:open|lock))$/.test(pathName) ||
     pathName === '/api/files/vault/password'

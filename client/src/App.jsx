@@ -24,6 +24,7 @@ import Trash from './components/Trash'
 import FilePicker from './components/FilePicker'
 import GlobalQuizLauncher from './components/GlobalQuizLauncher'
 import RequiredChanges from './components/RequiredChanges'
+import ElocutionPage from './components/ElocutionPage'
 import Toast from './components/Toast'
 import ContextMenu from './components/ContextMenu'
 import Modals from './components/Modals'
@@ -138,6 +139,8 @@ function AppShell() {
           <KnowledgeGraph />
         ) : view === 'timeline' ? (
           <HistoricalTimeline />
+        ) : view === 'elocution' ? (
+          <ElocutionPage />
         ) : view === 'roadtrips' ? (
           <RoadTrips />
         ) : view === 'social-journal' ? (
@@ -275,6 +278,7 @@ const VIEW_TABS = {
   'life-grid': { label: 'Vie perso', icon: 'life' },
   'knowledge-graph': { label: 'Base de liens', icon: 'database' },
   timeline: { label: 'Frise historique', icon: 'timeline' },
+  elocution: { label: 'Élocution', icon: 'play' },
   roadtrips: { label: 'Carnet de voyage', icon: 'map' },
   'social-journal': { label: 'Journal public', icon: 'newspaper' },
   tutorial: { label: 'Aide', icon: 'thought' },

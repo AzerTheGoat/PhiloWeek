@@ -1,0 +1,15 @@
+{
+  "score_global": 7.4,
+  "scores_details": {
+    "debit": { "score": 7, "commentaire": "Le débit est plus posé, avec une accélération dans la dernière phrase." },
+    "articulation": { "score": 8, "commentaire": "Les consonnes sont nettes et les fins de mots restent audibles." },
+    "pauses": { "score": 7, "commentaire": "Les pauses suivent globalement les groupes de sens." },
+    "fluidite": { "score": 8, "commentaire": "Peu d’hésitations et aucun tic de langage récurrent." },
+    "structure": { "score": 7, "commentaire": "L’idée principale est claire, mais la conclusion pourrait être plus courte." }
+  },
+  "remarques_generales": "Une prise maîtrisée et intelligible. Le prochain objectif est de conserver le même rythme jusqu’à la fin.",
+  "conseils": [
+    "Marquer une respiration silencieuse avant la dernière phrase.",
+    "Répéter une fois à 55 BPM puis une fois sans métronome."
+  ]
+}

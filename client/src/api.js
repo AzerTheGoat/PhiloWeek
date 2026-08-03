@@ -120,6 +120,22 @@ export const uploadVoice = (file_id, audioBlob, duration, title) => {
 }
 export const deleteVoice = id => req('DELETE', `/voice/${id}`)
 
+// Entraînement à l'élocution — workflow IA entièrement manuel
+export const getElocutionCourses = () => req('GET', '/elocution/courses')
+export const importElocutionCourse = course => req('POST', '/elocution/courses/import', course)
+export const deleteElocutionCourse = id => req('DELETE', `/elocution/courses/${id}`)
+export const uploadElocutionAudio = (exerciseId, audioBlob, duration, source = 'web') => {
+  const fd = new FormData()
+  fd.append('audio', audioBlob, source === 'mobile' ? 'recording.m4a' : 'recording.webm')
+  fd.append('duration', String(duration))
+  fd.append('source', source)
+  return req('POST', `/elocution/exercises/${exerciseId}/audio`, fd, true)
+}
+export const getElocutionPrompt = audioId => req('GET', `/elocution/audios/${audioId}/prompt`)
+export const saveElocutionEvaluation = (audioId, raw_json) => req('PUT', `/elocution/audios/${audioId}/evaluation`, { raw_json })
+export const deleteElocutionAudio = audioId => req('DELETE', `/elocution/audios/${audioId}`)
+export const elocutionAudioUrl = audioId => `${BASE}/elocution/audios/${audioId}/file`
+
 // Reconnaissance manuscrite
 
 // Inbox — Resources

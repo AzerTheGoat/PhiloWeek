@@ -179,4 +179,44 @@ data class UsageSummary(
     val months: List<UsageMonth>,
 )
 
+data class ElocutionEvaluation(
+    val globalScore: Double,
+    val detailScores: Map<String, Pair<Double, String>>,
+    val generalRemarks: String,
+    val advice: List<String>,
+    val evaluatedAt: String?,
+)
+
+data class ElocutionAudio(
+    val id: String,
+    val durationSeconds: Int,
+    val source: String,
+    val recordedAt: String?,
+    val evaluation: ElocutionEvaluation?,
+)
+
+data class ElocutionExercise(
+    val id: String,
+    val type: String,
+    val instruction: String,
+    val supportText: String?,
+    val parameters: String,
+    val audios: List<ElocutionAudio>,
+)
+
+data class ElocutionChapter(
+    val id: String,
+    val number: Int,
+    val title: String,
+    val description: String?,
+    val exercises: List<ElocutionExercise>,
+)
+
+data class ElocutionCourse(
+    val id: String,
+    val title: String,
+    val description: String?,
+    val chapters: List<ElocutionChapter>,
+)
+
 class ApiException(val status: Int, message: String) : Exception(message)

@@ -603,6 +603,63 @@ const MIGRATIONS = [
         ON article_comments(parent_id, created_at);
     `)
   },
+  // v20 -> v21 : cours d'entrainement a l'elocution, prises audio et
+  // evaluations collees manuellement depuis une IA externe.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS elocution_courses (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        json_source TEXT NOT NULL,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS elocution_chapters (
+        id TEXT PRIMARY KEY,
+        course_id TEXT NOT NULL REFERENCES elocution_courses(id) ON DELETE CASCADE,
+        number INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS elocution_exercises (
+        id TEXT PRIMARY KEY,
+        chapter_id TEXT NOT NULL REFERENCES elocution_chapters(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        instruction TEXT NOT NULL,
+        support_text TEXT,
+        parameters_json TEXT NOT NULL DEFAULT '{}',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS elocution_audios (
+        id TEXT PRIMARY KEY,
+        exercise_id TEXT NOT NULL REFERENCES elocution_exercises(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL UNIQUE,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL CHECK(source IN ('web', 'mobile')),
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS elocution_ai_evaluations (
+        id TEXT PRIMARY KEY,
+        audio_id TEXT NOT NULL UNIQUE REFERENCES elocution_audios(id) ON DELETE CASCADE,
+        global_score REAL NOT NULL CHECK(global_score >= 0 AND global_score <= 10),
+        detail_scores_json TEXT NOT NULL,
+        general_remarks TEXT,
+        advice_json TEXT NOT NULL DEFAULT '[]',
+        raw_json TEXT NOT NULL,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        evaluated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_elocution_courses_user ON elocution_courses(user_id, imported_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_elocution_chapters_course ON elocution_chapters(course_id, number);
+      CREATE INDEX IF NOT EXISTS idx_elocution_exercises_chapter ON elocution_exercises(chapter_id, sort_order);
+      CREATE INDEX IF NOT EXISTS idx_elocution_audios_exercise ON elocution_audios(exercise_id, recorded_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_elocution_evaluations_user ON elocution_ai_evaluations(user_id, evaluated_at DESC);
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

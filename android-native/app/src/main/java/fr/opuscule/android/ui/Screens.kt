@@ -173,7 +173,8 @@ fun OpusculeApp(state: AppState) {
     var settingsVisible by remember { mutableStateOf(false) }
     var captureVisible by remember { mutableStateOf(false) }
     var organizeTarget by remember { mutableStateOf<OrganizationSection?>(null) }
-    var libraryArticles by rememberSaveable { mutableStateOf(false) }
+    var libraryArticles by rememberSaveable { mutableStateOf(true) }
+    var timelineVisible by rememberSaveable { mutableStateOf(false) }
     var chromeHidden by remember { mutableStateOf(false) }
     var lastRootBackAt by remember { mutableLongStateOf(0L) }
     val tab = RootTab.valueOf(tabName)
@@ -182,6 +183,7 @@ fun OpusculeApp(state: AppState) {
 
     BackHandler {
         when {
+            timelineVisible -> timelineVisible = false
             settingsVisible -> settingsVisible = false
             captureVisible -> captureVisible = false
             fileStack.isNotEmpty() -> fileStack = fileStack.dropLast(1)
@@ -254,6 +256,7 @@ fun OpusculeApp(state: AppState) {
                             tabName = RootTab.YOU.name
                         },
                         openSource = { fileStack = listOf(it) },
+                        openTimeline = { timelineVisible = true },
                     )
                     RootTab.LIBRARY -> if (libraryArticles) {
                         ArticlesScreen(
@@ -281,6 +284,13 @@ fun OpusculeApp(state: AppState) {
             }
         }
 
+        AnimatedVisibility(
+            timelineVisible,
+            enter = slideInHorizontally { it } + fadeIn(),
+            exit = slideOutHorizontally { it } + fadeOut(),
+        ) {
+            HistoricalTimelineScreen(state) { timelineVisible = false }
+        }
         AnimatedVisibility(
             fileStack.isNotEmpty(),
             enter = slideInHorizontally { it } + fadeIn(),

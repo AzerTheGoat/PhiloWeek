@@ -7,7 +7,7 @@ const path = require('path')
 const os = require('os')
 const { getDb, updateTags } = require('../db')
 const { v4: uuidv4 } = require('uuid')
-const { ROADTRIP_PHOTOS_DIR } = require('../paths')
+const { ROADTRIP_PHOTOS_DIR, RECORDINGS_DIR } = require('../paths')
 const { xlsxBufferToSpreadsheetContent } = require('../spreadsheetXlsx')
 const { syncGeneratedQuizzes } = require('../generatedQuizzes')
 const { readBoundedZip } = require('../safeZip')
@@ -42,6 +42,7 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     const entries = await readBoundedZip(req.file.path, {
       accept: relativePath => !relativePath.startsWith('__MACOSX') && (
         /^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(relativePath) ||
+        /^_Opuscule\/elocution-audio\/[^/]+\.(webm|m4a|mp4|aac|ogg|wav)$/i.test(relativePath) ||
         /\.(md|json|xlsx)$/i.test(relativePath)
       ),
     })
@@ -49,6 +50,11 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
       .filter(entry => /\.(md|json|xlsx)$/i.test(entry.relativePath) && !/^_Opuscule\/roadtrip-photos\//i.test(entry.relativePath))
       .sort((a, b) => a.relativePath.split('/').length - b.relativePath.split('/').length)
     const roadtripPhotoEntries = entries.filter(entry => /^_Opuscule\/roadtrip-photos\/[^/]+\.(jpe?g|webp|png)$/i.test(entry.relativePath))
+    const elocutionAudioEntries = entries.filter(entry => /^_Opuscule\/elocution-audio\/[^/]+\.(webm|m4a|mp4|aac|ogg|wav)$/i.test(entry.relativePath))
+    const elocutionAudioBuffers = new Map(elocutionAudioEntries.map(entry => [entry.relativePath.split('/').pop(), entry.buffer]))
+    if (elocutionAudioEntries.length > 0) {
+      assertUserStorageQuota(db, req.user.id, elocutionAudioEntries.reduce((sum, entry) => sum + entry.buffer.length, 0))
+    }
 
     // Décompresse les binaires photos des road trips (clé = nom de fichier d'origine).
     const roadtripPhotoBuffers = new Map()
@@ -91,7 +97,9 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
     let spreadsheetMetadataPayload = null
     let roadTripsPayload = null
     let generatedQuizzesPayload = null
+    let elocutionPayload = null
     const roadtripPhotoWrites = [] // { filename, buffer } écrits sur disque après la transaction
+    const elocutionAudioWrites = []
 
     const importTx = db.transaction(() => {
       const insertFolder = db.prepare(
@@ -211,6 +219,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           }
           if (jsonSpecial?.philoweek_type === 'generated_quizzes') {
             generatedQuizzesPayload = jsonSpecial
+            continue
+          }
+          if (jsonSpecial?.philoweek_type === 'elocution') {
+            elocutionPayload = jsonSpecial
             continue
           }
           if (jsonSpecial?.philoweek_type === 'encrypted_folders') continue
@@ -772,6 +784,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         })
       }
 
+      if (elocutionPayload) {
+        importElocutionPayload(db, elocutionPayload, elocutionAudioBuffers, elocutionAudioWrites, req.user.id, report)
+      }
+
       // Les imports Obsidian sans historique commencent avec leur contenu actuel.
       db.prepare(`
         INSERT OR IGNORE INTO file_revisions (file_id, user_id, revision_no, content, created_at)
@@ -816,6 +832,10 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
         try { fs.writeFileSync(path.join(ROADTRIP_PHOTOS_DIR, filename), buffer) }
         catch (err) { report.errors.push(`roadtrip-photos/${filename}: ${err.message}`) }
       }
+    }
+    for (const { filename, buffer } of elocutionAudioWrites) {
+      try { fs.writeFileSync(path.join(RECORDINGS_DIR, filename), buffer) }
+      catch (err) { report.errors.push(`elocution-audio/${filename}: ${err.message}`) }
     }
 
     // Phase 4: resolve [[links]] — one query to get all files with content
@@ -936,6 +956,50 @@ async function encryptImportedFolder(db, folderId, userId, sessionId, password) 
 function safeMatter(rawContent) {
   try { return matter(rawContent) }
   catch (_) { return { data: {}, content: rawContent } }
+}
+
+function importElocutionPayload(db, payload, audioBuffers, audioWrites, userId, report) {
+  const courseIds = new Map()
+  const chapterIds = new Map()
+  const exerciseIds = new Map()
+  const audioIds = new Map()
+  const addCourse = db.prepare('INSERT INTO elocution_courses (id, title, description, json_source, user_id, imported_at) VALUES (?, ?, ?, ?, ?, ?)')
+  const addChapter = db.prepare('INSERT INTO elocution_chapters (id, course_id, number, title, description, user_id) VALUES (?, ?, ?, ?, ?, ?)')
+  const addExercise = db.prepare(`INSERT INTO elocution_exercises (id, chapter_id, type, instruction, support_text, parameters_json, sort_order, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+  const addAudio = db.prepare(`INSERT INTO elocution_audios (id, exercise_id, filename, duration_seconds, source, user_id, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+  const addEvaluation = db.prepare(`INSERT INTO elocution_ai_evaluations (id, audio_id, global_score, detail_scores_json, general_remarks, advice_json, raw_json, user_id, evaluated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  for (const course of Array.isArray(payload.courses) ? payload.courses : []) {
+    if (!String(course.title || '').trim()) continue
+    const id = uuidv4(); courseIds.set(course.id, id)
+    addCourse.run(id, String(course.title).slice(0, 200), course.description || null, course.json_source || '{}', userId, normalizeIsoDate(course.imported_at) || new Date().toISOString())
+    report.imported++
+  }
+  for (const chapter of Array.isArray(payload.chapters) ? payload.chapters : []) {
+    const courseId = courseIds.get(chapter.course_id); if (!courseId) continue
+    const id = uuidv4(); chapterIds.set(chapter.id, id)
+    addChapter.run(id, courseId, Number(chapter.number) || 1, String(chapter.title || 'Chapitre').slice(0, 200), chapter.description || null, userId)
+  }
+  for (const exercise of Array.isArray(payload.exercises) ? payload.exercises : []) {
+    const chapterId = chapterIds.get(exercise.chapter_id); if (!chapterId) continue
+    const id = uuidv4(); exerciseIds.set(exercise.id, id)
+    addExercise.run(id, chapterId, exercise.type || 'lecture', exercise.instruction || '', exercise.support_text || null, exercise.parameters_json || '{}', Number(exercise.sort_order) || 0, userId)
+  }
+  for (const audio of Array.isArray(payload.audios) ? payload.audios : []) {
+    const exerciseId = exerciseIds.get(audio.exercise_id)
+    const buffer = audioBuffers.get(path.basename(String(audio.filename || '')))
+    if (!exerciseId || !buffer) continue
+    const extension = path.extname(audio.filename || '').toLowerCase()
+    const filename = `elocution-${uuidv4()}${/^\.(webm|m4a|mp4|aac|ogg|wav)$/.test(extension) ? extension : '.webm'}`
+    const id = uuidv4(); audioIds.set(audio.id, id)
+    addAudio.run(id, exerciseId, filename, Math.max(0, Number(audio.duration_seconds) || 0), audio.source === 'mobile' ? 'mobile' : 'web', userId, normalizeIsoDate(audio.recorded_at) || new Date().toISOString())
+    audioWrites.push({ filename, buffer })
+  }
+  for (const evaluation of Array.isArray(payload.evaluations) ? payload.evaluations : []) {
+    const audioId = audioIds.get(evaluation.audio_id)
+    const score = Number(evaluation.global_score)
+    if (!audioId || !Number.isFinite(score) || score < 0 || score > 10) continue
+    addEvaluation.run(uuidv4(), audioId, score, evaluation.detail_scores_json || '{}', evaluation.general_remarks || null, evaluation.advice_json || '[]', evaluation.raw_json || '{}', userId, normalizeIsoDate(evaluation.evaluated_at) || new Date().toISOString())
+  }
 }
 
 function safeJson(rawContent) {

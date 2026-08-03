@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
@@ -98,7 +99,7 @@ import java.util.Locale
 import kotlin.math.max
 
 enum class OrganizationSection {
-    IDEAS, QUOTES, FACTS, TODOS, AGENDA, LIFE, USAGE
+    IDEAS, QUOTES, FACTS, TODOS, AGENDA, LIFE, USAGE, ELOCUTION
 }
 
 @Composable
@@ -130,6 +131,7 @@ fun OrganizationScreen(
             OrganizationSection.AGENDA -> AgendaScreen(state) { section = null }
             OrganizationSection.LIFE -> LifeScreen(state) { section = null }
             OrganizationSection.USAGE -> UsageScreen(state) { section = null }
+            OrganizationSection.ELOCUTION -> ElocutionScreen(state) { section = null }
         }
         return
     }
@@ -163,6 +165,8 @@ fun OrganizationScreen(
             ActionRow("Vie en semaines", "Visualiser le temps vécu", Icons.Rounded.FavoriteBorder, { section = OrganizationSection.LIFE }, accent = Coral, accentSoft = CoralSoft)
             HorizontalDivider(color = Divider)
             ActionRow("Statistiques", "Temps passé dans Opuscule", Icons.Rounded.BarChart, { section = OrganizationSection.USAGE }, accent = KnowledgeBlue, accentSoft = KnowledgeBlueSoft)
+            HorizontalDivider(color = Divider)
+            ActionRow("Élocution", "Cours, enregistrements et résultats", Icons.Rounded.GraphicEq, { section = OrganizationSection.ELOCUTION }, accent = Opuscule, accentSoft = OpusculeSoft)
             Spacer(Modifier.height(26.dp))
         }
     }

@@ -56,20 +56,20 @@ private val LightPalette = OpusculePalette(
 )
 
 private val DarkPalette = OpusculePalette(
-    canvas = Color(0xFF0D111A),
-    surface = Color(0xFF171D29),
-    surfacePressed = Color(0xFF222B3B),
-    readingPaper = Color(0xFF121824),
-    ink = Color(0xFFF4F7FC),
-    muted = Color(0xFFAAB3C4),
-    divider = Color(0xFF2A3447),
-    accent = Color(0xFF70A7FF),
-    accentSoft = Color(0xFF192E52),
-    danger = Color(0xFFFF6B7C),
-    dangerSoft = Color(0xFF3A1D27),
-    success = Color(0xFF52CE91),
-    successSoft = Color(0xFF17372A),
-    warning = Color(0xFFFFB45C),
+    canvas = Color(0xFF000000),
+    surface = Color(0xFF111111),
+    surfacePressed = Color(0xFF1C1C1C),
+    readingPaper = Color(0xFF080808),
+    ink = Color(0xFFF7F3EA),
+    muted = Color(0xFFAAA49A),
+    divider = Color(0xFF292929),
+    accent = Color(0xFFC6A15B),
+    accentSoft = Color(0xFF2A2112),
+    danger = Color(0xFFFF716B),
+    dangerSoft = Color(0xFF351615),
+    success = Color(0xFF78C59A),
+    successSoft = Color(0xFF112A1C),
+    warning = Color(0xFFE7A95D),
 )
 
 private val LocalOpusculePalette = compositionLocalOf { LightPalette }
@@ -129,7 +129,7 @@ fun OpusculeTheme(
     val colors = if (dark) {
         darkColorScheme(
             primary = palette.accent,
-            onPrimary = Color(0xFF06152E),
+            onPrimary = Color(0xFF160F04),
             primaryContainer = palette.accentSoft,
             onPrimaryContainer = palette.ink,
             background = palette.canvas,

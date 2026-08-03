@@ -2,7 +2,6 @@ package fr.opuscule.android.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +12,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -94,26 +91,32 @@ fun QuickCaptureSheet(state: AppState, dismiss: () -> Unit) {
         ) {
             Text("Capturer", style = MaterialTheme.typography.headlineMedium)
             Text("Gardez l’élan. Vous pourrez organiser plus tard.", color = Muted)
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-            ) {
-                CaptureKind.entries.forEach { item ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CaptureKind.entries.chunked(3).forEach { rowItems ->
                     Row(
-                        Modifier.widthIn(min = 94.dp).background(
-                            if (kind == item) OpusculeSoft else Surface,
-                            RoundedCornerShape(13.dp),
-                        ).clickable { kind = item }.padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(item.icon, null, tint = if (kind == item) Opuscule else Muted, modifier = Modifier.size(18.dp))
-                        Text(
-                            item.label,
-                            Modifier.padding(start = 6.dp),
-                            color = if (kind == item) Opuscule else Muted,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+                        rowItems.forEach { item ->
+                            Row(
+                                Modifier.weight(1f).background(
+                                    if (kind == item) OpusculeSoft else Surface,
+                                    RoundedCornerShape(13.dp),
+                                ).clickable { kind = item }.padding(horizontal = 8.dp, vertical = 11.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(item.icon, null, tint = if (kind == item) Opuscule else Muted, modifier = Modifier.size(17.dp))
+                                Text(
+                                    item.label,
+                                    Modifier.padding(start = 5.dp),
+                                    color = if (kind == item) Opuscule else Muted,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }

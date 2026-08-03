@@ -5,12 +5,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.MultipartBody
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 class ApiClient {
@@ -251,28 +254,63 @@ class ApiClient {
     }
 
     suspend fun historicalEvents(token: String): List<HistoricalEvent> =
-        callArray("/historical-timeline", token = token).objects().map { row ->
-            HistoricalEvent(
-                id = row.getString("id"),
-                title = row.optString("title"),
-                startLabel = row.nullable("start_label"),
-                startYear = row.nullableInt("start_year"),
-                startMonth = row.nullableInt("start_month"),
-                startDay = row.nullableInt("start_day"),
-                endLabel = row.nullable("end_label"),
-                endYear = row.nullableInt("end_year"),
-                endMonth = row.nullableInt("end_month"),
-                endDay = row.nullableInt("end_day"),
-                description = row.nullable("description"),
-                category = row.nullable("category"),
-                image = row.nullable("image_data"),
-                canEdit = row.optBoolean("can_edit"),
-            )
-        }
+        callArray("/historical-timeline", token = token).objects().map(::historicalEvent)
+
+    suspend fun createHistoricalEvent(
+        token: String,
+        title: String,
+        start: String,
+        end: String,
+        description: String,
+        category: String,
+    ): HistoricalEvent = historicalEvent(
+        call(
+            "/historical-timeline",
+            "POST",
+            JSONObject().put("title", title).put("start", start).put("end", end)
+                .put("description", description).put("category", category),
+            token,
+        ).put("can_edit", true),
+    )
+
+    suspend fun updateHistoricalEvent(
+        token: String,
+        id: String,
+        title: String,
+        start: String,
+        end: String,
+        description: String,
+        category: String,
+    ): HistoricalEvent = historicalEvent(
+        call(
+            "/historical-timeline/$id",
+            "PUT",
+            JSONObject().put("title", title).put("start", start).put("end", end)
+                .put("description", description).put("category", category),
+            token,
+        ).put("can_edit", true),
+    )
 
     suspend fun deleteHistoricalEvent(token: String, id: String) {
         call("/historical-timeline/$id", "DELETE", token = token)
     }
+
+    private fun historicalEvent(row: JSONObject) = HistoricalEvent(
+        id = row.getString("id"),
+        title = row.optString("title"),
+        startLabel = row.nullable("start_label"),
+        startYear = row.nullableInt("start_year"),
+        startMonth = row.nullableInt("start_month"),
+        startDay = row.nullableInt("start_day"),
+        endLabel = row.nullable("end_label"),
+        endYear = row.nullableInt("end_year"),
+        endMonth = row.nullableInt("end_month"),
+        endDay = row.nullableInt("end_day"),
+        description = row.nullable("description"),
+        category = row.nullable("category"),
+        image = row.nullable("image_data"),
+        canEdit = row.optBoolean("can_edit"),
+    )
 
     suspend fun reviewResults(token: String): List<ReviewResult> =
         callArray("/questionnaires/results", token = token).objects().map {
@@ -491,6 +529,70 @@ class ApiClient {
     suspend fun trackUsage(token: String, day: String, seconds: Int) {
         call("/timer/app-usage", "POST", JSONObject()
             .put("entries", JSONArray().put(JSONObject().put("day", day).put("seconds", seconds.coerceIn(1, 300)))), token)
+    }
+
+    suspend fun elocutionCourses(token: String): List<ElocutionCourse> =
+        callArray("/elocution/courses", token = token).objects().map { course ->
+            ElocutionCourse(
+                id = course.getString("id"),
+                title = course.optString("title"),
+                description = course.nullable("description"),
+                chapters = course.optJSONArray("chapters").orEmpty().objects().map { chapter ->
+                    ElocutionChapter(
+                        id = chapter.getString("id"),
+                        number = chapter.optInt("number"),
+                        title = chapter.optString("title"),
+                        description = chapter.nullable("description"),
+                        exercises = chapter.optJSONArray("exercises").orEmpty().objects().map { exercise ->
+                            ElocutionExercise(
+                                id = exercise.getString("id"),
+                                type = exercise.optString("type"),
+                                instruction = exercise.optString("instruction"),
+                                supportText = exercise.nullable("support_text"),
+                                parameters = exercise.optJSONObject("parameters")?.toString() ?: "{}",
+                                audios = exercise.optJSONArray("audios").orEmpty().objects().map(::elocutionAudio),
+                            )
+                        },
+                    )
+                },
+            )
+        }
+
+    suspend fun uploadElocutionAudio(token: String, exerciseId: String, file: File, durationSeconds: Int) = withContext(Dispatchers.IO) {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("source", "mobile")
+            .addFormDataPart("duration", durationSeconds.toString())
+            .addFormDataPart("audio", file.name, file.asRequestBody("audio/mp4".toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url(BuildConfig.API_BASE_URL.trimEnd('/') + "/elocution/exercises/$exerciseId/audio")
+            .header("Accept", "application/json")
+            .header("Authorization", "Bearer $token")
+            .post(body).build()
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val message = runCatching { JSONObject(text).optString("error") }.getOrNull().orEmpty()
+                throw ApiException(response.code, message.ifBlank { "Échec de l’envoi audio (${response.code})." })
+            }
+        }
+    }
+
+    private fun elocutionAudio(row: JSONObject): ElocutionAudio {
+        val evaluation = row.optJSONObject("evaluation")?.let { value ->
+            val details = value.optJSONObject("scores_details") ?: JSONObject()
+            ElocutionEvaluation(
+                globalScore = value.optDouble("score_global"),
+                detailScores = listOf("debit", "articulation", "pauses", "fluidite", "structure").associateWith { key ->
+                    val detail = details.optJSONObject(key) ?: JSONObject()
+                    detail.optDouble("score") to detail.optString("commentaire")
+                },
+                generalRemarks = value.optString("remarques_generales"),
+                advice = value.optJSONArray("conseils").orEmpty().let { array -> (0 until array.length()).map { array.optString(it) } },
+                evaluatedAt = value.nullable("date_evaluation"),
+            )
+        }
+        return ElocutionAudio(row.getString("id"), row.optInt("duration_seconds"), row.optString("source"), row.nullable("recorded_at"), evaluation)
     }
 
     private suspend fun saveActorProgress(token: String, question: ReviewQuestion, known: Boolean) {

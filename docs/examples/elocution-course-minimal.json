@@ -1,0 +1,23 @@
+{
+  "title": "Parler plus lentement",
+  "description": "Installer un débit posé et une articulation claire.",
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Poser le rythme",
+      "description": "Respirer et laisser une pause entre les groupes de sens.",
+      "exercises": [
+        {
+          "type": "metronome",
+          "instruction": "Lisez le texte en plaçant une syllabe forte tous les deux battements.",
+          "support_text": "Je prends le temps de formuler chaque idée avant de poursuivre.",
+          "parameters": { "bpm": 60, "repetitions": 3 }
+        },
+        {
+          "type": "phrase_libre",
+          "instruction": "Expliquez en une minute une idée qui vous tient à cœur, avec des phrases courtes."
+        }
+      ]
+    }
+  ]
+}

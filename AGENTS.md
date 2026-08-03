@@ -179,6 +179,15 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les fonctionnalites IA ont ete retirees de l'interface.
 - Ne pas ajouter de nouveau panneau IA, appel fournisseur, estimation de cout ou generation automatique sans demande explicite.
 - Le recap de semaine/periode passe par le panneau `Copier`, qui met un preprompt dans le presse-papier sans appeler de fournisseur IA.
+- Le module `Élocution` ne fait aucun appel IA automatique. Sur le web, il
+  importe des cours JSON, relie plusieurs audios à chaque exercice, génère un
+  prompt contextuel à copier et valide une réponse JSON collée manuellement.
+  L’APK consulte les cours et résultats et enregistre des audios synchronisés,
+  mais n’expose ni le prompt ni une zone de collage de réponse IA.
+- Les tables `elocution_courses`, `elocution_chapters`, `elocution_exercises`,
+  `elocution_audios` et `elocution_ai_evaluations` sont exportées dans
+  `_Opuscule/Elocution.json`; les binaires sont sauvegardés sous
+  `_Opuscule/elocution-audio/` et restaurés à l’import.
 
 ## Client mobile React Native
 
@@ -312,6 +321,16 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   inaccessible produit un état explicite au lieu d’un nom de fichier brut.
 - Les listes et cartes d’articles placent les contenus non lus avant les contenus
   déjà ouverts; ouvrir un article conserve le marquage de lecture existant.
+- La Bibliothèque Android s’ouvre sur les articles avant les fichiers. Le panneau
+  Capturer présente ses types dans une grille compacte sans défilement horizontal.
+- La frise historique Android est accessible directement depuis le header
+  d’Aujourd’hui. Elle permet de rechercher et filtrer les repères, consulter leur
+  détail et créer, modifier ou supprimer ses propres repères. Les cartes Dates
+  historiques d’Aujourd’hui conservent aussi leur suppression confirmée.
+- En thème sombre Android, le fond est noir franc et l’accent principal est doré;
+  les surfaces ne doivent pas dériver vers le bleu Android.
+- Le changement vertical de catégorie dans Aujourd’hui exige un geste volontaire
+  afin d’éviter de faire défiler plusieurs cartes trop rapidement.
 
 ### Dictionnaire et suivi des cartes à corriger
 
