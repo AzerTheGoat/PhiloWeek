@@ -226,9 +226,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   personnes des réseaux d'acteurs. La carte garde les actions en bas, utilise le
   rouge `Danger` pour `À revoir`, ouvre le fichier source et peut retirer une
   question non pertinente du JSON après confirmation.
-- Sur Android, une carte de révision non révélée ne garde qu'une action principale
-  `Afficher la réponse`. `Voir la source`, `Modifier`, `Marquer à modifier` et
-  `Supprimer` sont regroupés dans le menu compact `…` du header.
+- Sur Android, une carte de révision non révélée ne garde qu'une action principale :
+  `Afficher la réponse` pour un rappel libre ou `Valider mon choix` pour un QCM.
+  `Voir la source`, `Modifier`, `Marquer à modifier` et `Supprimer` sont regroupés
+  dans le menu compact `…` du header.
 - Pour un quiz généré situé dans `Quiz générés/X/Y.json`, la source implicite est
   toujours recherchée dans `X/Y.md`, hors du dossier `Quiz générés`; si elle
   n'existe pas, l'application affiche un avertissement court.
@@ -299,6 +300,18 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   réellement évalués pendant la session.
 - Les questionnaires, définitions et personnes sont chargés séparément pour que
   chaque catégorie dispose de sa propre pile et ne recycle pas une unique carte.
+- Les QCM Android affichent leurs choix nativement dans `Aujourd’hui` et dans la
+  session complète. La correction accepte soit `answer` (texte exact du choix),
+  soit `correct_index`; après validation, le bon choix et une éventuelle sélection
+  erronée remplacent immédiatement la liste et restent visibles. `Continuer`
+  enregistre automatiquement le résultat; un QCM ne redemande jamais une
+  auto-évaluation `À revoir` / `Je savais` lorsque sa correction est connue.
+- Le flux `Aujourd’hui` signale un chargement partiel ou totalement impossible et
+  permet de réessayer. Chaque catégorie possède une vraie fin de pile et ne boucle
+  jamais implicitement sur son premier élément.
+- Le texte d’une carte garde la priorité sur le geste vertical : le pager ne doit
+  pas intercepter de force un fling provenant du contenu défilable. Le swipe
+  horizontal d’évaluation reste limité aux cartes révélées.
 - `Aujourd’hui` ajoute une catégorie `Dates historiques` issue de la frise :
   chaque carte demande de retrouver la date ou la période d’un événement avant
   de révéler la réponse et d’avancer dans la même catégorie. Les repères sont

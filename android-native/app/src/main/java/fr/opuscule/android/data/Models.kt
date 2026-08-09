@@ -64,6 +64,8 @@ data class ReviewQuestion(
     val explanation: String,
     val kind: String,
     val type: String,
+    val choices: List<String>,
+    val correctIndex: Int?,
     val index: Int,
     val image: String?,
     val imageAlt: String?,

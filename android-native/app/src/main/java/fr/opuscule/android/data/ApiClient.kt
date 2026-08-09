@@ -650,6 +650,8 @@ class ApiClient {
         explanation = row.optString("explanation"),
         kind = row.optString("review_kind", "questionnaire"),
         type = row.optString("type", "open"),
+        choices = row.optJSONArray("choices").orEmpty().strings(),
+        correctIndex = row.nullableInt("correct_index"),
         index = row.optInt("index"),
         image = row.nullable("image"),
         imageAlt = row.nullable("image_alt"),
@@ -741,6 +743,8 @@ class ApiClient {
 
 private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
 private fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull(::optJSONObject)
+// Preserve positions: correct_index refers to the original JSON array index.
+private fun JSONArray.strings(): List<String> = (0 until length()).map { index -> optString(index) }
 private fun JSONObject.nullable(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 private fun JSONObject.nullableInt(key: String): Int? =

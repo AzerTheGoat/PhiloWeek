@@ -72,8 +72,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -81,7 +79,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Velocity
 import coil.compose.AsyncImage
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.Article
@@ -91,7 +88,6 @@ import fr.opuscule.android.data.Idea
 import fr.opuscule.android.data.Quote
 import fr.opuscule.android.data.ReviewQuestion
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -130,6 +126,11 @@ private data class KnowledgeSection(
     val items: List<KnowledgeItem>,
 )
 
+private data class FeedLoadResult(
+    val sections: List<KnowledgeSection>,
+    val failures: List<Throwable>,
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TodayScreen(
@@ -145,6 +146,7 @@ fun TodayScreen(
     var sections by remember { mutableStateOf<List<KnowledgeSection>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var warning by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<ReviewQuestion?>(null) }
     var deleting by remember { mutableStateOf<ReviewQuestion?>(null) }
     var deletingHistorical by remember { mutableStateOf<HistoricalEvent?>(null) }
@@ -158,36 +160,54 @@ fun TodayScreen(
     suspend fun loadFeed() {
         loading = true
         error = null
+        warning = null
         runCatching {
             coroutineScope {
                 val quiz = async {
                     runCatching { state.api.review(token, limit = 50, reviewKinds = listOf("questionnaire")) }
-                        .getOrDefault(emptyList())
                 }
                 val definitions = async {
                     runCatching { state.api.review(token, limit = 50, reviewKinds = listOf("definition")) }
-                        .getOrDefault(emptyList())
                 }
                 val actors = async {
                     runCatching { state.api.review(token, limit = 30, reviewKinds = listOf("actor")) }
-                        .getOrDefault(emptyList())
                 }
-                val history = async { runCatching { state.api.historicalEvents(token) }.getOrDefault(emptyList()) }
-                val ideas = async { runCatching { state.api.ideas(token) }.getOrDefault(emptyList()) }
-                val quotes = async { runCatching { state.api.quotes(token) }.getOrDefault(emptyList()) }
-                val facts = async { runCatching { state.api.factChecks(token) }.getOrDefault(emptyList()) }
-                val articles = async { runCatching { state.api.articles(token) }.getOrDefault(emptyList()) }
-                awaitAll(quiz, definitions, actors, history, ideas, quotes, facts, articles)
-                buildKnowledgeSections(
-                    quiz.await() + definitions.await() + actors.await(),
-                    history.await(),
-                    ideas.await(),
-                    quotes.await(),
-                    facts.await(),
-                    articles.await(),
+                val history = async { runCatching { state.api.historicalEvents(token) } }
+                val ideas = async { runCatching { state.api.ideas(token) } }
+                val quotes = async { runCatching { state.api.quotes(token) } }
+                val facts = async { runCatching { state.api.factChecks(token) } }
+                val articles = async { runCatching { state.api.articles(token) } }
+                val quizResult = quiz.await()
+                val definitionsResult = definitions.await()
+                val actorsResult = actors.await()
+                val historyResult = history.await()
+                val ideasResult = ideas.await()
+                val quotesResult = quotes.await()
+                val factsResult = facts.await()
+                val articlesResult = articles.await()
+                FeedLoadResult(
+                    sections = buildKnowledgeSections(
+                        quizResult.getOrDefault(emptyList()) + definitionsResult.getOrDefault(emptyList()) + actorsResult.getOrDefault(emptyList()),
+                        historyResult.getOrDefault(emptyList()),
+                        ideasResult.getOrDefault(emptyList()),
+                        quotesResult.getOrDefault(emptyList()),
+                        factsResult.getOrDefault(emptyList()),
+                        articlesResult.getOrDefault(emptyList()),
+                    ),
+                    failures = listOf(
+                        quizResult.exceptionOrNull(), definitionsResult.exceptionOrNull(), actorsResult.exceptionOrNull(),
+                        historyResult.exceptionOrNull(), ideasResult.exceptionOrNull(), quotesResult.exceptionOrNull(),
+                        factsResult.exceptionOrNull(), articlesResult.exceptionOrNull(),
+                    ).filterNotNull(),
                 )
             }
-        }.onSuccess { sections = it }
+        }.onSuccess { result ->
+            sections = result.sections
+            when {
+                result.failures.size == 8 -> error = result.failures.first().message ?: "Le serveur est indisponible."
+                result.failures.isNotEmpty() -> warning = "Certaines catégories n’ont pas pu être chargées (${result.failures.size}/8)."
+            }
+        }
             .onFailure { error = it.message ?: "Impossible de préparer votre journée." }
         loading = false
     }
@@ -196,6 +216,7 @@ fun TodayScreen(
 
     Column(Modifier.fillMaxSize().background(Canvas)) {
         TodayHeader(state, completed, openTimeline, openSettings)
+        warning?.let { PartialFeedWarning(it) { scope.launch { loadFeed() } } }
         when {
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -215,24 +236,6 @@ fun TodayScreen(
             )
             else -> {
                 val pagerState = rememberPagerState(pageCount = { sections.size })
-                val categoryFlingThreshold = with(LocalDensity.current) { 1_350.dp.toPx() }
-                val categoryFlingConnection = remember(pagerState, sections.size, categoryFlingThreshold) {
-                    object : NestedScrollConnection {
-                        override suspend fun onPreFling(available: Velocity): Velocity {
-                            if (abs(available.y) < categoryFlingThreshold) return Velocity.Zero
-                            val target = if (available.y < 0f) {
-                                pagerState.currentPage + 1
-                            } else {
-                                pagerState.currentPage - 1
-                            }
-                            if (target !in sections.indices || target == pagerState.currentPage) {
-                                return Velocity.Zero
-                            }
-                            pagerState.animateScrollToPage(target)
-                            return available
-                        }
-                    }
-                }
                 val currentSection = sections[pagerState.currentPage.coerceIn(sections.indices)]
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
@@ -253,7 +256,7 @@ fun TodayScreen(
                 }
                 VerticalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize().nestedScroll(categoryFlingConnection),
+                    modifier = Modifier.fillMaxSize(),
                     beyondViewportPageCount = 1,
                     flingBehavior = PagerDefaults.flingBehavior(
                         state = pagerState,
@@ -276,7 +279,7 @@ fun TodayScreen(
                             sectionCursors[section.id] = cursor + 1
                         },
                         saveRecall = { known ->
-                            val item = section.items[cursor % section.items.size]
+                            val item = section.items.getOrNull(cursor) ?: return@KnowledgeSectionPage
                             if (rated[occurrenceKey] == true) return@KnowledgeSectionPage
                             rated[occurrenceKey] = true
                             completed += 1
@@ -441,6 +444,17 @@ private fun TodayHeader(state: AppState, completed: Int, openTimeline: () -> Uni
 }
 
 @Composable
+private fun PartialFeedWarning(message: String, retry: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Warning.copy(alpha = .12f)).padding(horizontal = 18.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(message, Modifier.weight(1f), color = Warning, style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = retry) { Text("Réessayer", color = Warning) }
+    }
+}
+
+@Composable
 private fun KnowledgeSectionPage(
     section: KnowledgeSection,
     cursor: Int,
@@ -459,6 +473,10 @@ private fun KnowledgeSectionPage(
     openArticles: () -> Unit,
     openSection: (OrganizationSection) -> Unit,
 ) {
+    if (cursor >= section.items.size) {
+        CompletedCategoryPage(section.label, openReview)
+        return
+    }
     AnimatedContent(
         targetState = cursor,
         modifier = Modifier.fillMaxSize(),
@@ -473,7 +491,7 @@ private fun KnowledgeSectionPage(
         },
         label = "knowledge-section-${section.id}",
     ) { targetCursor ->
-        val item = section.items[targetCursor % section.items.size]
+        val item = section.items.getOrNull(targetCursor) ?: return@AnimatedContent
         KnowledgePage(
             item = item,
             revealed = if (targetCursor == cursor) revealed else false,
@@ -490,6 +508,24 @@ private fun KnowledgeSectionPage(
             openArticles = openArticles,
             openSection = openSection,
         )
+    }
+}
+
+@Composable
+private fun CompletedCategoryPage(label: String, openReview: () -> Unit) {
+    Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.size(58.dp).clip(CircleShape).background(SuccessSoft), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Verified, null, tint = Success, modifier = Modifier.size(29.dp))
+            }
+            Text("$label terminé", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+            Text(
+                "Vous avez parcouru tous les éléments de cette catégorie. Balayez verticalement pour changer de catégorie.",
+                color = Muted,
+                textAlign = TextAlign.Center,
+            )
+            SecondaryButton("Ouvrir la révision complète", openReview)
+        }
     }
 }
 
@@ -631,10 +667,14 @@ private fun RecallSwipePage(
     delete: () -> Unit,
 ) {
     var menu by remember(question.key) { mutableStateOf(false) }
+    var selectedChoice by remember(question.key) { mutableStateOf<Int?>(null) }
     var horizontalDrag by remember(question.key, revealed) { mutableFloatStateOf(0f) }
+    val contentScroll = rememberScrollState()
+    val hasChoices = reviewChoices(question).isNotEmpty()
+    val correctChoice = reviewCorrectIndex(question)
     val swipeThreshold = with(LocalDensity.current) { 92.dp.toPx() }
     val swipeProgress = (abs(horizontalDrag) / swipeThreshold).coerceIn(0f, 1f)
-    val gesture = if (revealed && !rating) {
+    val gesture = if (revealed && !rating && !hasChoices) {
         Modifier.draggable(
             state = rememberDraggableState { amount ->
                 horizontalDrag = (horizontalDrag + amount).coerceIn(-1_200f, 1_200f)
@@ -649,6 +689,10 @@ private fun RecallSwipePage(
             },
         )
     } else Modifier
+
+    LaunchedEffect(question.key, revealed, contentScroll.maxValue) {
+        if (revealed && contentScroll.maxValue > 0) contentScroll.animateScrollTo(contentScroll.maxValue)
+    }
 
     Box(
         Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 4.dp),
@@ -712,11 +756,16 @@ private fun RecallSwipePage(
                 overflow = TextOverflow.Ellipsis,
             )
             Column(
-                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(contentScroll),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(question.prompt, style = MaterialTheme.typography.titleLarge)
-                if (revealed) {
+                if (!revealed && hasChoices) {
+                    ReviewChoiceList(question, selectedChoice, false) { selectedChoice = it }
+                }
+                if (revealed && hasChoices) {
+                    ReviewChoiceResult(question, selectedChoice)
+                } else if (revealed) {
                     Column(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
                             .background(OpusculeSoft).padding(16.dp),
@@ -735,15 +784,31 @@ private fun RecallSwipePage(
                 }
             }
             if (!revealed) {
-                PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
+                PrimaryButton(
+                    if (hasChoices) "Valider mon choix" else "Afficher la réponse",
+                    reveal,
+                    Modifier.fillMaxWidth(),
+                    enabled = !hasChoices || selectedChoice != null,
+                )
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton("← À revoir", { save(false) }, Modifier.weight(1f), enabled = !rating)
-                    PrimaryButton("Je savais →", { save(true) }, Modifier.weight(1f), enabled = !rating)
+                if (hasChoices && correctChoice != null) {
+                    PrimaryButton(
+                        "Continuer",
+                        { save(selectedChoice == correctChoice) },
+                        Modifier.fillMaxWidth(),
+                        enabled = !rating,
+                    )
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton("← À revoir", { save(false) }, Modifier.weight(1f), enabled = !rating)
+                        PrimaryButton("Je savais →", { save(true) }, Modifier.weight(1f), enabled = !rating)
+                    }
                 }
             }
             Text(
-                if (revealed) "Glissez la carte à gauche ou à droite"
+                if (revealed && hasChoices && correctChoice != null) "La réponse est enregistrée en continuant"
+                else if (revealed && hasChoices) "Correction manquante : évaluez cette carte manuellement"
+                else if (revealed) "Glissez la carte à gauche ou à droite"
                 else "La question et la correction restent défilables",
                 Modifier.fillMaxWidth(),
                 color = Muted,

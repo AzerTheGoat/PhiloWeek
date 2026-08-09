@@ -91,6 +91,8 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     var session by remember { mutableStateOf<List<ReviewQuestion>>(emptyList()) }
     var index by remember { mutableIntStateOf(0) }
     var revealed by remember { mutableStateOf(false) }
+    var selectedChoice by remember { mutableStateOf<Int?>(null) }
+    var grading by remember { mutableStateOf(false) }
     var known by remember { mutableIntStateOf(0) }
     var missed by remember { mutableStateOf<List<ReviewQuestion>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -116,6 +118,8 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
                     session = filtered
                     index = 0
                     revealed = false
+                    selectedChoice = null
+                    grading = false
                     known = 0
                     missed = emptyList()
                     selector = false
@@ -126,7 +130,9 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     }
 
     fun grade(value: Boolean) {
+        if (grading) return
         current ?: return
+        grading = true
         scope.launch {
             runCatching { state.api.saveReview(token, current, value) }
                 .onSuccess {
@@ -134,8 +140,13 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
                     if (value) known++ else missed = missed + current
                     index++
                     revealed = false
+                    selectedChoice = null
+                    grading = false
                 }
-                .onFailure(state::handle)
+                .onFailure {
+                    grading = false
+                    state.handle(it)
+                }
         }
     }
 
@@ -151,6 +162,9 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
             index,
             session.size,
             revealed,
+            selectedChoice,
+            grading,
+            { selectedChoice = it },
             { revealed = true; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
             { grade(false) },
             { grade(true) },
@@ -291,6 +305,9 @@ private fun ReviewCard(
     index: Int,
     total: Int,
     revealed: Boolean,
+    selectedChoice: Int?,
+    grading: Boolean,
+    selectChoice: (Int) -> Unit,
     reveal: () -> Unit,
     unknown: () -> Unit,
     known: () -> Unit,
@@ -301,9 +318,15 @@ private fun ReviewCard(
     stop: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val pageScroll = rememberScrollState()
+    val hasChoices = reviewChoices(question).isNotEmpty()
+    val correctChoice = reviewCorrectIndex(question)
     val kindAccent = reviewKindAccent(question.kind)
     val kindSoft = reviewKindSoft(question.kind)
     BackHandler(onBack = stop)
+    LaunchedEffect(question.key, revealed, pageScroll.maxValue) {
+        if (revealed && pageScroll.maxValue > 0) pageScroll.animateScrollTo(pageScroll.maxValue)
+    }
     Scaffold(
         containerColor = Canvas,
         topBar = {
@@ -348,17 +371,31 @@ private fun ReviewCard(
                     transitionSpec = { fadeIn() + scaleIn(initialScale = .98f, animationSpec = spring()) togetherWith fadeOut() },
                     label = "quiz-actions",
                 ) { answerVisible ->
-                    if (!answerVisible) PrimaryButton("Afficher la réponse", reveal, Modifier.fillMaxWidth())
-                    else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    if (!answerVisible) PrimaryButton(
+                        if (hasChoices) "Valider mon choix" else "Afficher la réponse",
+                        reveal,
+                        Modifier.fillMaxWidth(),
+                        enabled = !grading && (!hasChoices || selectedChoice != null),
+                    )
+                    else if (hasChoices && correctChoice != null) {
+                        PrimaryButton(
+                            "Continuer",
+                            if (selectedChoice == correctChoice) known else unknown,
+                            Modifier.fillMaxWidth(),
+                            enabled = !grading,
+                        )
+                    } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         Button(
                             unknown,
                             Modifier.weight(1f).height(54.dp),
+                            enabled = !grading,
                             shape = RoundedCornerShape(15.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Danger, contentColor = MaterialTheme.colorScheme.onError),
                         ) { Text("Je ne connais pas", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                         Button(
                             known,
                             Modifier.weight(1f).height(54.dp),
+                            enabled = !grading,
                             shape = RoundedCornerShape(15.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Opuscule, contentColor = MaterialTheme.colorScheme.onPrimary),
                         ) { Text("Je connais", fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
@@ -368,7 +405,7 @@ private fun ReviewCard(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().padding(padding).verticalScroll(pageScroll)
                 .padding(horizontal = 16.dp, vertical = 18.dp).animateContentSize(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -408,28 +445,36 @@ private fun ReviewCard(
                         color = Ink,
                         style = if (question.prompt.length > 180) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                     )
-                    AnimatedContent(
-                        revealed,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "answer",
-                    ) { visible ->
-                        if (visible) {
-                            Column(
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OpusculeSoft).padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(9.dp),
-                            ) {
-                                Text("RÉPONSE", style = MaterialTheme.typography.labelMedium, color = Opuscule)
-                                Text(question.answer.ifBlank { "Aucune réponse renseignée." }, color = Ink, style = MaterialTheme.typography.titleLarge)
-                                if (question.explanation.isNotBlank()) {
-                                    Text(question.explanation, style = MaterialTheme.typography.bodyLarge, color = Ink.copy(alpha = .78f))
-                                }
-                            }
+                    if (hasChoices) {
+                        if (revealed) {
+                            ReviewChoiceResult(question, selectedChoice)
                         } else {
-                            Text(
-                                "Formulez votre réponse mentalement.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Ink.copy(alpha = .62f),
-                            )
+                            ReviewChoiceList(question, selectedChoice, false, selectChoice)
+                        }
+                    } else {
+                        AnimatedContent(
+                            revealed,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "answer",
+                        ) { visible ->
+                            if (visible) {
+                                Column(
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OpusculeSoft).padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                                ) {
+                                    Text("RÉPONSE", style = MaterialTheme.typography.labelMedium, color = Opuscule)
+                                    Text(question.answer.ifBlank { "Aucune réponse renseignée." }, color = Ink, style = MaterialTheme.typography.titleLarge)
+                                    if (question.explanation.isNotBlank()) {
+                                        Text(question.explanation, style = MaterialTheme.typography.bodyLarge, color = Ink.copy(alpha = .78f))
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    "Formulez votre réponse mentalement.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Ink.copy(alpha = .62f),
+                                )
+                            }
                         }
                     }
                 }

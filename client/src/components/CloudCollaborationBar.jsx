@@ -4,11 +4,12 @@ import Icon from './Icons'
 import * as api from '../api'
 
 export default function CloudCollaborationBar() {
-  const { currentFile, fileConflicts, fileHistory, resolveFileConflict, openFile } = useApp()
+  const { currentFile, fileConflicts, fileHistory, fileSavePending, resolveFileConflict, openFile } = useApp()
   const [participants, setParticipants] = useState([])
   const [remoteUpdate, setRemoteUpdate] = useState(false)
   const [resolving, setResolving] = useState(false)
   const conflict = currentFile?.id ? fileConflicts[currentFile.id] : null
+  const savePending = Boolean(currentFile?.id && fileSavePending[currentFile.id])
 
   useEffect(() => {
     if (!currentFile?.id || currentFile.type !== 'file') return undefined
@@ -19,7 +20,7 @@ export default function CloudCollaborationBar() {
         if (active) {
           setParticipants(result.participants || [])
           const knownVersion = fileHistory[currentFile.id]?.contentVersion ?? Number(currentFile.content_version || 0)
-          setRemoteUpdate(Number(result.content_version || 0) > knownVersion)
+          setRemoteUpdate(!savePending && Number(result.content_version || 0) > knownVersion)
         }
       } catch (_) {}
     }
@@ -30,7 +31,7 @@ export default function CloudCollaborationBar() {
       clearInterval(timer)
       api.leaveFilePresence(currentFile.id).catch(() => {})
     }
-  }, [currentFile?.id, currentFile?.type, fileHistory[currentFile?.id]?.contentVersion])
+  }, [currentFile?.id, currentFile?.type, fileHistory[currentFile?.id]?.contentVersion, savePending])
 
   const resolve = async (choice) => {
     setResolving(true)

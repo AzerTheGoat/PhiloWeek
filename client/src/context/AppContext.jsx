@@ -23,6 +23,7 @@ const init = {
   fileNames: [],
   fileHistory: {},
   fileConflicts: {},
+  fileSavePending: {},
   showFilePicker: false,
   showQuizLauncher: false,
   articleReadingFocus: false,
@@ -65,6 +66,12 @@ function reducer(state, action) {
       const fileConflicts = { ...state.fileConflicts }
       delete fileConflicts[action.payload]
       return { ...state, fileConflicts }
+    }
+    case 'SET_FILE_SAVE_PENDING': {
+      const fileSavePending = { ...state.fileSavePending }
+      if (action.payload.pending) fileSavePending[action.payload.id] = true
+      else delete fileSavePending[action.payload.id]
+      return { ...state, fileSavePending }
     }
     case 'OPEN_FILE': {
       const tab = tabFromFile(action.payload)
@@ -225,6 +232,7 @@ export function AppProvider({ children }) {
   const insertRef = useRef(null)
   const openRequestRef = useRef(0)
   const fileVersionRef = useRef({})
+  const fileSaveQueueRef = useRef({})
 
   if (state.openFile?.id && fileVersionRef.current[state.openFile.id] === undefined) {
     fileVersionRef.current[state.openFile.id] = Number(state.openFile.content_version || 0)
@@ -271,33 +279,46 @@ export function AppProvider({ children }) {
     }
   }, [loadTree, toast])
 
-  const saveFile = useCallback(async (id, content) => {
-    try {
-      const updated = await api.updateFile(id, {
-        content,
-        base_version: Number(fileVersionRef.current[id] ?? 0),
-      })
-      fileVersionRef.current[id] = Number(updated.content_version || 0)
-      dispatch({ type: 'SET_FILE_HISTORY', payload: { id, ...updated } })
-      return updated
-    } catch (err) {
-      if (err.code === 'FILE_VERSION_CONFLICT' && err.details?.current_file) {
-        dispatch({
-          type: 'SET_FILE_CONFLICT',
-          payload: { id, local_content: content, current_file: err.details.current_file },
+  const saveFile = useCallback((id, content) => {
+    const runSave = async () => {
+      try {
+        const updated = await api.updateFile(id, {
+          content,
+          base_version: Number(fileVersionRef.current[id] ?? 0),
         })
-        toast('Conflit détecté : le fichier a été modifié ailleurs', 'error')
+        fileVersionRef.current[id] = Number(updated.content_version || 0)
+        dispatch({ type: 'SET_FILE_HISTORY', payload: { id, ...updated } })
+        return updated
+      } catch (err) {
+        if (err.code === 'FILE_VERSION_CONFLICT' && err.details?.current_file) {
+          dispatch({
+            type: 'SET_FILE_CONFLICT',
+            payload: { id, local_content: content, current_file: err.details.current_file },
+          })
+          toast('Conflit détecté : le fichier a été modifié ailleurs', 'error')
+          err.alreadyToasted = true
+          throw err
+        }
+        if (/not found/i.test(err.message || '')) {
+          dispatch({ type: 'CLEAR_OPEN_FILE' })
+          await loadTree()
+        }
+        toast(err.message || 'Erreur lors de la sauvegarde', 'error')
         err.alreadyToasted = true
         throw err
       }
-      if (/not found/i.test(err.message || '')) {
-        dispatch({ type: 'CLEAR_OPEN_FILE' })
-        await loadTree()
-      }
-      toast(err.message || 'Erreur lors de la sauvegarde', 'error')
-      err.alreadyToasted = true
-      throw err
     }
+
+    dispatch({ type: 'SET_FILE_SAVE_PENDING', payload: { id, pending: true } })
+    const previousSave = fileSaveQueueRef.current[id] || Promise.resolve()
+    const queuedSave = previousSave.catch(() => undefined).then(runSave)
+    fileSaveQueueRef.current[id] = queuedSave
+    queuedSave.finally(() => {
+      if (fileSaveQueueRef.current[id] !== queuedSave) return
+      delete fileSaveQueueRef.current[id]
+      dispatch({ type: 'SET_FILE_SAVE_PENDING', payload: { id, pending: false } })
+    }).catch(() => {})
+    return queuedSave
   }, [loadTree, toast])
 
   const stepFileHistory = useCallback(async (id, direction) => {

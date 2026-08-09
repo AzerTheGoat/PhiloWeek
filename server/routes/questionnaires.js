@@ -135,6 +135,7 @@ router.get('/required-changes', (req, res) => {
 })
 
 module.exports = router
+module.exports.normalizeReviewQuestion = normalizeReviewQuestion
 
 function getQuestionnaireFiles(db, { scope, folderIds, fileId, fileIds }, userId, sessionId) {
   let rows = readableRows(db, userId, sessionId)
@@ -308,7 +309,20 @@ function normalizeReviewQuestion(question, index, questionnaire, file, source = 
   if (!question || typeof question !== 'object') return null
   const prompt = question.prompt || question.question || question.text
   if (!prompt) return null
-  const answer = question.answer || question.expected_answer || question.correction || ''
+  const choices = Array.isArray(question.choices) ? question.choices.map(choice => String(choice ?? '')) : []
+  const statedAnswer = question.answer || question.expected_answer || question.correction || question.correct_answer || ''
+  const rawCorrectIndex = question.correct_index ?? question.correctIndex
+  const numericCorrectIndex = typeof rawCorrectIndex === 'string' && /^\d+$/.test(rawCorrectIndex.trim())
+    ? Number(rawCorrectIndex)
+    : rawCorrectIndex
+  const explicitCorrectIndex = Number.isInteger(numericCorrectIndex) && numericCorrectIndex >= 0 && numericCorrectIndex < choices.length
+    ? numericCorrectIndex
+    : null
+  const answerCorrectIndex = statedAnswer
+    ? choices.findIndex(choice => choice.trim().toLocaleLowerCase() === String(statedAnswer).trim().toLocaleLowerCase())
+    : -1
+  const correctIndex = explicitCorrectIndex ?? (answerCorrectIndex >= 0 ? answerCorrectIndex : null)
+  const answer = correctIndex !== null ? choices[correctIndex] : statedAnswer
   const questionId = String(question.id || hash(`${prompt}|${answer}`)).slice(0, 80)
   const questionnaireKey = String(questionnaire.id || questionnaire.title || file.name).trim()
   const questionKey = `${questionnaireKey}:${questionId}`
@@ -330,7 +344,8 @@ function normalizeReviewQuestion(question, index, questionnaire, file, source = 
     source_file_name: source?.name || null,
     source_missing: !source && questionnaire.review_kind !== 'actor',
     require_change: Boolean(question.require_change),
-    choices: Array.isArray(question.choices) ? question.choices.map(String) : [],
+    choices,
+    correct_index: correctIndex,
     tags: Array.isArray(question.tags) ? question.tags.map(String) : [],
     index,
   }

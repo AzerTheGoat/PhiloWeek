@@ -82,6 +82,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.DictionaryEntry
+import fr.opuscule.android.data.ReviewQuestion
 import io.noties.markwon.Markwon
 import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.core.MarkwonTheme
@@ -281,6 +282,124 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         border = androidx.compose.foundation.BorderStroke(1.dp, Divider),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
+}
+
+@Composable
+fun ReviewChoiceList(
+    question: ReviewQuestion,
+    selectedIndex: Int?,
+    revealed: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    val choices = reviewChoices(question)
+    if (choices.isEmpty()) return
+    val correctIndex = reviewCorrectIndex(question)
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        choices.forEachIndexed { index, choice ->
+            val selected = selectedIndex == index
+            val correct = revealed && correctIndex == index
+            val wrongSelection = revealed && correctIndex != null && selected && correctIndex != index
+            val accent = when {
+                correct -> Success
+                wrongSelection -> Danger
+                selected -> Opuscule
+                else -> Divider
+            }
+            val background = when {
+                correct -> SuccessSoft
+                wrongSelection -> DangerSoft
+                selected -> OpusculeSoft
+                else -> ReadingPaper
+            }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp))
+                    .background(background).border(1.dp, accent, RoundedCornerShape(15.dp))
+                    .clickable(enabled = !revealed) { onSelect(index) }
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(if (selected || correct) accent else Surface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        ('A'.code + index).toChar().toString(),
+                        color = if (selected || correct) Color.White else Muted,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+                Text(choice, Modifier.padding(start = 11.dp).weight(1f), color = Ink)
+            }
+        }
+    }
+}
+
+fun reviewChoices(question: ReviewQuestion): List<String> = when {
+    question.choices.isNotEmpty() -> question.choices
+    question.type == "true_false" -> listOf("Vrai", "Faux")
+    else -> emptyList()
+}
+
+fun reviewCorrectIndex(question: ReviewQuestion): Int? {
+    val choices = reviewChoices(question)
+    return question.correctIndex?.takeIf { it in choices.indices }
+        ?: choices.indexOfFirst { it.trim().equals(question.answer.trim(), ignoreCase = true) }
+            .takeIf { it >= 0 }
+}
+
+@Composable
+fun ReviewChoiceResult(question: ReviewQuestion, selectedIndex: Int?) {
+    val correctIndex = reviewCorrectIndex(question)
+    val isCorrect = correctIndex != null && selectedIndex == correctIndex
+    val statusColor = when {
+        correctIndex == null -> Warning
+        isCorrect -> Success
+        else -> Danger
+    }
+    val statusBackground = when {
+        correctIndex == null -> OpusculeSoft
+        isCorrect -> SuccessSoft
+        else -> DangerSoft
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
+                .background(statusBackground).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                when {
+                    correctIndex == null -> "CORRECTION INDISPONIBLE"
+                    isCorrect -> "BONNE RÉPONSE"
+                    else -> "À REVOIR"
+                },
+                color = statusColor,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Text(
+                when {
+                    correctIndex == null -> "Ce QCM ne fournit pas de réponse correcte exploitable. Votre choix ne sera pas compté automatiquement comme faux."
+                    isCorrect -> "Votre choix correspond à la réponse attendue."
+                    else -> "La bonne réponse est indiquée en vert et votre choix en rouge."
+                },
+                color = Ink,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        ReviewChoiceList(question, selectedIndex, true) {}
+        question.explanation.takeIf(String::isNotBlank)?.let {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Surface).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text("EXPLICATION", color = Muted, style = MaterialTheme.typography.labelMedium)
+                Text(it, color = Ink, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
 }
 
 @Composable
