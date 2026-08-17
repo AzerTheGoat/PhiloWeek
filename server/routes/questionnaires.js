@@ -310,7 +310,11 @@ function normalizeReviewQuestion(question, index, questionnaire, file, source = 
   const prompt = question.prompt || question.question || question.text
   if (!prompt) return null
   const choices = Array.isArray(question.choices) ? question.choices.map(choice => String(choice ?? '')) : []
-  const statedAnswer = question.answer || question.expected_answer || question.correction || question.correct_answer || ''
+  const statedAnswer = coerceAnswerValue(question.answer)
+    || coerceAnswerValue(question.expected_answer)
+    || coerceAnswerValue(question.correction)
+    || coerceAnswerValue(question.correct_answer)
+    || ''
   const rawCorrectIndex = question.correct_index ?? question.correctIndex
   const numericCorrectIndex = typeof rawCorrectIndex === 'string' && /^\d+$/.test(rawCorrectIndex.trim())
     ? Number(rawCorrectIndex)
@@ -439,7 +443,7 @@ function collectRequiredChanges(file) {
     index,
     item_id: String(row.id || ''),
     title: String(row.prompt || row.term || row.name || row.title || `Élément ${index + 1}`),
-    answer: String(row.answer || row.definition || row.summary || row.body || ''),
+    answer: coerceAnswerValue(row.answer) || coerceAnswerValue(row.definition) || coerceAnswerValue(row.summary) || coerceAnswerValue(row.body) || '',
     explanation: String(row.explanation || row.example || row.details || ''),
   }] : [])
 }
@@ -468,6 +472,14 @@ function normalizeType(type) {
   if (type === 'definition') return 'definition'
   if (type === 'actor') return 'actor'
   return ['open', 'mcq', 'true_false'].includes(type) ? type : 'open'
+}
+
+// Booleans (true_false answers) are falsy for `false`, so a plain `||` chain
+// silently drops them; coerce to 'Vrai'/'Faux' before falling back.
+function coerceAnswerValue(value) {
+  if (typeof value === 'boolean') return value ? 'Vrai' : 'Faux'
+  if (value === null || value === undefined) return ''
+  return String(value)
 }
 
 function getStats(db, userId) {

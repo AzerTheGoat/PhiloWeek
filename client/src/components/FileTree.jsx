@@ -230,6 +230,8 @@ function FileNode({
   }, [isEncrypted, node.id, password, loadTree, toast])
 
   const icon = isLocked ? '🔒' : isFolder ? (expanded ? '▾' : '▸') : /\.xlsx$/i.test(node.name || '') ? '▦' : '📄'
+  const isNote = !isFolder && /\.md$/i.test(node.name || '')
+  const missingQuiz = isNote && !node.has_quiz
 
   return (
     <li className={`file-node ${isActive ? 'active' : ''}`}>
@@ -275,6 +277,7 @@ function FileNode({
           )}
           <span className="file-icon">{icon}</span>
           <span className="file-name">{node.name.replace(/\.(md|json|xlsx)$/i, '')}</span>
+          {missingQuiz && <span className="file-no-quiz-badge" title="Aucun quiz genere pour cette note">🚫</span>}
           {isEncrypted && <span className="file-encrypted-badge" title={isLocked ? 'Chiffré et verrouillé' : 'Chiffré en base, ouvert dans cette session'}>🛡</span>}
           {node.shared_root && <span className="file-shared-badge" title={`Partagé par ${node.owner_username}`}>☁</span>}
         </div>

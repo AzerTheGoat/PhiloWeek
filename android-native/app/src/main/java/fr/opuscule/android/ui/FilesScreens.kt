@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -254,6 +253,7 @@ fun FileViewerScreen(state: AppState, id: String, onBack: () -> Unit, openLinked
             }
         },
         applyStatusInset = true,
+        floatingAction = { if (!editing && detail?.name?.endsWith(".md", true) == true) ReadingFontSizeControl(state) },
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding)) { LoadingPane() }
@@ -289,14 +289,14 @@ private fun FileReader(file: FileDetail, onWikiLink: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         when {
-            file.name.endsWith(".md", true) && kind != "graph" -> ReaderPaper { MarkdownView(stripFrontmatter(file.content), onWikiLink = onWikiLink) }
+            file.name.endsWith(".md", true) && kind != "graph" -> MarkdownView(stripFrontmatter(file.content), onWikiLink = onWikiLink)
             kind == "questionnaire" -> QuestionnaireReader(json, onWikiLink)
             kind == "definitions" -> DefinitionsReader(json, onWikiLink)
             kind == "actor_network" -> ActorNetworkReader(json, onWikiLink)
             kind == "spreadsheet" || file.name.endsWith(".xlsx", true) -> SpreadsheetReader(json)
             kind == "graph" || file.content.contains("```philoweek-graph") -> GraphReader(file.content, json, onWikiLink)
             json != null -> GenericJsonReader(json)
-            else -> ReaderPaper { MarkdownView(file.content, onWikiLink = onWikiLink) }
+            else -> MarkdownView(file.content, onWikiLink = onWikiLink)
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -417,17 +417,6 @@ private fun ReaderTitle(title: String, description: String, icon: ImageVector) {
             Text(title, style = MaterialTheme.typography.headlineMedium)
             if (description.isNotBlank()) Text(description, color = Muted, style = MaterialTheme.typography.bodyMedium)
         }
-    }
-}
-
-@Composable
-private fun ReaderPaper(content: @Composable () -> Unit) {
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(ReadingPaper)
-            .border(1.dp, Divider.copy(alpha = .7f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 19.dp, vertical = 18.dp),
-    ) {
-        content()
     }
 }
 

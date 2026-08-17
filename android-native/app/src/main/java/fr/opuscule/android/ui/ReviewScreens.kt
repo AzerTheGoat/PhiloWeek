@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
@@ -65,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -95,6 +97,7 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     var grading by remember { mutableStateOf(false) }
     var known by remember { mutableIntStateOf(0) }
     var missed by remember { mutableStateOf<List<ReviewQuestion>>(emptyList()) }
+    val history = remember { mutableStateListOf<Pair<ReviewQuestion, Boolean>>() }
     var loading by remember { mutableStateOf(false) }
     var selector by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<ReviewQuestion?>(null) }
@@ -122,6 +125,7 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
                     grading = false
                     known = 0
                     missed = emptyList()
+                    history.clear()
                     selector = false
                 }
             }
@@ -138,6 +142,7 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
                 .onSuccess {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (value) known++ else missed = missed + current
+                    history.add(current to value)
                     index++
                     revealed = false
                     selectedChoice = null
@@ -148,6 +153,16 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
                     state.handle(it)
                 }
         }
+    }
+
+    fun back() {
+        if (grading || history.isEmpty()) return
+        val (previous, wasKnown) = history.removeLast()
+        if (wasKnown) known-- else missed = missed.dropLast(1)
+        index--
+        revealed = false
+        selectedChoice = null
+        state.notify("Retour à « ${previous.prompt.take(60)}${if (previous.prompt.length > 60) "…" else ""} »")
     }
 
     when {
@@ -164,10 +179,12 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
             revealed,
             selectedChoice,
             grading,
+            history.isNotEmpty(),
             { selectedChoice = it },
             { revealed = true; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
             { grade(false) },
             { grade(true) },
+            ::back,
             {
                 current.sourceFileId?.let(openSource)
                     ?: state.notify("Aucune note Markdown liée à cette carte.", "warning")
@@ -307,10 +324,12 @@ private fun ReviewCard(
     revealed: Boolean,
     selectedChoice: Int?,
     grading: Boolean,
+    canGoBack: Boolean,
     selectChoice: (Int) -> Unit,
     reveal: () -> Unit,
     unknown: () -> Unit,
     known: () -> Unit,
+    back: () -> Unit,
     source: () -> Unit,
     edit: () -> Unit,
     delete: () -> Unit,
@@ -333,6 +352,9 @@ private fun ReviewCard(
             Column(Modifier.fillMaxWidth().background(Surface)) {
                 Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = stop, modifier = Modifier.size(38.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Quitter") }
+                    IconButton(onClick = back, enabled = canGoBack && !grading, modifier = Modifier.size(38.dp)) {
+                        Icon(Icons.AutoMirrored.Rounded.Undo, "Carte précédente", tint = if (canGoBack) Ink else Muted)
+                    }
                     Text("${index + 1} sur $total", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.MoreHoriz, "Options") }

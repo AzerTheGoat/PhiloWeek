@@ -956,6 +956,13 @@ function validateWritableParent(db, parentId, userId, sessionId) {
   return { ownerId: parent.user_id, encryptedFolderId: parent.encrypted_folder_id || null }
 }
 
+function getGeneratedQuizSourceIds(db, ownerId) {
+  return new Set(
+    db.prepare('SELECT source_file_id FROM generated_quizzes WHERE user_id = ?').all(ownerId)
+      .map(row => String(row.source_file_id))
+  )
+}
+
 function buildAccessibleTree(db, userId, sessionId) {
   const rawOwnedRows = db.prepare(`
     SELECT id, parent_id, name, type, sort_order, created_at, updated_at, content_version,
@@ -967,6 +974,7 @@ function buildAccessibleTree(db, userId, sessionId) {
   const lockedEncryptedRoots = new Set(rawOwnedRows
     .filter(row => row.is_encrypted && !isFolderOpen(sessionId, row.id))
     .map(row => row.id))
+  const ownedQuizSourceIds = getGeneratedQuizSourceIds(db, userId)
   const ownedRows = rawOwnedRows
     .filter(row => !row.encrypted_folder_id || row.id === row.encrypted_folder_id || !lockedEncryptedRoots.has(row.encrypted_folder_id))
     .map(row => ({
@@ -977,6 +985,7 @@ function buildAccessibleTree(db, userId, sessionId) {
     can_edit: true,
     can_share: true,
     shared: false,
+    has_quiz: ownedQuizSourceIds.has(row.id),
   }))
   const roots = assembleTree(ownedRows)
 
@@ -993,6 +1002,7 @@ function buildAccessibleTree(db, userId, sessionId) {
       FROM files WHERE id IN (SELECT id FROM subtree) AND encrypted_folder_id IS NULL
       ORDER BY type DESC, sort_order ASC, name ASC
     `).all(shareRoot.file_id, shareRoot.owner_id)
+    const sharedQuizSourceIds = getGeneratedQuizSourceIds(db, shareRoot.owner_id)
     const decorated = rows.map(row => {
       const access = getFileAccess(db, row.id, userId)
       return {
@@ -1003,6 +1013,7 @@ function buildAccessibleTree(db, userId, sessionId) {
         shared: true,
         owner_username: shareRoot.owner_username,
         permission: access?.permission || 'view',
+        has_quiz: sharedQuizSourceIds.has(row.id),
       }
     })
     const sharedRoots = assembleTree(decorated, shareRoot.file_id)

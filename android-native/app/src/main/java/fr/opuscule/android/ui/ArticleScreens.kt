@@ -195,6 +195,7 @@ private fun ArticleDetailScreen(state: AppState, id: String, back: () -> Unit) {
                 }
             }
         },
+        floatingAction = { if (article != null) ReadingFontSizeControl(state) },
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding)) { LoadingPane() }
@@ -209,9 +210,7 @@ private fun ArticleDetailScreen(state: AppState, id: String, back: () -> Unit) {
                     Text(article!!.author ?: "Compte supprimé", style = MaterialTheme.typography.labelLarge)
                     Text(" · ${article!!.publishedOn.orEmpty()}", color = Muted)
                 }
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(ReadingPaper).padding(horizontal = 18.dp, vertical = 17.dp)) {
-                    MarkdownView(article!!.content.orEmpty())
-                }
+                MarkdownView(article!!.content.orEmpty())
                 HorizontalDivider(color = Divider)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = {

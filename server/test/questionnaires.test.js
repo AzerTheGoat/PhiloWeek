@@ -51,3 +51,27 @@ test('keeps an invalid MCQ correction unresolved instead of inventing an answer'
   assert.equal(result.correct_index, null)
   assert.equal(result.answer, '')
 })
+
+test('keeps a boolean false true_false answer instead of dropping it as falsy', () => {
+  const result = normalizeReviewQuestion({
+    id: 'q9',
+    type: 'true_false',
+    prompt: 'Cette affirmation est-elle correcte ?',
+    answer: false,
+    explanation: 'Explication.',
+  }, 0, questionnaire, file)
+
+  assert.equal(result.answer, 'Faux')
+  assert.equal(result.type, 'true_false')
+})
+
+test('keeps a boolean true true_false answer', () => {
+  const result = normalizeReviewQuestion({
+    id: 'q10',
+    type: 'true_false',
+    prompt: 'Cette affirmation est-elle correcte ?',
+    answer: true,
+  }, 0, questionnaire, file)
+
+  assert.equal(result.answer, 'Vrai')
+})

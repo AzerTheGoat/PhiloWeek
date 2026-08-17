@@ -10444,6 +10444,13 @@ kbd {
   opacity: .82;
 }
 
+.file-no-quiz-badge {
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1;
+  opacity: .55;
+}
+
 .modal-divider {
   width: 100%;
   margin: 18px 0;

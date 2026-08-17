@@ -23,6 +23,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,17 +73,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.opuscule.android.AppState
 import fr.opuscule.android.data.DictionaryEntry
@@ -153,11 +163,13 @@ fun DetailScaffold(
     onBack: () -> Unit,
     action: (@Composable () -> Unit)? = null,
     applyStatusInset: Boolean = false,
+    floatingAction: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val compact = LocalCompactInterface.current
     Scaffold(
         containerColor = Canvas,
+        floatingActionButton = { floatingAction?.invoke() },
         topBar = {
             Column(
                 Modifier
@@ -454,6 +466,50 @@ fun InlineNotice(message: String, visible: Boolean) {
 }
 
 @Composable
+fun ReadingFontSizeControl(state: AppState, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        AnimatedVisibility(expanded, enter = fadeIn(), exit = fadeOut()) {
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(Surface)
+                    .border(1.dp, Divider, RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = { state.updateReadingFontSize(state.readingFontSize - 1f) },
+                    modifier = Modifier.size(38.dp),
+                    enabled = state.readingFontSize > 14f,
+                ) { Text("A", color = Ink, style = MaterialTheme.typography.bodyMedium) }
+                Text(
+                    "${state.readingFontSize.toInt()}",
+                    Modifier.padding(horizontal = 3.dp),
+                    color = Muted,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                IconButton(
+                    onClick = { state.updateReadingFontSize(state.readingFontSize + 1f) },
+                    modifier = Modifier.size(38.dp),
+                    enabled = state.readingFontSize < 25f,
+                ) { Text("A", color = Ink, style = MaterialTheme.typography.titleLarge) }
+                Box(Modifier.width(1.dp).height(20.dp).background(Divider))
+                IconButton(onClick = { expanded = false }, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Rounded.Close, "Fermer", tint = Muted, modifier = Modifier.size(15.dp))
+                }
+            }
+        }
+        AnimatedVisibility(!expanded, enter = fadeIn(), exit = fadeOut()) {
+            Box(
+                Modifier.size(46.dp).clip(CircleShape).background(Opuscule)
+                    .clickable { expanded = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Aa", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
 fun MarkdownView(markdown: String, modifier: Modifier = Modifier, onWikiLink: ((String) -> Unit)? = null) {
     val parts = remember(markdown) { splitMarkdown(markdown) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -536,7 +592,9 @@ private fun NativeMarkdownText(markdown: String, modifier: Modifier, onWikiLink:
                 setTextColor(ink.toArgbCompat())
                 setLinkTextColor(accent.toArgbCompat())
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, readingFontSize)
-                setLineSpacing(4f, 1.28f)
+                setLineSpacing(2f, 1.5f)
+                justificationMode = android.text.Layout.JUSTIFICATION_MODE_INTER_WORD
+                hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NORMAL
                 highlightColor = accentSoft.toArgbCompat()
                 movementMethod = if (onWikiLink == null) LinkMovementMethod.getInstance() else WikiLinkMovementMethod(onWikiLink)
                 setTextIsSelectable(true)
@@ -637,6 +695,7 @@ private fun MermaidDiagram(source: String, key: Int) {
     var image by remember(source) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var error by remember(source) { mutableStateOf<String?>(null) }
     var retry by remember(source) { mutableStateOf(0) }
+    var zoomed by remember { mutableStateOf(false) }
     LaunchedEffect(source, retry, token, dark) {
         if (token == null || source.isBlank()) {
             error = "Diagramme Mermaid vide."
@@ -656,15 +715,20 @@ private fun MermaidDiagram(source: String, key: Int) {
             .background(Surface).border(1.dp, Divider, RoundedCornerShape(16.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("DIAGRAMME", style = MaterialTheme.typography.labelMedium, color = Opuscule)
-            Text("  Mermaid", style = MaterialTheme.typography.labelMedium, color = Ink)
+            Text("  Mermaid", style = MaterialTheme.typography.labelMedium, color = Ink, modifier = Modifier.weight(1f))
+            if (image != null) {
+                IconButton(onClick = { zoomed = true }, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Rounded.OpenInFull, "Agrandir le diagramme", tint = Opuscule, modifier = Modifier.size(17.dp))
+                }
+            }
         }
         when {
             image != null -> androidx.compose.foundation.Image(
                 image!!,
                 contentDescription = "Diagramme Mermaid ${key + 1}",
-                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 520.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 520.dp).clickable { zoomed = true },
                 contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             )
             error != null -> {
@@ -675,6 +739,63 @@ private fun MermaidDiagram(source: String, key: Int) {
             else -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(26.dp), color = Opuscule, strokeWidth = 2.5.dp)
             }
+        }
+    }
+    if (zoomed) {
+        image?.let { bitmap ->
+            ZoomableImageDialog(bitmap, "Diagramme Mermaid ${key + 1}") { zoomed = false }
+        }
+    }
+}
+
+@Composable
+private fun ZoomableImageDialog(image: androidx.compose.ui.graphics.ImageBitmap, description: String, dismiss: () -> Unit) {
+    Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        var scale by remember { mutableFloatStateOf(1f) }
+        var offset by remember { mutableStateOf(Offset.Zero) }
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .96f))
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val nextScale = (scale * zoom).coerceIn(1f, 6f)
+                        scale = nextScale
+                        offset = if (nextScale <= 1f) Offset.Zero else offset + pan
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap = {
+                        scale = if (scale > 1.01f) 1f else 2.5f
+                        offset = Offset.Zero
+                    })
+                },
+        ) {
+            androidx.compose.foundation.Image(
+                image,
+                contentDescription = description,
+                modifier = Modifier.fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+            IconButton(
+                onClick = dismiss,
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp)
+                    .size(42.dp).clip(CircleShape).background(Color.White.copy(alpha = .16f)),
+            ) {
+                Icon(Icons.Rounded.Close, "Fermer", tint = Color.White)
+            }
+            Text(
+                "Pincez pour zoomer · double-tap pour réinitialiser",
+                color = Color.White.copy(alpha = .75f),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp)
+                    .clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = .14f))
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            )
         }
     }
 }
