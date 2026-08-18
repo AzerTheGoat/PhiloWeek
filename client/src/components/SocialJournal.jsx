@@ -4,7 +4,6 @@ import { useApp } from '../context/useApp'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { useArticleReadTracker } from '../utils/useArticleReadTracker'
 import { promptImageUrl } from '../utils/imageInput'
-import useIsMobile from '../hooks/useIsMobile'
 import Icon from './Icons'
 import MarkdownHtml from './MarkdownHtml'
 import * as api from '../api'
@@ -24,22 +23,24 @@ const EMPTY_FORM = {
 
 export default function SocialJournal() {
   const { toast, articleReadingFocus, dispatch } = useApp()
-  const isMobile = useIsMobile()
   const [scope, setScope] = useState('feed')
   const [query, setQuery] = useState('')
   const [articles, setArticles] = useState([])
   const [events, setEvents] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState('read')
+  // Écran plein affiché : 'feed' (le magazine), 'article' (page dédiée d'un
+  // texte) ou 'write' (composition/édition). Un seul écran visible à la
+  // fois, sur tous les gabarits — cliquer un article change de page, il ne
+  // s'ouvre plus dans un volet à côté du fil.
+  const [screen, setScreen] = useState('feed')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [comment, setComment] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [replyBody, setReplyBody] = useState('')
-  // Mobile uniquement : afficher soit le fil, soit l'article/formulaire (plein écran).
-  const [mobileView, setMobileView] = useState('feed') // 'feed' | 'reader'
-  const backToFeed = useCallback(() => { setMode('read'); setMobileView('feed') }, [])
+
+  const backToFeed = useCallback(() => setScreen('feed'), [])
 
   useEffect(() => () => dispatch({ type: 'SET_ARTICLE_READING_FOCUS', payload: false }), [dispatch])
 
@@ -52,16 +53,12 @@ export default function SocialJournal() {
     try {
       const rows = await api.getArticles({ scope, q: query, date: localDate() })
       setArticles(rows)
-      if (!selected && rows[0]) {
-        const full = await api.getArticle(rows[0].id)
-        setSelected(full)
-      }
     } catch (err) {
       toast(err.message || 'Journal impossible a charger', 'error')
     } finally {
       setLoading(false)
     }
-  }, [query, scope, selected, toast])
+  }, [query, scope, toast])
 
   useEffect(() => { loadArticles() }, [loadArticles])
 
@@ -83,7 +80,6 @@ export default function SocialJournal() {
     const handler = async (event) => {
       const id = event.detail?.articleId
       if (!id) return
-      setMode('read')
       await openArticle(id)
     }
     window.addEventListener('philoweek:open-article', handler)
@@ -94,7 +90,7 @@ export default function SocialJournal() {
   const markedReadRef = useRef(new Set())
 
   // On ne compte pas l'auteur comme lecteur de son propre article.
-  const trackable = mode === 'read' && !!selected && !selected.can_edit
+  const trackable = screen === 'article' && !!selected && !selected.can_edit
 
   const applyReadSummary = useCallback((id, summary) => {
     const patch = current => (current?.id === id ? { ...current, ...summary } : current)
@@ -127,8 +123,7 @@ export default function SocialJournal() {
     try {
       const full = await api.getArticle(id)
       setSelected(full)
-      setMode('read')
-      setMobileView('reader')
+      setScreen('article')
     } catch (err) {
       toast(err.message || 'Article introuvable', 'error')
     }
@@ -137,8 +132,7 @@ export default function SocialJournal() {
   const startCreate = () => {
     setEditingId(null)
     setForm({ ...EMPTY_FORM, published_on: localDate() })
-    setMode('write')
-    setMobileView('reader')
+    setScreen('write')
   }
 
   const startEdit = (article) => {
@@ -153,8 +147,7 @@ export default function SocialJournal() {
       event_id: article.event_id || '',
       cover_image_data: article.cover_image_data || '',
     })
-    setMode('write')
-    setMobileView('reader')
+    setScreen('write')
   }
 
   const saveArticle = async (event) => {
@@ -181,7 +174,7 @@ export default function SocialJournal() {
     try {
       await api.deleteArticle(article.id)
       setSelected(null)
-      setMobileView('feed')
+      setScreen('feed')
       await loadArticles()
       toast('Article supprime')
     } catch (err) {
@@ -273,113 +266,174 @@ export default function SocialJournal() {
     }
   }
 
+  const featured = articles[0]
+  const rest = articles.slice(1)
+
   return (
-    <div className={`social-journal-page ${articleReadingFocus ? 'reading-focus' : ''}`} data-mobile-view={isMobile ? mobileView : 'both'}>
-      {isMobile && mobileView === 'reader' && (
-        <button type="button" className="social-journal-back" onClick={backToFeed}>
-          <Icon name="back" size={16} /> Retour au fil
+    <div className={`social-journal-page ${articleReadingFocus ? 'reading-focus' : ''}`} data-screen={screen}>
+      {(screen === 'article' || screen === 'write') && (
+        <button type="button" className="magazine-back" onClick={backToFeed}>
+          <Icon name="back" size={16} /> Retour au magazine
         </button>
       )}
 
-      <header className="social-journal-header">
-        <div>
-          <span>Journal public</span>
-          <h1>Articles du reseau</h1>
-        </div>
-        <button type="button" className="btn-primary" onClick={startCreate}>
-          <Icon name="edit" size={16} /> Ecrire
-        </button>
-      </header>
-
-      <section className="social-journal-toolbar">
-        <div className="social-tabs">
-          {[
-            ['feed', 'Fil'],
-            ['mine', 'Mes articles'],
-          ].map(([key, label]) => (
-            <button key={key} type="button" className={scope === key ? 'active' : ''} onClick={() => setScope(key)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher un article, un auteur..." />
-      </section>
-
-      <div className="social-journal-layout">
-        <aside className="article-feed">
-          {loading && <p className="article-empty">Chargement...</p>}
-          {!loading && articles.length === 0 && <p className="article-empty">Aucun article pour le moment.</p>}
-          {articles.map(article => {
-            const unread = !article.can_edit && !article.read_by_me
-            return (
-              <article
-                key={article.id}
-                className={`article-feed-card ${selected?.id === article.id ? 'active' : ''} ${unread ? 'unread' : ''}`}
-                onClick={() => openArticle(article.id)}
-              >
-                <ArticleMedia src={article.cover_image_data} className="article-card-media" />
-                <div>
-                  <span className="article-card-line">
-                    {unread && <i className="article-unread-dot" title="Non lu" />}
-                    {formatDate(article.published_on || article.created_at)}
-                    {!unread && !article.can_edit && (
-                      <em className="article-read-flag"><Icon name="check" size={12} /> Lu</em>
-                    )}
-                  </span>
-                  <h2>{article.title}</h2>
-                  <p>{article.excerpt || stripMarkdown(article.content).slice(0, 150)}</p>
-                  <small>
-                    {article.author_username || 'Compte supprime'} · <Icon name="eye" size={12} /> {article.read_count || 0} · {article.like_count || 0} j'aime · {article.comment_count || 0} comm.
-                  </small>
-                  {article.status === 'draft' && <em>Brouillon</em>}
-                </div>
-              </article>
-            )
-          })}
-        </aside>
-
-        <main className="article-reader" ref={readerRef}>
-          {mode === 'write' ? (
-            <ArticleForm
-              form={form}
-              setForm={setForm}
-              events={events}
-              editingId={editingId}
-              onSubmit={saveArticle}
-              onCancel={backToFeed}
-              onCover={handleCover}
-              onCoverUrl={handleCoverUrl}
-            />
-          ) : selected ? (
-            <ArticleView
-              article={selected}
-              onEdit={() => startEdit(selected)}
-              onDelete={() => removeArticle(selected)}
-              onCopyLink={() => copyPublicLink(selected)}
-              onLike={() => toggleLike(selected)}
-              comment={comment}
-              setComment={setComment}
-              onComment={sendComment}
-              replyTo={replyTo}
-              replyBody={replyBody}
-              setReplyBody={setReplyBody}
-              onReply={sendReply}
-              onStartReply={item => { setReplyTo(item); setReplyBody('') }}
-              onCancelReply={() => { setReplyTo(null); setReplyBody('') }}
-              onRemoveComment={removeComment}
-              readingFocus={articleReadingFocus}
-              onToggleReadingFocus={toggleReadingFocus}
-            />
-          ) : (
-            <div className="article-placeholder">
-              <Icon name="newspaper" size={40} />
-              <h2>Choisis un article</h2>
-              <p>Le journal public rassemble les textes publies par tous les comptes.</p>
+      {screen === 'feed' && (
+        <>
+          <header className="magazine-masthead">
+            <div>
+              <span>Journal public</span>
+              <h1>Le Magazine</h1>
+              <p>
+                {loading
+                  ? 'Chargement des derniers textes...'
+                  : articles.length
+                    ? `${articles.length} article${articles.length > 1 ? 's' : ''} publié${articles.length > 1 ? 's' : ''} par la communauté`
+                    : 'Les textes publiés par les membres du réseau'}
+              </p>
             </div>
-          )}
+            <button type="button" className="btn-primary" onClick={startCreate}>
+              <Icon name="edit" size={16} /> Écrire
+            </button>
+          </header>
+
+          <section className="magazine-toolbar">
+            <div className="social-tabs">
+              {[
+                ['feed', 'Fil'],
+                ['mine', 'Mes articles'],
+              ].map(([key, label]) => (
+                <button key={key} type="button" className={scope === key ? 'active' : ''} onClick={() => setScope(key)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher un article, un auteur..." />
+          </section>
+
+          <div className="magazine-body">
+            {loading && (
+              <div className="magazine-skeleton">
+                <div className="magazine-skeleton-hero" />
+                <div className="magazine-skeleton-grid">
+                  <div /><div /><div />
+                </div>
+              </div>
+            )}
+            {!loading && articles.length === 0 && (
+              <div className="magazine-empty">
+                <Icon name="newspaper" size={40} />
+                <h2>{scope === 'mine' ? "Tu n'as pas encore publié" : 'Aucun article pour le moment'}</h2>
+                <p>{scope === 'mine' ? "Partage ta première réflexion avec le réseau." : 'Sois le premier à publier un texte dans le journal public.'}</p>
+                <button type="button" className="btn-primary" onClick={startCreate}>Écrire un article</button>
+              </div>
+            )}
+            {!loading && featured && (
+              <>
+                <FeaturedCard article={featured} onOpen={openArticle} />
+                {rest.length > 0 && (
+                  <div className="magazine-grid">
+                    {rest.map(article => (
+                      <GridCard key={article.id} article={article} onOpen={openArticle} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === 'write' && (
+        <ArticleForm
+          form={form}
+          setForm={setForm}
+          events={events}
+          editingId={editingId}
+          onSubmit={saveArticle}
+          onCancel={backToFeed}
+          onCover={handleCover}
+          onCoverUrl={handleCoverUrl}
+        />
+      )}
+
+      {screen === 'article' && selected && (
+        <main className="article-page" ref={readerRef}>
+          <ArticleView
+            article={selected}
+            onEdit={() => startEdit(selected)}
+            onDelete={() => removeArticle(selected)}
+            onCopyLink={() => copyPublicLink(selected)}
+            onLike={() => toggleLike(selected)}
+            comment={comment}
+            setComment={setComment}
+            onComment={sendComment}
+            replyTo={replyTo}
+            replyBody={replyBody}
+            setReplyBody={setReplyBody}
+            onReply={sendReply}
+            onStartReply={item => { setReplyTo(item); setReplyBody('') }}
+            onCancelReply={() => { setReplyTo(null); setReplyBody('') }}
+            onRemoveComment={removeComment}
+            readingFocus={articleReadingFocus}
+            onToggleReadingFocus={toggleReadingFocus}
+          />
         </main>
-      </div>
+      )}
     </div>
+  )
+}
+
+// Carte "une" du magazine : le premier article du fil, en grand format.
+function FeaturedCard({ article, onOpen }) {
+  const unread = !article.can_edit && !article.read_by_me
+  return (
+    <article className={`magazine-hero ${unread ? 'unread' : ''}`} onClick={() => onOpen(article.id)}>
+      <div className="magazine-hero-media">
+        {article.cover_image_data
+          ? <img src={article.cover_image_data} alt="" loading="lazy" referrerPolicy="no-referrer" />
+          : <Icon name="newspaper" size={44} />}
+      </div>
+      <div className="magazine-hero-content">
+        <span className="magazine-hero-line">
+          {unread && <i className="article-unread-dot" title="Non lu" />}
+          {formatDate(article.published_on || article.created_at)}
+          {article.status === 'draft' && <em className="magazine-draft-badge">Brouillon</em>}
+        </span>
+        <h2>{article.title}</h2>
+        <p>{article.excerpt || stripMarkdown(article.content).slice(0, 220)}</p>
+        <div className="magazine-hero-meta">
+          <span className="magazine-author">{article.author_username || 'Compte supprime'}</span>
+          <span><Icon name="eye" size={13} /> {article.read_count || 0}</span>
+          <span><Icon name="heart" size={13} /> {article.like_count || 0}</span>
+          <span>{article.comment_count || 0} comm.</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+// Carte de grille : le reste du fil, en format compact et régulier.
+function GridCard({ article, onOpen }) {
+  const unread = !article.can_edit && !article.read_by_me
+  return (
+    <article className={`magazine-card ${unread ? 'unread' : ''}`} onClick={() => onOpen(article.id)}>
+      <ArticleMedia src={article.cover_image_data} className="magazine-card-media" />
+      <div className="magazine-card-body">
+        <span className="magazine-card-line">
+          {unread && <i className="article-unread-dot" title="Non lu" />}
+          {formatDate(article.published_on || article.created_at)}
+          {!unread && !article.can_edit && (
+            <em className="article-read-flag"><Icon name="check" size={12} /> Lu</em>
+          )}
+        </span>
+        <h3>{article.title}</h3>
+        <p>{article.excerpt || stripMarkdown(article.content).slice(0, 120)}</p>
+        <small>
+          {article.author_username || 'Compte supprime'} · <Icon name="eye" size={12} /> {article.read_count || 0} · {article.like_count || 0} j'aime
+        </small>
+        {article.status === 'draft' && <em className="magazine-draft-badge">Brouillon</em>}
+      </div>
+    </article>
   )
 }
 

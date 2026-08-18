@@ -293,7 +293,12 @@ function useAppUrlNavigation({ view, currentFile, openFile, dispatch }) {
       dispatch({ type: 'SET_VIEW', payload: route.view })
     } else {
       dispatch({ type: 'CLEAR_OPEN_FILE' })
-      dispatch({ type: 'SET_VIEW', payload: 'editor' })
+      dispatch({ type: 'SET_VIEW', payload: 'social-journal' })
+      // Le fallback racine atterrit sur les Articles, dont le chemin canonique
+      // (/app/views/articles) diffère de route.path (/app) : sans ce
+      // réajustement, l'effet de sync d'URL resterait bloqué en comparant
+      // une cible qui ne correspondra jamais à applyingPathRef.
+      applyingPathRef.current = appPathForState('social-journal', null)
     }
 
     setHydrated(true)

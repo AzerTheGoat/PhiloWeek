@@ -13,9 +13,9 @@ const init = {
   viewTabs: [],
   openFileId: null,
   openFile: null,
-  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
+  view: 'social-journal', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
   theme: localStorage.getItem('pw-theme') || 'light',
-  sidebarOpen: !isMobileViewport(),
+  sidebarOpen: false,
   featuresOpen: false,
   toasts: [],
   contextMenu: null,
