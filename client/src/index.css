@@ -1017,7 +1017,8 @@
   background: var(--bg);
 }
 
-.social-journal-page[data-screen="feed"] {
+.social-journal-page[data-screen="feed"],
+.social-journal-page[data-screen="write"] {
   overflow-y: auto;
   overflow-x: hidden;
 }
