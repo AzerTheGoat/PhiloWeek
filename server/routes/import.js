@@ -134,6 +134,12 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
           practice_id, entry_date, done, user_id, updated_at
         ) VALUES (?, ?, ?, ?, ?)`
       )
+      const insertAgendaEvent = db.prepare(
+        `INSERT OR IGNORE INTO agenda_events (
+          id, title, notes, location, start_date, start_time, end_date, end_time,
+          all_day, source_uid, user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
       const upsertLifeProfile = db.prepare(
         `INSERT INTO life_profiles (user_id, birth_date, life_expectancy_years, updated_at)
          VALUES (?, ?, ?, ?)
@@ -444,6 +450,33 @@ router.post('/obsidian', upload.single('vault'), async (req, res) => {
                 check.done ? 1 : 0,
                 req.user.id,
                 check.updated_at || now
+              )
+              report.imported++
+            }
+            const events = Array.isArray(jsonSpecial.events) ? jsonSpecial.events : []
+            for (const event of events) {
+              const title = String(event.title || '').trim().slice(0, 240)
+              const startDate = normalizeDueDate(event.start_date)
+              const endDate = normalizeDueDate(event.end_date || event.start_date)
+              const allDay = event.all_day ? 1 : 0
+              const startTime = allDay ? null : normalizeAgendaTime(event.start_time)
+              const endTime = allDay ? null : normalizeAgendaTime(event.end_time)
+              if (!title || !startDate || !endDate || endDate < startDate) continue
+              if (!allDay && (!startTime || !endTime || (endDate === startDate && endTime <= startTime))) continue
+              insertAgendaEvent.run(
+                event.id || uuidv4(),
+                title,
+                String(event.notes || '').trim().slice(0, 4000) || null,
+                String(event.location || '').trim().slice(0, 500) || null,
+                startDate,
+                startTime,
+                endDate,
+                endTime,
+                allDay,
+                String(event.source_uid || '').trim().slice(0, 500) || null,
+                req.user.id,
+                normalizeIsoDate(event.created_at) || now,
+                normalizeIsoDate(event.updated_at) || now
               )
               report.imported++
             }
@@ -1092,6 +1125,12 @@ function normalizeIsoDate(value) {
   if (!text) return null
   const date = new Date(text)
   return Number.isFinite(date.getTime()) ? date.toISOString() : null
+}
+
+function normalizeAgendaTime(value) {
+  const match = String(value || '').trim().match(/^(\d{2}):(\d{2})/)
+  if (!match) return null
+  return Number(match[1]) <= 23 && Number(match[2]) <= 59 ? `${match[1]}:${match[2]}` : null
 }
 
 function normalizeColor(value) {

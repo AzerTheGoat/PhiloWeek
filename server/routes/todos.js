@@ -75,7 +75,13 @@ router.get('/dashboard', (req, res) => {
     birth_date: null,
     life_expectancy_years: 85,
   }
-  res.json({ practices, checks, profile, today: todayInput(), since })
+  const events = db.prepare(`
+    SELECT * FROM agenda_events
+    WHERE user_id = ?
+    ORDER BY start_date ASC, COALESCE(start_time, '') ASC, created_at ASC
+    LIMIT 2500
+  `).all(req.user.id)
+  res.json({ practices, checks, events, profile, today: todayInput(), since })
 })
 
 router.post('/practices', (req, res) => {
@@ -137,6 +143,114 @@ router.delete('/practices/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' })
   db.prepare('DELETE FROM agenda_checks WHERE practice_id = ? AND user_id = ?').run(req.params.id, req.user.id)
   db.prepare('DELETE FROM agenda_practices WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
+  res.json({ ok: true })
+})
+
+router.post('/events/import-ics', (req, res) => {
+  const db = getDb()
+  const content = String(req.body.content || '')
+  if (!content.trim()) return res.status(400).json({ error: 'Fichier iCalendar vide' })
+  if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Le fichier iCalendar dépasse 2 Mo' })
+  }
+
+  const parsed = parseIcsEvents(content).slice(0, 500)
+  if (parsed.length === 0) return res.status(400).json({ error: 'Aucun événement compatible trouvé' })
+  const now = new Date().toISOString()
+  const upsert = db.prepare(`
+    INSERT INTO agenda_events (
+      id, title, notes, location, start_date, start_time, end_date, end_time,
+      all_day, source_uid, user_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, source_uid) WHERE source_uid IS NOT NULL DO UPDATE SET
+      title = excluded.title, notes = excluded.notes, location = excluded.location,
+      start_date = excluded.start_date, start_time = excluded.start_time,
+      end_date = excluded.end_date, end_time = excluded.end_time,
+      all_day = excluded.all_day, updated_at = excluded.updated_at
+  `)
+  const importEvents = db.transaction(() => {
+    for (const event of parsed) {
+      upsert.run(
+        uuidv4(), event.title, event.notes, event.location,
+        event.start_date, event.start_time, event.end_date, event.end_time,
+        event.all_day ? 1 : 0, event.source_uid || `ics-${uuidv4()}`,
+        req.user.id, now, now,
+      )
+    }
+  })
+  importEvents()
+  res.json({ imported: parsed.length })
+})
+
+router.get('/events/export-ics', (req, res) => {
+  const db = getDb()
+  const events = db.prepare(`
+    SELECT * FROM agenda_events WHERE user_id = ?
+    ORDER BY start_date ASC, COALESCE(start_time, '') ASC
+  `).all(req.user.id)
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Opuscule//Agenda//FR', 'CALSCALE:GREGORIAN']
+  for (const event of events) {
+    lines.push('BEGIN:VEVENT', `UID:${escapeIcs(event.source_uid || `${event.id}@opuscule`)}`)
+    lines.push(`DTSTAMP:${icsTimestamp(event.updated_at)}`)
+    if (event.all_day) {
+      lines.push(`DTSTART;VALUE=DATE:${event.start_date.replace(/-/g, '')}`)
+      lines.push(`DTEND;VALUE=DATE:${shiftDate(event.end_date, 1).replace(/-/g, '')}`)
+    } else {
+      lines.push(`DTSTART:${icsLocalDateTime(event.start_date, event.start_time)}`)
+      lines.push(`DTEND:${icsLocalDateTime(event.end_date, event.end_time)}`)
+    }
+    lines.push(`SUMMARY:${escapeIcs(event.title)}`)
+    if (event.location) lines.push(`LOCATION:${escapeIcs(event.location)}`)
+    if (event.notes) lines.push(`DESCRIPTION:${escapeIcs(event.notes)}`)
+    lines.push('END:VEVENT')
+  }
+  lines.push('END:VCALENDAR')
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="agenda-opuscule.ics"')
+  res.send(lines.join('\r\n'))
+})
+
+router.post('/events', (req, res) => {
+  const db = getDb()
+  const event = normalizeAgendaEvent(req.body)
+  if (event.error) return res.status(400).json({ error: event.error })
+  const id = uuidv4()
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO agenda_events (
+      id, title, notes, location, start_date, start_time, end_date, end_time,
+      all_day, source_uid, user_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+  `).run(
+    id, event.title, event.notes, event.location, event.start_date, event.start_time,
+    event.end_date, event.end_time, event.all_day ? 1 : 0, req.user.id, now, now,
+  )
+  res.status(201).json(db.prepare('SELECT * FROM agenda_events WHERE id = ? AND user_id = ?').get(id, req.user.id))
+})
+
+router.put('/events/:id', (req, res) => {
+  const db = getDb()
+  const existing = db.prepare('SELECT * FROM agenda_events WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!existing) return res.status(404).json({ error: 'Not found' })
+  const event = normalizeAgendaEvent({ ...existing, ...req.body })
+  if (event.error) return res.status(400).json({ error: event.error })
+  db.prepare(`
+    UPDATE agenda_events SET
+      title = ?, notes = ?, location = ?, start_date = ?, start_time = ?,
+      end_date = ?, end_time = ?, all_day = ?, updated_at = ?
+    WHERE id = ? AND user_id = ?
+  `).run(
+    event.title, event.notes, event.location, event.start_date, event.start_time,
+    event.end_date, event.end_time, event.all_day ? 1 : 0, new Date().toISOString(),
+    req.params.id, req.user.id,
+  )
+  res.json(db.prepare('SELECT * FROM agenda_events WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id))
+})
+
+router.delete('/events/:id', (req, res) => {
+  const db = getDb()
+  const result = db.prepare('DELETE FROM agenda_events WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
+  if (!result.changes) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
 })
 
@@ -210,6 +324,105 @@ function normalizeDate(value) {
 function normalizeColor(value) {
   const color = String(value || '').trim()
   return /^#[0-9a-f]{6}$/i.test(color) ? color : '#6ba3e8'
+}
+
+function normalizeAgendaEvent(value) {
+  const title = String(value.title || '').trim().slice(0, 240)
+  const startDate = normalizeDate(value.start_date)
+  const endDate = normalizeDate(value.end_date || value.start_date)
+  const allDay = value.all_day === true || value.all_day === 1 || value.all_day === '1'
+  const startTime = allDay ? null : normalizeTime(value.start_time)
+  const endTime = allDay ? null : normalizeTime(value.end_time)
+  if (!title) return { error: 'Le titre est requis' }
+  if (!startDate || !endDate) return { error: 'Les dates sont invalides' }
+  if (endDate < startDate) return { error: 'La fin doit être après le début' }
+  if (!allDay && (!startTime || !endTime)) return { error: 'Les horaires sont requis' }
+  if (!allDay && endDate === startDate && endTime <= startTime) return { error: 'L’heure de fin doit être après le début' }
+  return {
+    title,
+    notes: limitedText(value.notes, 4000),
+    location: limitedText(value.location, 500),
+    start_date: startDate,
+    start_time: startTime,
+    end_date: endDate,
+    end_time: endTime,
+    all_day: allDay,
+    source_uid: limitedText(value.source_uid, 500),
+  }
+}
+
+function normalizeTime(value) {
+  const match = String(value || '').trim().match(/^(\d{2}):(\d{2})/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  return hour <= 23 && minute <= 59 ? `${match[1]}:${match[2]}` : null
+}
+
+function limitedText(value, max) {
+  const text = String(value || '').trim()
+  return text ? text.slice(0, max) : null
+}
+
+function parseIcsEvents(content) {
+  const unfolded = String(content).replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '')
+  const blocks = unfolded.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/gi) || []
+  return blocks.map(block => {
+    const properties = {}
+    for (const line of block.split(/\r?\n/)) {
+      const separator = line.indexOf(':')
+      if (separator < 0) continue
+      const rawKey = line.slice(0, separator)
+      const key = rawKey.split(';')[0].toUpperCase()
+      if (!properties[key]) properties[key] = { value: line.slice(separator + 1), rawKey }
+    }
+    const start = parseIcsDate(properties.DTSTART)
+    if (!start) return null
+    const rawEnd = parseIcsDate(properties.DTEND)
+    let end = rawEnd || { ...start }
+    if (start.allDay && rawEnd && rawEnd.date > start.date) end = { ...rawEnd, date: shiftDate(rawEnd.date, -1) }
+    return normalizeAgendaEvent({
+      title: unescapeIcs(properties.SUMMARY?.value || 'Événement importé'),
+      notes: unescapeIcs(properties.DESCRIPTION?.value || ''),
+      location: unescapeIcs(properties.LOCATION?.value || ''),
+      start_date: start.date,
+      start_time: start.time,
+      end_date: end.date,
+      end_time: end.time || start.time,
+      all_day: start.allDay,
+      source_uid: unescapeIcs(properties.UID?.value || ''),
+    })
+  }).filter(event => event && !event.error)
+}
+
+function parseIcsDate(property) {
+  if (!property) return null
+  const value = String(property.value || '').trim()
+  const match = value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/)
+  if (!match) return null
+  const date = `${match[1]}-${match[2]}-${match[3]}`
+  if (!normalizeDate(date)) return null
+  const allDay = /VALUE=DATE/i.test(property.rawKey) || !match[4]
+  return { date, time: allDay ? null : `${match[4]}:${match[5]}`, allDay }
+}
+
+function unescapeIcs(value) {
+  return String(value || '').replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\')
+}
+
+function escapeIcs(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
+}
+
+function icsLocalDateTime(date, time) {
+  return `${String(date).replace(/-/g, '')}T${String(time || '00:00').replace(':', '')}00`
+}
+
+function icsTimestamp(value) {
+  const date = new Date(value || Date.now())
+  return Number.isFinite(date.getTime())
+    ? date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+    : new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 }
 
 function clampInt(value, min, max, fallback) {

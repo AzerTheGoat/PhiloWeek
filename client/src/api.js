@@ -180,6 +180,11 @@ export const createPractice = data => req('POST', '/todos/practices', data)
 export const updatePractice = (id, data) => req('PUT', `/todos/practices/${id}`, data)
 export const deletePractice = id => req('DELETE', `/todos/practices/${id}`)
 export const setPracticeCheck = (id, data) => req('PUT', `/todos/practices/${id}/check`, data)
+export const createAgendaEvent = data => req('POST', '/todos/events', data)
+export const updateAgendaEvent = (id, data) => req('PUT', `/todos/events/${id}`, data)
+export const deleteAgendaEvent = id => req('DELETE', `/todos/events/${id}`)
+export const importAgendaIcs = content => req('POST', '/todos/events/import-ics', { content })
+export const exportAgendaIcs = () => { window.location.href = `${BASE}/todos/events/export-ics` }
 export const updateLifeProfile = data => req('PUT', '/todos/life-profile', data)
 // Questionnaires
 export const getQuestionnaireSession = data => req('POST', '/questionnaires/session', data)

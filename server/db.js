@@ -660,6 +660,30 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_elocution_evaluations_user ON elocution_ai_evaluations(user_id, evaluated_at DESC);
     `)
   },
+  // v21 -> v22 : evenements complets de l'agenda et imports iCalendar.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agenda_events (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        notes TEXT,
+        location TEXT,
+        start_date TEXT NOT NULL,
+        start_time TEXT,
+        end_date TEXT NOT NULL,
+        end_time TEXT,
+        all_day INTEGER NOT NULL DEFAULT 1,
+        source_uid TEXT,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_agenda_events_user_dates
+        ON agenda_events(user_id, start_date, end_date);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_events_user_source
+        ON agenda_events(user_id, source_uid) WHERE source_uid IS NOT NULL;
+    `)
+  },
 ]
 
 // Ajoute une colonne seulement si elle n'existe pas déjà (SQLite ne

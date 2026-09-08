@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context/useApp'
 import Icon from './Icons'
 import * as api from '../api'
@@ -26,12 +26,17 @@ export default function TodosPage({ section = 'tasks' }) {
   const [selectedAgendaDate, setSelectedAgendaDate] = useState(todayInput())
   const [agendaNoticeClosed, setAgendaNoticeClosed] = useState(false)
 
-  const [dashboard, setDashboard] = useState(() => ({ practices: [], checks: [], profile: { birth_date: '', life_expectancy_years: 85 }, today: todayInput() }))
+  const [dashboard, setDashboard] = useState(() => ({ practices: [], checks: [], events: [], profile: { birth_date: '', life_expectancy_years: 85 }, today: todayInput() }))
   const [practiceForm, setPracticeForm] = useState({ title: '' })
   const [editingPracticeId, setEditingPracticeId] = useState(null)
   const [editingPracticeTitle, setEditingPracticeTitle] = useState('')
   const [lifeUnit, setLifeUnit] = useState('week')
   const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [eventForm, setEventForm] = useState(() => emptyAgendaEvent(todayInput()))
+  const [editingEventId, setEditingEventId] = useState(null)
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [importingCalendar, setImportingCalendar] = useState(false)
+  const calendarInputRef = useRef(null)
 
   useEffect(() => {
     if (section === 'tasks') loadTodos(filter)
@@ -91,6 +96,10 @@ export default function TodosPage({ section = 'tasks' }) {
     [dashboard.practices, selectedAgendaDate]
   )
   const selectedDayDone = selectedDayPractices.filter(practice => checkMap.get(`${practice.id}:${selectedAgendaDate}`)).length
+  const selectedDayEvents = useMemo(
+    () => (dashboard.events || []).filter(event => event.start_date <= selectedAgendaDate && event.end_date >= selectedAgendaDate),
+    [dashboard.events, selectedAgendaDate]
+  )
   const showAgendaNotice = section === 'agenda'
     && !agendaNoticeClosed
     && (todayTasks.length > 0 || overdueTasks.length > 0)
@@ -253,6 +262,77 @@ export default function TodosPage({ section = 'tasks' }) {
     }
   }
 
+  function beginNewEvent(date = selectedAgendaDate) {
+    setEditingEventId(null)
+    setEventForm(emptyAgendaEvent(date))
+    setShowEventForm(true)
+  }
+
+  function beginEditEvent(event) {
+    setEditingEventId(event.id)
+    setEventForm({
+      title: event.title || '', notes: event.notes || '', location: event.location || '',
+      start_date: event.start_date, start_time: event.start_time || '09:00',
+      end_date: event.end_date, end_time: event.end_time || '10:00', all_day: Boolean(event.all_day),
+    })
+    setShowEventForm(true)
+  }
+
+  async function saveAgendaEvent(event) {
+    event.preventDefault()
+    try {
+      const saved = editingEventId
+        ? await api.updateAgendaEvent(editingEventId, eventForm)
+        : await api.createAgendaEvent(eventForm)
+      setDashboard(prev => ({
+        ...prev,
+        events: editingEventId
+          ? (prev.events || []).map(item => item.id === saved.id ? saved : item)
+          : [...(prev.events || []), saved],
+      }))
+      setSelectedAgendaDate(saved.start_date)
+      setAgendaMonth(startOfMonth(saved.start_date))
+      setShowEventForm(false)
+      setEditingEventId(null)
+      setEventForm(emptyAgendaEvent(saved.start_date))
+      toast(editingEventId ? 'Événement modifié' : 'Événement ajouté')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function removeAgendaEvent(event) {
+    if (!window.confirm(`Supprimer « ${event.title} » ?`)) return
+    try {
+      await api.deleteAgendaEvent(event.id)
+      setDashboard(prev => ({ ...prev, events: (prev.events || []).filter(item => item.id !== event.id) }))
+      if (editingEventId === event.id) {
+        setEditingEventId(null)
+        setShowEventForm(false)
+      }
+      toast('Événement supprimé')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function importCalendarFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setImportingCalendar(true)
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('Le fichier iCalendar dépasse 2 Mo')
+      const result = await api.importAgendaIcs(await file.text())
+      await loadDashboard()
+      toast(`${result.imported} événement(s) importé(s)`)
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setImportingCalendar(false)
+    }
+  }
+
   async function saveLifeProfile(patch) {
     try {
       const next = {
@@ -317,6 +397,7 @@ export default function TodosPage({ section = 'tasks' }) {
           agendaMonthGrid={agendaMonthGrid}
           tasksByDate={tasksByDate}
           selectedDayTasks={selectedDayTasks}
+          selectedDayEvents={selectedDayEvents}
           todayTasks={todayTasks}
           overdueTasks={overdueTasks}
           showAgendaNotice={showAgendaNotice}
@@ -334,6 +415,19 @@ export default function TodosPage({ section = 'tasks' }) {
           cancelEditPractice={() => { setEditingPracticeId(null); setEditingPracticeTitle('') }}
           removePractice={removePractice}
           togglePracticeCheck={togglePracticeCheck}
+          events={dashboard.events || []}
+          eventForm={eventForm}
+          setEventForm={setEventForm}
+          editingEventId={editingEventId}
+          showEventForm={showEventForm}
+          beginNewEvent={beginNewEvent}
+          beginEditEvent={beginEditEvent}
+          saveAgendaEvent={saveAgendaEvent}
+          removeAgendaEvent={removeAgendaEvent}
+          cancelEventForm={() => { setShowEventForm(false); setEditingEventId(null) }}
+          calendarInputRef={calendarInputRef}
+          importCalendarFile={importCalendarFile}
+          importingCalendar={importingCalendar}
         />
       )}
 
@@ -454,6 +548,7 @@ function AgendaPanel({
   agendaMonthGrid,
   tasksByDate,
   selectedDayTasks,
+  selectedDayEvents,
   todayTasks,
   overdueTasks,
   showAgendaNotice,
@@ -471,6 +566,19 @@ function AgendaPanel({
   cancelEditPractice,
   removePractice,
   togglePracticeCheck,
+  events,
+  eventForm,
+  setEventForm,
+  editingEventId,
+  showEventForm,
+  beginNewEvent,
+  beginEditEvent,
+  saveAgendaEvent,
+  removeAgendaEvent,
+  cancelEventForm,
+  calendarInputRef,
+  importCalendarFile,
+  importingCalendar,
 }) {
   return (
     <div className="agenda-dashboard">
@@ -515,15 +623,21 @@ function AgendaPanel({
             <span>{monthLabel(agendaMonth)}</span>
           </div>
           <div className="agenda-calendar-nav">
+            <input ref={calendarInputRef} className="agenda-file-input" type="file" accept=".ics,text/calendar" onChange={importCalendarFile} />
+            <button type="button" className="btn-ghost" disabled={importingCalendar} onClick={() => calendarInputRef.current?.click()}>
+              {importingCalendar ? 'Import…' : 'Importer .ics'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={api.exportAgendaIcs}>Exporter</button>
             <button type="button" className="icon-btn" onClick={() => setAgendaMonth(month => shiftMonth(month, -1))}>‹</button>
             <button type="button" className="btn-ghost" onClick={() => { setAgendaMonth(startOfMonth(today)); setSelectedDate(today) }}>Aujourd'hui</button>
             <button type="button" className="icon-btn" onClick={() => setAgendaMonth(month => shiftMonth(month, 1))}>›</button>
           </div>
         </div>
         <div className="agenda-calendar-grid">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(day => <span key={day} className="agenda-weekday">{day}</span>)}
+          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => <span key={`${day}-${index}`} className="agenda-weekday">{day}</span>)}
           {agendaMonthGrid.map(day => {
             const dayTasks = tasksByDate.get(day.date) || []
+            const dayEvents = events.filter(event => event.start_date <= day.date && event.end_date >= day.date)
             const dayPractices = dashboardAvailablePractices(practices, day.date)
             const dayDone = dayPractices.filter(practice => checkMap.get(`${practice.id}:${day.date}`)).length
             return (
@@ -539,6 +653,7 @@ function AgendaPanel({
                 onClick={() => setSelectedDate(day.date)}
               >
                 <strong>{dayNumber(day.date)}</strong>
+                <b>{dayEvents.length ? `${dayEvents.length} évènement${dayEvents.length > 1 ? 's' : ''}` : ''}</b>
                 <span>{dayTasks.length ? `${dayTasks.length} tâche${dayTasks.length > 1 ? 's' : ''}` : ''}</span>
                 {dayPractices.length > 0 && <em>{dayDone}/{dayPractices.length}</em>}
               </button>
@@ -551,11 +666,26 @@ function AgendaPanel({
         <div className="agenda-section-head">
           <div>
             <h3>{selectedDate === today ? "Aujourd'hui" : formatDate(selectedDate)}</h3>
-            <span>{selectedDayTasks.length} tâche(s) · {selectedDayDone}/{dashboardAvailablePractices(practices, selectedDate).length} habitude(s)</span>
+            <span>{selectedDayEvents.length} événement(s) · {selectedDayTasks.length} tâche(s) · {selectedDayDone}/{dashboardAvailablePractices(practices, selectedDate).length} habitude(s)</span>
           </div>
+          <button type="button" className="btn-primary" onClick={() => beginNewEvent(selectedDate)}>+ Événement</button>
         </div>
         <div className="agenda-day-list">
-          {selectedDayTasks.length === 0 && <div className="todo-empty">Aucune tâche prévue ce jour-là.</div>}
+          {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && <div className="todo-empty">Rien de prévu ce jour-là.</div>}
+          {selectedDayEvents.map(event => (
+            <article key={event.id} className="agenda-event-card">
+              <div className="agenda-event-time">{formatEventTime(event, selectedDate)}</div>
+              <div>
+                <strong>{event.title}</strong>
+                {event.location && <span>📍 {event.location}</span>}
+                {event.notes && <p>{event.notes}</p>}
+              </div>
+              <div className="agenda-event-actions">
+                <button type="button" onClick={() => beginEditEvent(event)}>Modifier</button>
+                <button type="button" className="danger" onClick={() => removeAgendaEvent(event)}>Supprimer</button>
+              </div>
+            </article>
+          ))}
           {selectedDayTasks.map(todo => (
             <article key={todo.id} className="agenda-task-card">
               <button type="button" className="todo-check" onClick={() => toggleTodo(todo)} title="Terminer">✓</button>
@@ -581,6 +711,48 @@ function AgendaPanel({
           )}
         </div>
       </section>
+
+      {showEventForm && (
+        <section className="agenda-event-editor">
+          <div className="agenda-section-head">
+            <div>
+              <h3>{editingEventId ? 'Modifier l’événement' : 'Nouvel événement'}</h3>
+              <span>Journée entière ou rendez-vous avec horaires.</span>
+            </div>
+            <button type="button" className="btn-ghost" onClick={cancelEventForm}>Fermer</button>
+          </div>
+          <form className="agenda-event-form" onSubmit={saveAgendaEvent}>
+            <label className="agenda-event-title">Titre
+              <input className="todo-input" value={eventForm.title} maxLength="240" required onChange={event => setEventForm(prev => ({ ...prev, title: event.target.value }))} />
+            </label>
+            <label>Début
+              <input className="todo-input" type="date" required value={eventForm.start_date} onChange={event => setEventForm(prev => ({ ...prev, start_date: event.target.value, end_date: prev.end_date < event.target.value ? event.target.value : prev.end_date }))} />
+            </label>
+            {!eventForm.all_day && <label>Heure
+              <input className="todo-input" type="time" required value={eventForm.start_time} onChange={event => setEventForm(prev => ({ ...prev, start_time: event.target.value }))} />
+            </label>}
+            <label>Fin
+              <input className="todo-input" type="date" required min={eventForm.start_date} value={eventForm.end_date} onChange={event => setEventForm(prev => ({ ...prev, end_date: event.target.value }))} />
+            </label>
+            {!eventForm.all_day && <label>Heure
+              <input className="todo-input" type="time" required value={eventForm.end_time} onChange={event => setEventForm(prev => ({ ...prev, end_time: event.target.value }))} />
+            </label>}
+            <label className="agenda-all-day">
+              <input type="checkbox" checked={eventForm.all_day} onChange={event => setEventForm(prev => ({ ...prev, all_day: event.target.checked }))} /> Journée entière
+            </label>
+            <label>Lieu
+              <input className="todo-input" value={eventForm.location} maxLength="500" onChange={event => setEventForm(prev => ({ ...prev, location: event.target.value }))} />
+            </label>
+            <label className="agenda-event-notes">Notes
+              <textarea className="todo-input" rows="3" value={eventForm.notes} maxLength="4000" onChange={event => setEventForm(prev => ({ ...prev, notes: event.target.value }))} />
+            </label>
+            <div className="agenda-event-submit">
+              <button type="button" className="btn-ghost" onClick={cancelEventForm}>Annuler</button>
+              <button type="submit" className="btn-primary">{editingEventId ? 'Enregistrer' : 'Créer'}</button>
+            </div>
+          </form>
+        </section>
+      )}
 
       <section className="agenda-today">
         <div className="agenda-section-head">
@@ -769,6 +941,20 @@ function LifePanel({ profile, lifeGrid, lifeUnit, setLifeUnit, saveLifeProfile }
 function sortTodos(a, b) {
   if (a.status !== b.status) return a.status === 'open' ? -1 : 1
   return String(a.due_at).localeCompare(String(b.due_at)) || String(b.created_at).localeCompare(String(a.created_at))
+}
+
+function emptyAgendaEvent(date) {
+  return {
+    title: '', notes: '', location: '', start_date: date, start_time: '09:00',
+    end_date: date, end_time: '10:00', all_day: true,
+  }
+}
+
+function formatEventTime(event, selectedDate) {
+  if (event.all_day) return event.start_date === event.end_date ? 'Journée' : 'Plusieurs jours'
+  if (selectedDate === event.start_date) return event.start_time || 'Début'
+  if (selectedDate === event.end_date) return `jusqu’à ${event.end_time || ''}`.trim()
+  return 'En cours'
 }
 
 function todayInput() {

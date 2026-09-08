@@ -64,6 +64,7 @@ fact_checks  — id, claim, status (to_check/true/false/partial), notes, source,
 todos        — id, title, notes, status (open/done), due_at, user_id, created_at, updated_at, completed_at
 agenda_practices — id, title, color, active, user_id, created_at, updated_at, archived_at
 agenda_checks — practice_id, entry_date, done, user_id, updated_at
+agenda_events — id, title, notes, location, start_date/time, end_date/time, all_day, source_uid, user_id
 life_profiles — user_id, birth_date, life_expectancy_years, updated_at
 historical_events — id, title, start_label/year/month/day, end_label/year/month/day, description, category, color, image_data, image_caption, tags, user_id
 articles     — id, title, excerpt, content, status (draft/published), published_on, published_at, cover_image_data, tags, event_id, user_id, created_at, updated_at
@@ -108,6 +109,7 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 ## Navigation et panneau Fonctionnalites
 
 - La sidebar garde l'arbre de fichiers comme surface principale.
+- Sur le web desktop, `/app` s'ouvre sans fichier ni vue active et la sidebar de gauche est ouverte par défaut. Sur mobile, la sidebar reste fermée pour préserver l'espace utile.
 - La navigation web authentifiee inscrit l'ecran courant dans l'URL :
   `/app/files/:id` pour un fichier et `/app/views/:slug` pour une vue speciale.
   Un rechargement ainsi que les boutons precedent/suivant doivent restaurer le
@@ -462,12 +464,14 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
 - Les vues `Taches`, `Agenda` et `Vie perso` sont trois sections separees dans le panneau `Fonctions`.
 - Les tâches sont stockées dans la table `todos` avec titre, notes optionnelles, statut `open/done`, date de création et date limite max `due_at`.
 - La section `Agenda` est un vrai calendrier mensuel : chaque jour affiche ses taches dues, ses habitudes du jour et un detail de la journee selectionnee.
+- L'Agenda gère aussi de vrais événements : journée entière ou horaires, période sur plusieurs jours, titre, lieu et notes. Un événement peut être créé, modifié ou supprimé depuis le détail du jour.
+- L'import iCalendar accepte les fichiers `.ics` jusqu'à 2 Mo et 500 événements par import. Les UID iCalendar sont conservés afin qu'un nouvel import mette à jour les événements correspondants sans les dupliquer; l'Agenda peut aussi réexporter ses événements en `.ics`.
 - L'Agenda permet aussi de creer des habitudes quotidiennes, de les cocher par jour, de les renommer, de les archiver/reprendre, de les supprimer avec leur historique, et affiche un resume du jour, une moyenne sur 28 jours, une serie actuelle et une grille de rythme type GitHub : les jours n'affichent leurs details qu'au survol, et la couleur fonce selon la part d'habitudes accomplies. L'interface ne propose pas de choix manuel de couleur pour les habitudes.
 - Le rappel quotidien des taches s'affiche au plus une fois par jour pour les taches dues aujourd'hui ou en retard, puis ouvre la section `Agenda`.
 - La section `Vie perso` stocke la date de naissance et l'horizon de vie dans `life_profiles`, puis affiche une grille en semaines ou en mois avec les points deja vecus.
 - À l'entrée dans l'application, `TodoReminder.jsx` affiche au maximum une fois par jour les tâches ouvertes avec leurs dates limites; l'état quotidien est gardé dans `localStorage`.
 - L'export Obsidian ajoute `_Opuscule/Todos.json` avec `philoweek_type: todos`; l'import recrée les tâches depuis ce fichier.
-- L'export Obsidian ajoute aussi `_Opuscule/Dashboard.json` avec `philoweek_type: dashboard` pour les pratiques, coches d'agenda et le profil de vie; l'import recrée ces données.
+- L'export Obsidian ajoute aussi `_Opuscule/Dashboard.json` avec `philoweek_type: dashboard` pour les événements, pratiques, coches d'agenda et le profil de vie; l'import recrée ces données.
 
 ## Graphes d'idées
 

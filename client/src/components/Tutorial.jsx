@@ -232,7 +232,7 @@ const SECTIONS = [
       {
         icon: 'listCheck',
         title: 'Taches, Agenda, Vie perso',
-        text: "Les taches, les habitudes quotidiennes et la grille de vie sont separees. L'Agenda permet de cocher, renommer, archiver ou supprimer tes habitudes.",
+        text: "Les tâches, les événements, les habitudes quotidiennes et la grille de vie sont séparés. Dans l'Agenda, choisis un jour pour créer un événement avec horaires, lieu et notes, puis modifie-le ou supprime-le depuis sa carte. Importer .ics récupère un calendrier externe sans dupliquer les événements déjà importés; Exporter produit un fichier iCalendar réutilisable ailleurs. Les habitudes peuvent être cochées, renommées, archivées ou supprimées.",
       },
     ],
   },

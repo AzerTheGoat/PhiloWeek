@@ -13,9 +13,9 @@ const init = {
   viewTabs: [],
   openFileId: null,
   openFile: null,
-  view: 'social-journal', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
+  view: 'editor', // 'editor' | 'journal' | 'timer' | 'inbox' | 'life' | 'todos' | 'agenda' | 'life-grid' | 'knowledge-graph' | 'timeline' | 'roadtrips' | 'social-journal' | 'tutorial' | 'trash'
   theme: localStorage.getItem('pw-theme') || 'light',
-  sidebarOpen: false,
+  sidebarOpen: !isMobileViewport(),
   featuresOpen: false,
   toasts: [],
   contextMenu: null,
@@ -219,7 +219,7 @@ function reducer(state, action) {
     case 'LOGOUT': return {
       ...init,
       theme: state.theme,
-      sidebarOpen: state.sidebarOpen,
+      sidebarOpen: !isMobileViewport(),
       authChecked: true,
       currentUser: null,
     }

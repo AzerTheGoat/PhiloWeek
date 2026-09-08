@@ -88,6 +88,9 @@ function listOpusculeManifests(db, userId) {
     checks: db.prepare(
       'SELECT * FROM agenda_checks WHERE user_id = ? ORDER BY entry_date ASC'
     ).all(userId),
+    events: db.prepare(
+      'SELECT * FROM agenda_events WHERE user_id = ? ORDER BY start_date ASC, start_time ASC'
+    ).all(userId),
     life_profile: db.prepare('SELECT * FROM life_profiles WHERE user_id = ?').get(userId) || null,
   }))
 

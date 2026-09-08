@@ -33,9 +33,10 @@ function assertUserStorageQuota(db, userId, additionalBytes = 0) {
       COALESCE((SELECT SUM(LENGTH(COALESCE(body, '')) + LENGTH(COALESCE(details_json, ''))) FROM road_trip_notes WHERE user_id = ?), 0) +
       COALESCE((SELECT SUM(LENGTH(COALESCE(quote, '')) + LENGTH(COALESCE(notes, ''))) FROM quotes WHERE user_id = ?), 0) +
       COALESCE((SELECT SUM(LENGTH(COALESCE(claim, '')) + LENGTH(COALESCE(notes, ''))) FROM fact_checks WHERE user_id = ?), 0) +
-      COALESCE((SELECT SUM(LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(notes, ''))) FROM todos WHERE user_id = ?), 0)
+      COALESCE((SELECT SUM(LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(notes, ''))) FROM todos WHERE user_id = ?), 0) +
+      COALESCE((SELECT SUM(LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(notes, '')) + LENGTH(COALESCE(location, ''))) FROM agenda_events WHERE user_id = ?), 0)
       AS bytes
-  `).get(userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId)
+  `).get(userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId)
   const recordings = [
     ...db.prepare('SELECT filename FROM voice_notes WHERE user_id = ?').all(userId),
     ...db.prepare('SELECT filename FROM elocution_audios WHERE user_id = ?').all(userId),

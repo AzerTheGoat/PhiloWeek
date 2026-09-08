@@ -7880,6 +7880,7 @@ kbd {
 .agenda-today,
 .agenda-chart-panel,
 .agenda-practices-panel,
+.agenda-event-editor,
 .life-config-panel,
 .life-grid-panel {
   min-width: 0;
@@ -7893,12 +7894,27 @@ kbd {
 }
 
 .agenda-practices-panel,
+.agenda-event-editor,
 .life-grid-panel {
   border-right: none;
 }
 
 .agenda-practices-panel {
   grid-column: 1 / -1;
+}
+
+.agenda-event-editor {
+  grid-column: 1 / -1;
+  border-right: none;
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg));
+}
+
+.agenda-file-input { display: none; }
+
+.agenda-calendar-day b {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .agenda-page .agenda-practices-panel {
@@ -8092,6 +8108,52 @@ kbd {
 .agenda-task-card.late {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
+
+.agenda-event-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-elevated));
+}
+
+.agenda-event-time {
+  color: var(--accent-hover);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.agenda-event-card strong,
+.agenda-event-card span { display: block; }
+.agenda-event-card span,
+.agenda-event-card p { margin: 3px 0 0; color: var(--text-3); font-size: 12px; white-space: pre-wrap; }
+.agenda-event-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.agenda-event-actions button { color: var(--accent-hover); font-size: 12px; }
+.agenda-event-actions button.danger { color: var(--danger); }
+
+.agenda-event-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.agenda-event-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.agenda-event-form .agenda-all-day { flex-direction: row; align-items: center; align-self: center; }
+.agenda-event-form .agenda-event-notes { grid-column: 1 / -2; }
+.agenda-event-form textarea { resize: vertical; }
+.agenda-event-submit { display: flex; justify-content: flex-end; gap: 8px; }
 
 .agenda-task-card strong {
   display: block;
@@ -8444,10 +8506,15 @@ kbd {
   .agenda-today,
   .agenda-chart-panel,
   .agenda-practices-panel,
+  .agenda-event-editor,
   .life-config-panel,
   .life-grid-panel {
     border-right: none;
   }
+
+  .agenda-event-form { grid-template-columns: 1fr 1fr; }
+  .agenda-event-form .agenda-event-title,
+  .agenda-event-form .agenda-event-notes { grid-column: 1 / -1; }
 }
 
 @media (max-width: 768px) {
@@ -8468,6 +8535,13 @@ kbd {
     grid-template-columns: 1fr;
   }
 
+  .agenda-calendar-nav { flex-wrap: wrap; justify-content: flex-end; }
+  .agenda-event-card { grid-template-columns: 60px minmax(0, 1fr); }
+  .agenda-event-actions { grid-column: 2; justify-content: flex-start; }
+  .agenda-event-form { grid-template-columns: 1fr; }
+  .agenda-event-form .agenda-event-title,
+  .agenda-event-form .agenda-event-notes { grid-column: auto; }
+
   .todo-card {
     padding: 12px;
   }
@@ -8483,6 +8557,7 @@ kbd {
   .agenda-hero,
   .agenda-chart-panel,
   .agenda-practices-panel,
+  .agenda-event-editor,
   .life-config-panel,
   .life-grid-panel {
     padding: 12px;

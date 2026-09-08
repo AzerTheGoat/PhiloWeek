@@ -170,13 +170,15 @@ router.all('/obsidian', async (req, res) => {
 
   const practices = db.prepare('SELECT * FROM agenda_practices WHERE user_id = ? ORDER BY created_at ASC').all(req.user.id)
   const agendaChecks = db.prepare('SELECT * FROM agenda_checks WHERE user_id = ? ORDER BY entry_date ASC').all(req.user.id)
+  const agendaEvents = db.prepare('SELECT * FROM agenda_events WHERE user_id = ? ORDER BY start_date ASC, start_time ASC').all(req.user.id)
   const lifeProfile = db.prepare('SELECT * FROM life_profiles WHERE user_id = ?').get(req.user.id)
-  if (practices.length > 0 || agendaChecks.length > 0 || lifeProfile) {
+  if (practices.length > 0 || agendaChecks.length > 0 || agendaEvents.length > 0 || lifeProfile) {
     zip.file('_Opuscule/Dashboard.json', JSON.stringify({
       philoweek_type: 'dashboard',
       exported: new Date().toISOString(),
       practices,
       checks: agendaChecks,
+      events: agendaEvents,
       life_profile: lifeProfile || null,
     }, null, 2))
   }
