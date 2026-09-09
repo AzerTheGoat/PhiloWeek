@@ -2,6 +2,9 @@ package fr.opuscule.android.data
 
 import fr.opuscule.android.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -253,16 +256,84 @@ class ApiClient {
         return json.optJSONArray("questions").orEmpty().objects().map(::reviewQuestion)
     }
 
-    suspend fun reviewSources(token: String): List<ReviewSource> =
-        callArray("/questionnaires/sources", token = token).objects().map {
-            ReviewSource(
-                id = it.getString("id"),
-                title = it.optString("title", it.optString("name")),
-                fileName = it.optString("name"),
-                kind = it.optString("kind"),
-                questionCount = it.optInt("question_count"),
-            )
+    suspend fun reviewSources(token: String): List<ReviewSource> = try {
+        callArray("/questionnaires/sources", token = token).objects().map(::reviewSource)
+    } catch (error: ApiException) {
+        if (error.status != 404 && error.status != 405) throw error
+        reviewSourcesFromFiles(token)
+    }
+
+    private suspend fun reviewSourcesFromFiles(token: String): List<ReviewSource> = coroutineScope {
+        fun collectJsonFiles(nodes: List<FileNode>): List<FileNode> = nodes.flatMap { node ->
+            val current = if (!node.isFolder && node.name.endsWith(".json", ignoreCase = true)) listOf(node) else emptyList()
+            current + collectJsonFiles(node.children)
         }
+
+        collectJsonFiles(files(token))
+            .chunked(6)
+            .flatMap { chunk ->
+                chunk.map { node ->
+                    async {
+                        runCatching { reviewSourceFromFile(file(token, node.id)) }.getOrNull()
+                    }
+                }.awaitAll()
+            }
+            .filterNotNull()
+            .sortedBy { it.title.lowercase() }
+    }
+
+    private fun reviewSource(row: JSONObject) = ReviewSource(
+        id = row.getString("id"),
+        title = row.optString("title", row.optString("name")),
+        fileName = row.optString("name"),
+        kind = row.optString("kind"),
+        questionCount = row.optInt("question_count"),
+    )
+
+    private fun reviewSourceFromFile(file: FileDetail): ReviewSource? {
+        val json = runCatching { JSONObject(file.content.removePrefix("\uFEFF")) }.getOrNull() ?: return null
+        val questions = json.optJSONArray("questions")
+        val definitions = json.optJSONArray("definitions")
+        val isQuestionnaire = json.optString("philoweek_type") == "questionnaire" || (questions?.length() ?: 0) > 0
+        val isDefinitions = !isQuestionnaire &&
+            (json.optString("philoweek_type") == "definitions" || (definitions?.length() ?: 0) > 0)
+        val kind: String
+        val count: Int
+        when {
+            isQuestionnaire -> {
+                kind = "questionnaire"
+                count = questions.orEmpty().objects().count(::isUsableQuestion)
+            }
+            isDefinitions -> {
+                kind = "definition"
+                count = definitions.orEmpty().objects().count { definition ->
+                    definition.firstText("definition", "answer", "meaning").isNotBlank()
+                }
+            }
+            else -> return null
+        }
+        if (count == 0) return null
+        return ReviewSource(
+            id = file.id,
+            title = json.optString("title").ifBlank { file.name.removeSuffix(".json") },
+            fileName = file.name,
+            kind = kind,
+            questionCount = count,
+        )
+    }
+
+    private fun isUsableQuestion(question: JSONObject): Boolean {
+        if (question.firstText("prompt", "question", "text").isBlank()) return false
+        if (question.firstText("answer", "expected_answer", "correction", "correct_answer").isNotBlank()) return true
+        val choices = question.optJSONArray("choices") ?: return false
+        val snakeCaseIndex = question.opt("correct_index").takeUnless { it == null || it == JSONObject.NULL }
+        val index = when (val raw = snakeCaseIndex ?: question.opt("correctIndex")) {
+            is Number -> raw.toInt()
+            is String -> raw.trim().toIntOrNull()
+            else -> null
+        }
+        return index != null && index in 0 until choices.length() && choices.optString(index).isNotBlank()
+    }
 
     suspend fun historicalEvents(token: String): List<HistoricalEvent> =
         callArray("/historical-timeline", token = token).objects().map(::historicalEvent)
@@ -760,3 +831,7 @@ private fun JSONObject.nullable(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 private fun JSONObject.nullableInt(key: String): Int? =
     if (!has(key) || isNull(key)) null else optInt(key)
+private fun JSONObject.firstText(vararg keys: String): String =
+    keys.firstNotNullOfOrNull { key ->
+        if (!has(key) || isNull(key)) null else opt(key)?.toString()?.trim()?.takeIf(String::isNotBlank)
+    }.orEmpty()

@@ -232,6 +232,8 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   sélecteur de sources Android ne liste que les questionnaires et définitions
   contenant au moins une carte exploitable, avec leur type et leur nombre de
   cartes; il masque dossiers, notes, tableurs, réseaux et JSON non révisables.
+  Si la route dédiée n'est pas encore disponible sur le serveur, le client
+  reconstruit cette liste à partir des fichiers JSON accessibles.
 - Sur Android, une carte de révision non révélée ne garde qu'une action principale :
   `Afficher la réponse` pour un rappel libre ou `Valider mon choix` pour un QCM.
   `Voir la source`, `Modifier`, `Marquer à modifier` et `Supprimer` sont regroupés

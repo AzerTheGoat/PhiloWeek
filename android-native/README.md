@@ -13,6 +13,8 @@ routes mobiles et conserve le jeton de session chiffré par Android Keystore.
 - `Réviser` : volume de 1 à 50 questions choisi avant le lancement, série globale
   ou sélection limitée aux quiz et définitions réellement exploitables; tirage
   pondéré, source, édition et suppression d'une question, correction et bilan.
+  La liste reste disponible avec un serveur plus ancien grâce à une détection
+  locale des fichiers JSON révisables.
 - `Organiser` : idées, citations, fact checks, tâches, agenda, habitudes, vie en
   semaines ou mois et statistiques d'utilisation.
 - `Articles` : fil publié, lecture, réactions, commentaires et réponses, partage
