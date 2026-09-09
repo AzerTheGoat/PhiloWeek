@@ -228,6 +228,10 @@ Contenu Markdown avec [[liens-wiki]] et #tags inline...
   personnes des réseaux d'acteurs. La carte garde les actions en bas, utilise le
   rouge `Danger` pour `À revoir`, ouvre le fichier source et peut retirer une
   question non pertinente du JSON après confirmation.
+- Avant une série Android, l'utilisateur choisit de 1 à 50 questions. Le
+  sélecteur de sources Android ne liste que les questionnaires et définitions
+  contenant au moins une carte exploitable, avec leur type et leur nombre de
+  cartes; il masque dossiers, notes, tableurs, réseaux et JSON non révisables.
 - Sur Android, une carte de révision non révélée ne garde qu'une action principale :
   `Afficher la réponse` pour un rappel libre ou `Valider mon choix` pour un QCM.
   `Voir la source`, `Modifier`, `Marquer à modifier` et `Supprimer` sont regroupés

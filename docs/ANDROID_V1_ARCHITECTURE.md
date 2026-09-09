@@ -75,17 +75,21 @@ Objectif : permettre de choisir sans imposer une activité.
 │                                     │
 │ Tout revoir                         │
 │ Quiz · Définitions · Personnes      │
+│ Nombre de questions       10        │
+│ [────────────●────────────] 1—50    │
 │ [ Commencer une série ]             │
 │                                     │
-│ [ Choisir fichiers et dossiers ]    │
+│ [ Choisir les quiz et définitions ] │
 │                                     │
 │ Dernières sessions / maîtrise       │
 └─────────────────────────────────────┘
 ```
 
-Le sélecteur présente l’arbre avec cases à cocher et trois filtres de famille.
-Un dossier inclut récursivement son contenu. La validation annonce le nombre de
-sources sélectionnées.
+Le sélecteur présente uniquement les quiz et fichiers de définitions contenant
+au moins une carte exploitable, sous forme de liste avec cases à cocher, famille
+et nombre de cartes. Il reprend le réglage de 1 à 50 questions et annonce le
+nombre de sources sélectionnées. Aucun dossier, note ou fichier non révisable
+n’est affiché.
 
 Carte :
 

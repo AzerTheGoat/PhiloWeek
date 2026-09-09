@@ -57,6 +57,31 @@ router.post('/session', (req, res) => {
   })
 })
 
+router.get('/sources', (req, res) => {
+  const db = getDb()
+  const sources = readableRows(db, req.user.id, req.user.session_id).flatMap(file => {
+    const questionnaire = parseQuestionnaire(file.content)
+    const definitions = questionnaire ? null : parseDefinitions(file.content)
+    const parsed = questionnaire || definitions
+    if (!parsed) return []
+    const kind = questionnaire ? 'questionnaire' : 'definition'
+    const questionCount = parsed.questions.reduce((count, question, index) => {
+      const normalized = normalizeReviewQuestion(question, index, parsed, file)
+      return count + (normalized?.prompt?.trim() && normalized?.answer?.trim() ? 1 : 0)
+    }, 0)
+    if (questionCount === 0) return []
+    return [{
+      id: file.id,
+      name: file.name,
+      title: parsed.title || file.name.replace(/\.json$/i, ''),
+      kind,
+      question_count: questionCount,
+      path: getFilePath(db, file.id, req.user.id),
+    }]
+  }).sort((left, right) => left.title.localeCompare(right.title, 'fr', { sensitivity: 'base' }))
+  res.json(sources)
+})
+
 router.get('/linked/:fileId', (req, res) => {
   const db = getDb()
   const target = getFileAccess(db, req.params.fileId, req.user.id)?.file

@@ -38,15 +38,15 @@ principale. Leur édition structurelle complète reste réservée au web.
 
 ## 3. Révision et questionnaires
 
-Le bouton principal `Réviser` lance par défaut une série construite à partir de
-tous les fichiers compatibles du compte.
+Le bouton principal `Réviser` lance une série construite à partir de tous les
+fichiers compatibles du compte. Avant le lancement, l'utilisateur choisit entre
+1 et 50 questions; l'APK n'impose plus une série fixe de 12 cartes.
 
-Un parcours secondaire permet de sélectionner précisément :
-
-- un ou plusieurs fichiers ;
-- un ou plusieurs dossiers ;
-- le contenu de tous les sous-dossiers sélectionnés ;
-- les familles à inclure : questionnaires, définitions et personnes des réseaux.
+Un parcours secondaire permet de sélectionner précisément un ou plusieurs quiz
+ou fichiers de définitions. Ce sélecteur ne montre que les sources contenant au
+moins une carte exploitable, avec leur famille et leur nombre de cartes; les
+notes, dossiers, tableurs, réseaux d'acteurs et JSON non révisables n'y
+apparaissent pas.
 
 Le passage d’un quiz comprend l’ensemble cohérent suivant :
 

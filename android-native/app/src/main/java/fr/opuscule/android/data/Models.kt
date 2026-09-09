@@ -76,6 +76,14 @@ data class ReviewQuestion(
     val requireChange: Boolean,
 )
 
+data class ReviewSource(
+    val id: String,
+    val title: String,
+    val fileName: String,
+    val kind: String,
+    val questionCount: Int,
+)
+
 data class DictionaryDefinition(val partOfSpeech: String, val definition: String, val example: String)
 data class DictionaryEntry(
     val word: String,

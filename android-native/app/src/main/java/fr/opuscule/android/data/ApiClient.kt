@@ -253,6 +253,17 @@ class ApiClient {
         return json.optJSONArray("questions").orEmpty().objects().map(::reviewQuestion)
     }
 
+    suspend fun reviewSources(token: String): List<ReviewSource> =
+        callArray("/questionnaires/sources", token = token).objects().map {
+            ReviewSource(
+                id = it.getString("id"),
+                title = it.optString("title", it.optString("name")),
+                fileName = it.optString("name"),
+                kind = it.optString("kind"),
+                questionCount = it.optInt("question_count"),
+            )
+        }
+
     suspend fun historicalEvents(token: String): List<HistoricalEvent> =
         callArray("/historical-timeline", token = token).objects().map(::historicalEvent)
 

@@ -10,9 +10,9 @@ routes mobiles et conserve le jeton de session chiffré par Android Keystore.
 - `Fichiers` : arbre et recherche, notes Markdown lisibles et modifiables,
   création rapide, dossiers chiffrés et lecteurs adaptés à tous les formats
   Opuscule.
-- `Réviser` : série globale immédiate ou sélection récursive de fichiers et
-  dossiers; questionnaires, définitions et personnes; tirage pondéré, source,
-  édition et suppression d'une question, correction et bilan.
+- `Réviser` : volume de 1 à 50 questions choisi avant le lancement, série globale
+  ou sélection limitée aux quiz et définitions réellement exploitables; tirage
+  pondéré, source, édition et suppression d'une question, correction et bilan.
 - `Organiser` : idées, citations, fact checks, tâches, agenda, habitudes, vie en
   semaines ou mois et statistiques d'utilisation.
 - `Articles` : fil publié, lecture, réactions, commentaires et réponses, partage

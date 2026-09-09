@@ -202,7 +202,7 @@ const SECTIONS = [
       {
         icon: 'play',
         title: 'Réviser',
-        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Sur mobile, seul le texte de la carte défile : Afficher la solution, puis À revoir et Je savais, restent accessibles en bas. Ton auto-évaluation est gardée en historique.",
+        text: "Dans un fichier Quiz, les actions restent compactes : Lier des notes ouvre la sélection et Commencer une révision lance directement les cartes. Dans l’APK Android, choisis librement de 1 à 50 questions; le sélecteur n’affiche que les quiz et définitions qui contiennent réellement des cartes. Sur mobile, seul le texte de la carte défile : Afficher la solution, puis À revoir et Je savais, restent accessibles en bas. Ton auto-évaluation est gardée en historique.",
       },
       {
         icon: 'timer',

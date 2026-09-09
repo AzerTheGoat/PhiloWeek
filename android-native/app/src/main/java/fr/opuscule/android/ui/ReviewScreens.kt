@@ -34,9 +34,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -59,6 +57,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -83,8 +83,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import fr.opuscule.android.AppState
-import fr.opuscule.android.data.FileNode
 import fr.opuscule.android.data.ReviewQuestion
+import fr.opuscule.android.data.ReviewSource
 import kotlinx.coroutines.launch
 
 @Composable
@@ -100,6 +100,9 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     val history = remember { mutableStateListOf<Pair<ReviewQuestion, Boolean>>() }
     var loading by remember { mutableStateOf(false) }
     var selector by remember { mutableStateOf(false) }
+    var questionLimit by remember { mutableIntStateOf(10) }
+    var lastIds by remember { mutableStateOf<List<String>?>(null) }
+    var lastKinds by remember { mutableStateOf(setOf("questionnaire", "definition", "actor")) }
     var editing by remember { mutableStateOf<ReviewQuestion?>(null) }
     var deleting by remember { mutableStateOf<ReviewQuestion?>(null) }
     val scope = rememberCoroutineScope()
@@ -112,12 +115,15 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     }
 
     fun start(ids: List<String>? = null, kinds: Set<String> = setOf("questionnaire", "definition", "actor")) = scope.launch {
+        val requestedLimit = questionLimit.coerceIn(1, 50)
         loading = true
-        runCatching { state.api.review(token, ids, 50, kinds.toList()) }
+        runCatching { state.api.review(token, ids, requestedLimit, kinds.toList()) }
             .onSuccess { rows ->
-                val filtered = rows.filter { kinds.contains(it.kind) }.take(12)
+                val filtered = rows.filter { kinds.contains(it.kind) }.take(requestedLimit)
                 if (filtered.isEmpty()) state.notify("Aucune carte disponible pour cette sélection.")
                 else {
+                    lastIds = ids
+                    lastKinds = kinds
                     session = filtered
                     index = 0
                     revealed = false
@@ -166,9 +172,9 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
     }
 
     when {
-        selector -> ReviewScopeSelector(state, { selector = false }) { ids, kinds -> start(ids, kinds) }
-        session.isEmpty() -> ReviewLanding(state, loading, { start() }, { selector = true })
-        current == null -> ReviewSummary(session.size, known, missed, { start() }, {
+        selector -> ReviewScopeSelector(state, questionLimit, { questionLimit = it }, { selector = false }) { ids, kinds -> start(ids, kinds) }
+        session.isEmpty() -> ReviewLanding(state, loading, questionLimit, { questionLimit = it }, { start() }, { selector = true })
+        current == null -> ReviewSummary(session.size, known, missed, { start(lastIds, lastKinds) }, {
             session = emptyList()
             index = 0
         })
@@ -253,7 +259,14 @@ fun ReviewScreen(state: AppState, openSource: (String) -> Unit, onImmersiveChang
 }
 
 @Composable
-private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Unit, choose: () -> Unit) {
+private fun ReviewLanding(
+    state: AppState,
+    loading: Boolean,
+    questionLimit: Int,
+    updateQuestionLimit: (Int) -> Unit,
+    startAll: () -> Unit,
+    choose: () -> Unit,
+) {
     val token = state.token ?: return
     var resultCount by remember { mutableIntStateOf(0) }
     var recentCount by remember { mutableIntStateOf(0) }
@@ -280,16 +293,18 @@ private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Uni
             Text("Tout revoir", style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(8.dp))
             Text("Une série équilibrée entre vos questionnaires, vos définitions et les personnes de vos réseaux.", style = MaterialTheme.typography.bodyLarge, color = Muted)
+            Spacer(Modifier.height(20.dp))
+            QuestionCountPicker(questionLimit, updateQuestionLimit)
             Spacer(Modifier.height(22.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                ReviewMetric("À faire", "12", Modifier.weight(1f))
+                ReviewMetric("À faire", questionLimit.toString(), Modifier.weight(1f))
                 ReviewMetric("Récentes", recentCount.toString(), Modifier.weight(1f))
                 ReviewMetric("Maîtrise", "$recentAccuracy %", Modifier.weight(1f))
             }
             Spacer(Modifier.height(26.dp))
             PrimaryButton(if (loading) "Préparation…" else "Commencer une série", startAll, Modifier.fillMaxWidth(), !loading)
             Spacer(Modifier.height(10.dp))
-            SecondaryButton("Choisir les fichiers et dossiers", choose, Modifier.fillMaxWidth(), !loading)
+            SecondaryButton("Choisir les quiz et définitions", choose, Modifier.fillMaxWidth(), !loading)
             Spacer(Modifier.height(30.dp))
             SurfaceGroup {
                 Row(Modifier.fillMaxWidth().padding(vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -302,6 +317,30 @@ private fun ReviewLanding(state: AppState, loading: Boolean, startAll: () -> Uni
             }
             Spacer(Modifier.height(26.dp))
         }
+    }
+}
+
+@Composable
+private fun QuestionCountPicker(value: Int, update: (Int) -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(Surface)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Nombre de questions", style = MaterialTheme.typography.titleMedium)
+                Text("De 1 à 50 cartes", style = MaterialTheme.typography.bodySmall, color = Muted)
+            }
+            Text(value.toString(), color = Opuscule, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { update(it.toInt().coerceIn(1, 50)) },
+            valueRange = 1f..50f,
+            steps = 48,
+            colors = SliderDefaults.colors(thumbColor = Opuscule, activeTrackColor = Opuscule),
+        )
     }
 }
 
@@ -535,26 +574,31 @@ private fun ReviewSummary(total: Int, known: Int, missed: List<ReviewQuestion>, 
 }
 
 @Composable
-private fun ReviewScopeSelector(state: AppState, back: () -> Unit, start: (List<String>, Set<String>) -> Unit) {
+private fun ReviewScopeSelector(
+    state: AppState,
+    questionLimit: Int,
+    updateQuestionLimit: (Int) -> Unit,
+    back: () -> Unit,
+    start: (List<String>, Set<String>) -> Unit,
+) {
     val token = state.token ?: return
-    var roots by remember { mutableStateOf<List<FileNode>>(emptyList()) }
+    var sources by remember { mutableStateOf<List<ReviewSource>>(emptyList()) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var kinds by remember { mutableStateOf(setOf("questionnaire", "definition", "actor")) }
+    var kinds by remember { mutableStateOf(setOf("questionnaire", "definition")) }
     var loading by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        runCatching { state.api.files(token) }.onSuccess { roots = it }.onFailure(state::handle)
+    var loadFailed by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableIntStateOf(0) }
+    LaunchedEffect(reloadKey) {
+        loading = true
+        loadFailed = false
+        runCatching { state.api.reviewSources(token) }
+            .onSuccess { sources = it }
+            .onFailure { loadFailed = true; state.handle(it) }
         loading = false
     }
-    val allRows = remember(roots) { flattenFiles(roots) }
-    val selectedFileIds = remember(selected, roots) {
-        val chosen = allRows.filter { selected.contains(it.id) }
-        val ids = mutableSetOf<String>()
-        fun add(node: FileNode) {
-            if (!node.isFolder) ids += node.id
-            node.children.forEach(::add)
-        }
-        chosen.forEach(::add)
-        ids.toList()
+    val visibleSources = remember(sources, kinds) { sources.filter { kinds.contains(it.kind) } }
+    val selectedFileIds = remember(selected, visibleSources) {
+        visibleSources.filter { selected.contains(it.id) }.map { it.id }
     }
     BackHandler(onBack = back)
     DetailScaffold("Choisir les sources", back) { padding ->
@@ -564,30 +608,43 @@ private fun ReviewScopeSelector(state: AppState, back: () -> Unit, start: (List<
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     KindToggle("Quiz", "questionnaire", kinds) { kinds = it }
                     KindToggle("Définitions", "definition", kinds) { kinds = it }
-                    KindToggle("Personnes", "actor", kinds) { kinds = it }
                 }
+                QuestionCountPicker(questionLimit, updateQuestionLimit)
             }
             HorizontalDivider(color = Divider)
-            if (loading) LoadingPane() else LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
-                items(allRows, key = { it.id }) { row ->
+            if (loading) LoadingPane() else if (loadFailed) Column(Modifier.weight(1f).padding(20.dp), verticalArrangement = Arrangement.Center) {
+                Text("Impossible de charger les sources révisables.", color = Muted)
+                Spacer(Modifier.height(12.dp))
+                SecondaryButton("Réessayer", { reloadKey++ }, Modifier.fillMaxWidth())
+            } else if (visibleSources.isEmpty()) Column(Modifier.weight(1f).padding(20.dp), verticalArrangement = Arrangement.Center) {
+                Text("Aucun quiz ou fichier de définitions exploitable pour ces filtres.", color = Muted, textAlign = TextAlign.Center)
+            } else LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+                items(visibleSources, key = { it.id }) { source ->
                     Row(
                         Modifier.fillMaxWidth().clickable {
-                            selected = if (selected.contains(row.id)) selected - row.id else selected + row.id
-                        }.padding(start = (row.depth * 15).dp, top = 9.dp, bottom = 9.dp),
+                            selected = if (selected.contains(source.id)) selected - source.id else selected + source.id
+                        }.padding(vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
-                            selected.contains(row.id),
-                            { checked -> selected = if (checked) selected + row.id else selected - row.id },
+                            selected.contains(source.id),
+                            { checked -> selected = if (checked) selected + source.id else selected - source.id },
                             colors = CheckboxDefaults.colors(checkedColor = Ink),
                         )
-                        Icon(if (row.isFolder) Icons.Rounded.Folder else Icons.Rounded.Description, null, tint = Muted, modifier = Modifier.size(20.dp))
-                        Text(row.name.removeSuffix(".md").removeSuffix(".json"), Modifier.padding(start = 10.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Icon(kindIcon(source.kind), null, tint = reviewKindAccent(source.kind), modifier = Modifier.size(20.dp))
+                        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                            Text(source.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${if (source.kind == "definition") "Définitions" else "Quiz"} · ${source.questionCount} carte${if (source.questionCount > 1) "s" else ""}",
+                                color = Muted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }
             Column(Modifier.fillMaxWidth().background(Canvas).padding(16.dp)) {
-                Text("${selectedFileIds.size} fichier(s) dans la sélection", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                Text("${selectedFileIds.size} source(s) · jusqu’à $questionLimit questions", color = Muted, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(9.dp))
                 PrimaryButton("Commencer", { start(selectedFileIds, kinds) }, Modifier.fillMaxWidth(), selectedFileIds.isNotEmpty() && kinds.isNotEmpty())
             }
