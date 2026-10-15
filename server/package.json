@@ -19,7 +19,7 @@
     "express-rate-limit": "^8.6.0",
     "gray-matter": "^4.0.3",
     "helmet": "^8.3.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.2.3",
     "jszip": "^3.10.1",
     "multer": "^2.2.0",
     "uuid": "11.1.1",
